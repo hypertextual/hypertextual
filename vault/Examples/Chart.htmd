@@ -1,0 +1,41 @@
+# A chart inside a note
+
+HTMD extends Markdown with typed, data-only nodes. This chart lives in the note's file and renders directly between paragraphs. No notebook execution or external database is needed.
+
+```htmd:chart
+{
+  "version": 1,
+  "type": "bar",
+  "title": "Notes written this week",
+  "labels": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  "series": [
+    { "name": "Notes", "values": [4, 7, 3, 9, 6] },
+    { "name": "Revisions", "values": [2, 4, 1, 5, 3] }
+  ]
+}
+```
+
+Move past the chart with the arrow keys and keep typing here. Select the chart and press **⌘ Enter**, or use **Edit chart data**, to change its title, labels, or values. The chart stays visible while its data editor is open.
+
+## How it is stored
+
+The exact node above is a fenced block whose type is `htmd:chart`. This is the experimental v1 schema, not ordinary Markdown's code rendering:
+
+````markdown
+```htmd:chart
+{
+  "version": 1,
+  "type": "bar",
+  "title": "Notes written this week",
+  "labels": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  "series": [
+    { "name": "Notes", "values": [4, 7, 3, 9, 6] },
+    { "name": "Revisions", "values": [2, 4, 1, 5, 3] }
+  ]
+}
+```
+````
+
+A conventional Markdown viewer shows the data as code. Hypertextual recognizes the typed fence and displays the rich chart. Unsupported versions or invalid data display an error and retain the original source so it can be repaired.
+
+Type **/chart** in an empty paragraph to insert another example.

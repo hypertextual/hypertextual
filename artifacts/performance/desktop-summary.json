@@ -1,0 +1,293 @@
+{
+  "machine": "MacBookPro18,1",
+  "os": "14.5",
+  "profile": "cargo release; embedded production web assets; HTMD_BENCH marker only; no Vite server",
+  "fixture_vaults": "/var/folders/w4/r2mq7p0s039ds60kgqytyqqr0000gn/T/htmd-release-benchmark-34yqjzwy",
+  "metric": "CGEvent posting to changed marker observed with CGWindowListCreateImage; includes capture overhead; not physical key-to-photon",
+  "memory": "sum of proc_pid_rusage v4 physical footprints; Tauri includes fresh WebContent/GPU/Networking helpers identified at launch; RSS also retained",
+  "results": {
+    "gpui": {
+      "startup": {
+        "n": 3,
+        "median_ms": 329.3789583258331,
+        "p95_ms": 345.5078334081918,
+        "max_ms": 345.5078334081918
+      },
+      "100": {
+        "open": {
+          "n": 3,
+          "median_ms": 36.77454171702266,
+          "p95_ms": 41.88299993984401,
+          "max_ms": 41.88299993984401
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 17.218916676938534,
+          "p95_ms": 24.148625088855624,
+          "max_ms": 27.853375067934394
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 15.86814597249031,
+          "p95_ms": 22.698875050991774,
+          "max_ms": 28.02633331157267
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 16.453333431854844,
+          "p95_ms": 24.721166817471385,
+          "max_ms": 25.80425003543496
+        },
+        "settled_footprint_mib": 82.81500244140625,
+        "settled_rss_mib": 57.046875,
+        "idle_cpu_percent": 0.9042926694904682,
+        "sampled_peak_footprint_mib": 95.73712158203125,
+        "typing_cpu_percent": 5.176015161955185,
+        "navigation_cpu_percent": 5.635166350427717,
+        "scroll_cpu_percent": 4.382234191787278
+      },
+      "1000": {
+        "open": {
+          "n": 3,
+          "median_ms": 189.04670840129256,
+          "p95_ms": 194.744624895975,
+          "max_ms": 194.744624895975
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 18.993749981746078,
+          "p95_ms": 25.53270827047527,
+          "max_ms": 29.530666768550873
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 16.211458249017596,
+          "p95_ms": 23.67600006982684,
+          "max_ms": 30.821749940514565
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 15.718770795501769,
+          "p95_ms": 19.9432501103729,
+          "max_ms": 21.81779150851071
+        },
+        "settled_footprint_mib": 90.98699951171875,
+        "settled_rss_mib": 64.203125,
+        "idle_cpu_percent": 0.9054335997858288,
+        "sampled_peak_footprint_mib": 101.5809326171875,
+        "typing_cpu_percent": 8.377154286255871,
+        "navigation_cpu_percent": 6.103054294763827,
+        "scroll_cpu_percent": 3.71573164177991
+      },
+      "5000": {
+        "open": {
+          "n": 3,
+          "median_ms": 778.2229583244771,
+          "p95_ms": 778.2663332764059,
+          "max_ms": 778.2663332764059
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 25.564458454027772,
+          "p95_ms": 32.23616653122008,
+          "max_ms": 33.370125107467175
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 16.027541598305106,
+          "p95_ms": 23.54375016875565,
+          "max_ms": 25.743958307430148
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 16.3720624987036,
+          "p95_ms": 25.86141647771001,
+          "max_ms": 28.569750022143126
+        },
+        "settled_footprint_mib": 115.64324951171875,
+        "settled_rss_mib": 112.890625,
+        "idle_cpu_percent": 0.8843502774625082,
+        "sampled_peak_footprint_mib": 127.3624267578125,
+        "typing_cpu_percent": 16.539399739232667,
+        "navigation_cpu_percent": 6.287925667951714,
+        "scroll_cpu_percent": 5.029502707763322
+      },
+      "Chart": {
+        "open": {
+          "n": 3,
+          "median_ms": 45.6231664866209,
+          "p95_ms": 54.02491660788655,
+          "max_ms": 54.02491660788655
+        },
+        "settled_footprint_mib": 109.94036865234375,
+        "settled_rss_mib": 176.203125,
+        "idle_cpu_percent": 0.8993148102124956,
+        "sampled_peak_footprint_mib": 120.51873779296875
+      },
+      "capture_overhead": [
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.889791503548622,
+          "p95_ms": 5.749041447415948,
+          "samples": 1208
+        },
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.9007084667682648,
+          "p95_ms": 5.581500008702278,
+          "samples": 1212
+        },
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.830374985933304,
+          "p95_ms": 5.954041611403227,
+          "samples": 1211
+        }
+      ]
+    },
+    "tauri": {
+      "startup": {
+        "n": 3,
+        "median_ms": 461.70833334326744,
+        "p95_ms": 482.3601667303592,
+        "max_ms": 482.3601667303592
+      },
+      "100": {
+        "open": {
+          "n": 3,
+          "median_ms": 83.48670834675431,
+          "p95_ms": 88.64758349955082,
+          "max_ms": 88.64758349955082
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 14.792166650295258,
+          "p95_ms": 23.900583386421204,
+          "max_ms": 28.898833319544792
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 12.303124996833503,
+          "p95_ms": 19.189916783943772,
+          "max_ms": 21.365541499108076
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 9.770020726136863,
+          "p95_ms": 16.718874918296933,
+          "max_ms": 16.954583348706365
+        },
+        "settled_footprint_mib": 154.10284423828125,
+        "settled_rss_mib": 210.578125,
+        "idle_cpu_percent": 1.0321757357230879,
+        "sampled_peak_footprint_mib": 187.60272216796875,
+        "typing_cpu_percent": 19.760898579622115,
+        "navigation_cpu_percent": 12.932126627433563,
+        "scroll_cpu_percent": 12.835832216329283
+      },
+      "1000": {
+        "open": {
+          "n": 3,
+          "median_ms": 270.6513749435544,
+          "p95_ms": 270.79025004059076,
+          "max_ms": 270.79025004059076
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 14.177666511386633,
+          "p95_ms": 22.065083496272564,
+          "max_ms": 27.284374926239252
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 14.856583322398365,
+          "p95_ms": 19.544458482414484,
+          "max_ms": 22.442500106990337
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 9.28799994289875,
+          "p95_ms": 17.783249961212277,
+          "max_ms": 19.28245835006237
+        },
+        "settled_footprint_mib": 190.1341552734375,
+        "settled_rss_mib": 267.84375,
+        "idle_cpu_percent": 0.8104006838980228,
+        "sampled_peak_footprint_mib": 247.1495361328125,
+        "typing_cpu_percent": 20.527009202762237,
+        "navigation_cpu_percent": 14.935629718999458,
+        "scroll_cpu_percent": 11.779994142371267
+      },
+      "5000": {
+        "open": {
+          "n": 3,
+          "median_ms": 1136.5729582030326,
+          "p95_ms": 1158.7188334669918,
+          "max_ms": 1158.7188334669918
+        },
+        "typing": {
+          "n": 99,
+          "median_ms": 22.88287505507469,
+          "p95_ms": 25.807958329096437,
+          "max_ms": 34.51458318158984
+        },
+        "navigation": {
+          "n": 72,
+          "median_ms": 18.88145843986422,
+          "p95_ms": 23.757041664794087,
+          "max_ms": 27.266666758805513
+        },
+        "scroll": {
+          "n": 36,
+          "median_ms": 9.647520841099322,
+          "p95_ms": 29.464750085026026,
+          "max_ms": 30.60208330862224
+        },
+        "settled_footprint_mib": 356.36895751953125,
+        "settled_rss_mib": 426.5,
+        "idle_cpu_percent": 7.403047155731125,
+        "sampled_peak_footprint_mib": 381.30657958984375,
+        "typing_cpu_percent": 24.765338557494243,
+        "navigation_cpu_percent": 18.490016949499736,
+        "scroll_cpu_percent": 16.979391884944178
+      },
+      "Chart": {
+        "open": {
+          "n": 3,
+          "median_ms": 1105.4485831409693,
+          "p95_ms": 1120.3562915325165,
+          "max_ms": 1120.3562915325165
+        },
+        "settled_footprint_mib": 316.93157958984375,
+        "settled_rss_mib": 463.640625,
+        "idle_cpu_percent": 0.9383528192164687,
+        "sampled_peak_footprint_mib": 424.7906494140625
+      },
+      "capture_overhead": [
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.7367500588297844,
+          "p95_ms": 5.0627500750124454,
+          "samples": 1473
+        },
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.7148749213665724,
+          "p95_ms": 5.2350417245179415,
+          "samples": 1465
+        },
+        {
+          "kind": "capture_overhead",
+          "median_ms": 2.7368334122002125,
+          "p95_ms": 4.909500014036894,
+          "samples": 1478
+        }
+      ]
+    }
+  },
+  "trials_per_framework": 3,
+  "cpu_timebase": {
+    "numer": 125,
+    "denom": 3
+  }
+}

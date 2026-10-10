@@ -1,0 +1,32 @@
+# A quieter place to think
+
+Welcome to **Hypertextual**. A local vault, plain files, and room for ideas to connect.
+
+Move through the whole note with the keyboard. Headings and formatting stay rich while you type. A heading shows its Markdown marker beside the text when the cursor is inside it. **⌘ S** saves the note.
+
+## Files first
+
+- Notes live in `.htmd` files.
+- Existing `.md` files open in the same editor.
+- Folders give your vault a familiar shape.
+- One note at a time. No tabs to manage.
+
+> HTMD adds typed custom nodes to Markdown. Open **Examples/Chart** to see a live chart, its JSON data, and the exact file syntax. Notebook execution and database views are future work.
+
+## A small example
+
+```rust
+let thought = "Keep the fast path simple.";
+println!("{thought}");
+```
+
+| Format | Purpose | This experiment |
+| --- | --- | --- |
+| htmd | Notes | Editable |
+| md | Existing Markdown | Editable |
+| nbmd | Notebooks | Future |
+| dbmd | Tables and databases | Future |
+
+Try the notes in **Ideas** and **Reference** from the sidebar.
+
+/

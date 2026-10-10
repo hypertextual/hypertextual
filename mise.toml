@@ -1,0 +1,41 @@
+[tasks.setup]
+description = "Install web dependencies (requires the helical-ui checkout)"
+run = ["npm --prefix apps/web ci", "cd apps/web && npx playwright install chromium webkit"]
+
+[tasks.build]
+description = "Build both desktop prototypes and the web assets"
+run = ["npm --prefix apps/web run build", "cargo build -p htmd-vault -p htmd-gpui -p htmd-tauri"]
+
+[tasks.test]
+description = "Test the vault and browser editor through the real Rust backend"
+run = ["cargo test -p htmd-vault -p htmd-gpui", "cargo build -p htmd-vault", "npm --prefix apps/web test"]
+
+[tasks."run:tauri"]
+description = "Run the Tauri shell with web hot reload"
+dir = "apps/tauri"
+run = "../web/node_modules/.bin/tauri dev"
+
+[tasks."run:gpui"]
+description = "Run the native GPUI shell"
+run = "cargo run -p htmd-gpui"
+
+[tasks.fixtures]
+description = "Generate ignored 100/1000/5000-block notes for both editors"
+run = "python3 scripts/fixtures.py"
+
+[tasks.bench]
+description = "Measure the shared parser in release mode"
+run = "cargo run --release -p htmd-vault --example benchmark"
+
+
+[tasks."build:release"]
+description = "Build optimized GPUI and a packaged production Tauri app"
+run = ["cargo build --release -p htmd-gpui", "cd apps/tauri && ../web/node_modules/.bin/tauri build --bundles app --config '{\"bundle\":{\"active\":true}}'"]
+
+[tasks."bench:desktop"]
+description = "Compare native release apps on macOS using temporary vaults (brings windows forward)"
+run = "python3 scripts/desktop-benchmark.py"
+
+[tasks."bench:sizes"]
+description = "Measure release binaries, macOS app packages, ZIPs and web assets"
+run = "python3 scripts/bundle-sizes.py"

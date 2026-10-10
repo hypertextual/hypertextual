@@ -1,0 +1,27 @@
+{
+  "browser": "webkit",
+  "mode": "headless Vite dev; real Rust vault through stdio IPC adapter; rAF precedes presentation; open includes test overhead",
+  "results": [
+    {
+      "count": 100,
+      "openObservedMs": 136,
+      "mountedParagraphs": 100,
+      "beforeinputToFrameP95Ms": 15,
+      "samples": 35
+    },
+    {
+      "count": 1000,
+      "openObservedMs": 515,
+      "mountedParagraphs": 1000,
+      "beforeinputToFrameP95Ms": 18.000000000000227,
+      "samples": 37
+    },
+    {
+      "count": 5000,
+      "openObservedMs": 3571,
+      "mountedParagraphs": 5000,
+      "beforeinputToFrameP95Ms": 456.9999999999982,
+      "samples": 37
+    }
+  ]
+}

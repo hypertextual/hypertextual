@@ -1,0 +1,2 @@
+# Markdown vaults preserve meaningful trailing spaces and blank lines.
+vault/** whitespace=-blank-at-eol,-blank-at-eof

@@ -1,0 +1,16 @@
+[package]
+name = "htmd-gpui"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1"
+gpui-kit = { version = "=0.7.1", features = ["component", "assets"] }
+htmd-vault = { path = "../../crates/vault" }
+
+pulldown-cmark = "0.13"
+unicode-segmentation = "1"
+
+[dev-dependencies]
+gpui-kit = { version = "=0.7.1", features = ["test-support"] }

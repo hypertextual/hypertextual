@@ -1,0 +1,2 @@
+/* Local PoC palette; rich components come from HELICAL_UI's source checkout. */
+:root.dark { --background: #191a1d; --foreground: #dededc; --muted: #27272e; --muted-foreground: #9395a0; --border: #323039; --primary: #b2a1e8; --primary-foreground: #191a1d; --radius: 6px; }

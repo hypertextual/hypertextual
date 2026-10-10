@@ -1,0 +1,46 @@
+{
+  "machine": "Apple M1 Pro, 16 GiB, macOS 14.5",
+  "mode": "Native desktop, optimized Rust dependencies in dev; Tauri Vite dev; same display; one 57-character sequence at 12ms/character per size",
+  "measurement": "Input Change callback to scheduled next-frame callback p95; excludes physical input dispatch and GPU presentation. Refresh cadence may differ. Open read/parse excludes rich layout; Tauri includes IPC.",
+  "gpui": [
+    {
+      "blocks": 100,
+      "open_ms": 0.5,
+      "change_frame_p95_ms": 7.6,
+      "samples": 57
+    },
+    {
+      "blocks": 1000,
+      "open_ms": 2.2,
+      "change_frame_p95_ms": 7.2,
+      "samples": 57
+    },
+    {
+      "blocks": 5000,
+      "open_ms": 9.0,
+      "change_frame_p95_ms": 7.0,
+      "samples": 57
+    }
+  ],
+  "tauri": [
+    {
+      "blocks": 100,
+      "open_ms": 4.0,
+      "change_frame_p95_ms": 18.0,
+      "samples": 57
+    },
+    {
+      "blocks": 1000,
+      "open_ms": 7.0,
+      "change_frame_p95_ms": 17.0,
+      "samples": 57
+    },
+    {
+      "blocks": 5000,
+      "open_ms": 37.0,
+      "change_frame_p95_ms": 17.0,
+      "samples": 57
+    }
+  ],
+  "verification": "Both launched, rendered and accepted all 57 characters with live preview across all sizes. Cancellation preserved the generated vault files. Values transcribed from artifacts/<framework>-<count>-blocks.png. Native finish/save verified in both apps, including GPUI last-block save. The final scroll-anchor fix was rebuilt/relaunched and cancel at the last block kept the bottom scroll position."
+}

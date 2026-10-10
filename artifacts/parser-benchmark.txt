@@ -1,0 +1,9 @@
+[bench] $ cargo run --release -p htmd-vault --example benchmark
+   Compiling htmd-vault v0.1.0 (/Users/siddharthkapoor/.herdr/worktrees/hypertextual/poc-tauri-vs-gpui/crates/vault)
+    Finished `release` profile [optimized] target(s) in 1.01s
+     Running `/tmp/htmd-parser-bench/release/examples/benchmark`
+Release-mode parser measurements; not UI latency. Microseconds, 200 samples after 20 warmups.
+blocks,bytes,parse_p50_us,parse_p95_us,join_p95_us
+100,6400,46.3,47.0,0.8
+1000,64000,428.2,502.0,21.4
+5000,320000,2540.3,3188.0,119.8

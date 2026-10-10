@@ -1,0 +1,14 @@
+/target
+**/node_modules
+apps/web/dist
+apps/tauri/gen
+test-results
+playwright-report
+**/test-results
+**/playwright-report
+.DS_Store
+vault/Benchmarks/
+apps/web/src/helical.generated.css
+
+
+__pycache__/

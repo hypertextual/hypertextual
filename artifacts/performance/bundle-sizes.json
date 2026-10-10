@@ -1,0 +1,27 @@
+{
+  "tauri": {
+    "release_executable_bytes": 10734320,
+    "stripped_executable_bytes": 7628592,
+    "app_bytes": 7651396,
+    "zip_bytes": 2957783,
+    "app_path": "/Users/siddharthkapoor/.herdr/worktrees/hypertextual/poc-tauri-vs-gpui/target/performance-bundles/Hypertextual-tauri.app",
+    "zip_path": "/Users/siddharthkapoor/.herdr/worktrees/hypertextual/poc-tauri-vs-gpui/target/performance-bundles/Hypertextual-tauri.app.zip"
+  },
+  "gpui": {
+    "release_executable_bytes": 24036464,
+    "stripped_executable_bytes": 18753360,
+    "app_bytes": 18758566,
+    "zip_bytes": 7244146,
+    "app_path": "/Users/siddharthkapoor/.herdr/worktrees/hypertextual/poc-tauri-vs-gpui/target/performance-bundles/Hypertextual-gpui.app",
+    "zip_path": "/Users/siddharthkapoor/.herdr/worktrees/hypertextual/poc-tauri-vs-gpui/target/performance-bundles/Hypertextual-gpui.app.zip"
+  },
+  "web": {
+    "asset_bytes": 1635468,
+    "gzip_bytes": 504207,
+    "files": {
+      "index.html": 372,
+      "assets/index-O3vlad41.css": 94215,
+      "assets/index-BprrZj0N.js": 1540881
+    }
+  }
+}

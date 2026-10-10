@@ -1,0 +1,38 @@
+{
+  "name": "htmd-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node ../../scripts/helical-css.mjs",
+    "prebuild": "node ../../scripts/helical-css.mjs",
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@tiptap/extension-table": "^3.31.4",
+    "@tiptap/extension-task-item": "^3.31.4",
+    "@tiptap/extension-task-list": "^3.31.4",
+    "@tiptap/markdown": "^3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
+    "@tiptap/suggestion": "^3.31.4",
+    "marked": "^17.0.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.8.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "browser": "webkit",
+  "transport": "stdio adapter to real Rust vault; not Tauri IPC",
+  "mode": "Vite dev, headless; openObservedMs includes Playwright overhead; change-to-next-frame excludes input dispatch and presentation",
+  "results": [
+    {
+      "count": 100,
+      "mountedBlocks": 100,
+      "openObservedMs": 102,
+      "telemetry": "Change → next frame p95 18.0 ms · 57 samples"
+    },
+    {
+      "count": 1000,
+      "mountedBlocks": 21,
+      "openObservedMs": 61,
+      "telemetry": "Change → next frame p95 17.0 ms · 57 samples"
+    },
+    {
+      "count": 5000,
+      "mountedBlocks": 21,
+      "openObservedMs": 148,
+      "telemetry": "Change → next frame p95 16.0 ms · 57 samples"
+    }
+  ]
+}

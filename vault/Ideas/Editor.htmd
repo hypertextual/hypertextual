@@ -1,0 +1,24 @@
+# Editing without friction
+
+A good note editor gets out of the way. **Typing**, selection, clipboard, and undo should feel immediate.
+
+## Try this
+
+1. Use Enter in this list to add an item.
+2. Move the cursor into a heading and rename it.
+3. Save, open another note, and return.
+
+## Things to observe
+
+- Can you type quickly without dropped characters?
+- Does the text stay in place when the cursor crosses nodes?
+- Does a long note remain comfortable to scroll?
+
+> Both prototypes use a continuous rich editor. Type / in a paragraph to choose a heading, list, quote, code block, table, or divider. Save before exiting.
+> 
+> 
+> 
+
+
+
+#
