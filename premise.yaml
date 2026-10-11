@@ -1,0 +1,44 @@
+workspace:
+  name: hypertextual
+  kind: monorepo
+  schema-version: '0.2'
+  package_managers:
+    - cargo
+    - bun
+  providers:
+    ci: github
+    tools: mise
+    tasks: mise
+    infra: none
+    versioning: svu
+  projects:
+    - name: hypertextual
+      template: /Users/siddharthkapoor/Projects/premise-cargo:premise-clap-cli
+      path: apps/hyped
+      answers:
+        name: hyped
+    - name: hypertextual-desktop
+      template: /Users/siddharthkapoor/Projects/premise-cargo:premise-tauri-app
+      path: apps/hypertextual-desktop
+      ci:
+        check_platforms:
+          - linux
+          - macos
+          - windows
+        release_platforms:
+          - linux
+          - macos
+          - windows
+      answers:
+        identifier: com.hypertextual.desktop
+        name: hypertextual-desktop
+    - name: htmd-rs
+      template: /Users/siddharthkapoor/Projects/premise-cargo:premise-rust-lib
+      path: libs/htmd-rs
+      answers:
+        name: htmd-rs
+    - name: htmd-ts
+      template: /Users/siddharthkapoor/Projects/premise-bun:premise-ts-lib
+      path: libs/htmd-ts
+      answers:
+        name: htmd-ts
