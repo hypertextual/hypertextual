@@ -32,6 +32,11 @@ workspace:
       answers:
         identifier: com.hypertextual.desktop
         name: hypertextual-desktop
+    - name: hypertextual-svelte
+      template: /Users/siddharthkapoor/Projects/premise-bun:premise-svelte-app
+      path: apps/hypertextual-svelte
+      answers:
+        name: hypertextual-svelte
     - name: htmd-rs
       template: /Users/siddharthkapoor/Projects/premise-cargo:premise-rust-lib
       path: libs/htmd-rs

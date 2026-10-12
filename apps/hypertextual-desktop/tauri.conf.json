@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.hypertextual.desktop",
   "build": {
-    "frontendDist": "placeholder"
+    "beforeDevCommand": "mise run //apps/hypertextual-svelte:dev",
+    "beforeBuildCommand": "mise run //apps/hypertextual-svelte:build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../hypertextual-svelte/dist"
   },
   "app": {
     "windows": [
