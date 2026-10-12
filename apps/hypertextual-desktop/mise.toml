@@ -44,15 +44,17 @@ run = "cargo clean --manifest-path Cargo.toml"
 
 [tasks.test]
 description = "Run the Rust test suite"
-depends = ["install"]
+depends = ["install", "//apps/hypertextual-svelte:build"]
 run = "cargo test --manifest-path Cargo.toml"
 
 [tasks.lint]
 description = "Lint with clippy (deny warnings)"
+depends = ["//apps/hypertextual-svelte:build"]
 run = "cargo clippy --manifest-path Cargo.toml --all-targets --all-features -- -D warnings"
 
 [tasks."lint:fix"]
 description = "Auto-fix clippy findings"
+depends = ["//apps/hypertextual-svelte:build"]
 run = "cargo clippy --manifest-path Cargo.toml --fix --allow-dirty --allow-staged --allow-no-vcs"
 
 [tasks.format]
