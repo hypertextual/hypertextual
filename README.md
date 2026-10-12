@@ -9,7 +9,7 @@ The editor, HTMD format, and library integration remain future work.
 | `apps/hypertextual-desktop` | Tauri desktop app with a placeholder frontend |
 | `libs/htmd-ts`              | Internal TypeScript library managed with Bun  |
 | `libs/htmd-rs`              | Internal Rust library                         |
-| `apps/hyped`                | Rust CLI built with Clap                      |
+| `apps/hypertextual-cli`     | Rust CLI built with Clap                      |
 
 Premise manages project creation and development tasks.
 Mise installs the tools and runs those tasks.

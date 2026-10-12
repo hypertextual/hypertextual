@@ -1,6 +1,6 @@
 name: On Commit
 
-"on":
+'on':
   pull_request:
     branches: [main]
   push:
@@ -22,21 +22,31 @@ jobs:
       native: ${{ steps.plan.outputs.native }}
       version: ${{ steps.plan.outputs.release_version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-      - uses: cloudvoyant/premise@v0
+      - uses: cloudvoyant/premise@v0.4.3
         id: plan
         with:
           command: plan
           flow: on-commit
           release: auto
-          install-premise: build
+          install-premise: ${{ runner.os == 'Windows' && 'build' || 'pre-built' }}
+          premise-version: v0.4.3
+      - name: Check RC package credential before building or creating a release
+        if: steps.plan.outputs.release_version != ''
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        run: |
+          if [[ -z "$CRATES_TOKEN" ]]; then
+            echo '::error::Add CRATES_TOKEN as an Actions secret available to this repository before RC publication'
+            exit 1
+          fi
       - name: Run the root hook once before matrix rows
         if: steps.plan.outputs.mode == 'matrix'
-        uses: cloudvoyant/premise@v0
+        uses: cloudvoyant/premise@v0.4.3
         with:
           command: flow
           flow: on-commit
@@ -51,22 +61,23 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
       - name: Run complete flow
-        uses: cloudvoyant/premise@v0
+        uses: cloudvoyant/premise@v0.4.3
         with:
           command: flow
           flow: on-commit
           release: none
-          install-premise: build
+          install-premise: ${{ runner.os == 'Windows' && 'build' || 'pre-built' }}
+          premise-version: v0.4.3
           channel: rc
           version: ${{ needs.plan.outputs.version }}
           output-dir: ${{ runner.temp }}/premise-files
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: single
           path: ${{ runner.temp }}/premise-files/
@@ -83,25 +94,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
       - name: Run scoped complete flow
-        uses: cloudvoyant/premise@v0
+        uses: cloudvoyant/premise@v0.4.3
         with:
           command: flow-matrix
           flow: on-commit
           release: none
-          install-premise: build
+          install-premise: ${{ runner.os == 'Windows' && 'build' || 'pre-built' }}
+          premise-version: v0.4.3
           project: ${{ matrix.project }}
           platform: ${{ matrix.platform }}
           skip-root: true
           channel: rc
           version: ${{ needs.plan.outputs.version }}
           output-dir: ${{ runner.temp }}/premise-files
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ matrix.project }}-${{ matrix.platform }}
           path: ${{ runner.temp }}/premise-files/
@@ -123,24 +135,24 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8.0.2
         if: >-
           needs.plan.outputs.mode == 'single' &&
           needs.plan.outputs.native == 'true'
         with:
           name: single
           path: ${{ runner.temp }}/premise-files
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8.0.2
         if: >-
           needs.plan.outputs.mode == 'matrix' &&
           needs.plan.outputs.native == 'true'
         with:
-          pattern: "*-*"
+          pattern: '*-*'
           path: ${{ runner.temp }}/premise-files
           merge-multiple: false
       - name: Keep the release checkout clean
@@ -151,14 +163,15 @@ jobs:
             exit 1
           fi
       - name: Publish combined release
-        uses: cloudvoyant/premise@v0
+        uses: cloudvoyant/premise@v0.4.3
         env:
           GH_TOKEN: ${{ github.token }}
         with:
           command: release
           flow: on-commit
           release: none
-          install-premise: build
+          install-premise: ${{ runner.os == 'Windows' && 'build' || 'pre-built' }}
+          premise-version: v0.4.3
           channel: rc
           version: ${{ needs.plan.outputs.version }}
           files-dir: ${{ needs.plan.outputs.native == 'true' && format('{0}/premise-files', runner.temp) || '' }}
@@ -173,11 +186,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: Publish registry packages
-        uses: cloudvoyant/premise@v0
+        uses: cloudvoyant/premise@v0.4.3
         env:
           GH_TOKEN: ${{ github.token }}
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
@@ -185,6 +198,7 @@ jobs:
           command: packages
           flow: on-commit
           release: none
-          install-premise: build
+          install-premise: ${{ runner.os == 'Windows' && 'build' || 'pre-built' }}
+          premise-version: v0.4.3
           channel: rc
           version: ${{ needs.publish-release.outputs.version }}

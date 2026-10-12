@@ -14,7 +14,7 @@ workspace:
   projects:
     - name: hypertextual
       template: /Users/siddharthkapoor/Projects/premise-cargo:premise-clap-cli
-      path: apps/hyped
+      path: apps/hypertextual-cli
       answers:
         name: hyped
     - name: hypertextual-desktop
