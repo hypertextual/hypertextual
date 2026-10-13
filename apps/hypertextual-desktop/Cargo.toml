@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.88"
 description = "A minimal placeholder-backed Tauri v2 application template."
 publish = false
+license = "Apache-2.0"
 
 [lib]
 name = "premise_tauri_lib"

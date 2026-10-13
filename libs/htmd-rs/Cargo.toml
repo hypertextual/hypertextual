@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.88"
 description = "A minimal Rust library template that exports a hello greeting."
 publish = false
+license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.104"
