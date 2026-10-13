@@ -1,0 +1,82 @@
+# Architecture
+
+## Overview
+
+Hypertextual combines a Tauri desktop application, a Svelte frontend, a Rust CLI, and shared HTMD libraries. The desktop application hosts the frontend and its Rust backend in one installed application.
+
+The project uses Tauri 2, Svelte 5, TypeScript, Vite 8, Rust 2024, and Clap 4. [Premise](https://github.com/cloudvoyant/premise) manages project tasks, with Mise providing tools and Bun and Cargo managing dependencies.
+
+## Requirements
+
+### Functional requirements
+
+- Run the Svelte interface inside the desktop application and in a browser.
+- Expose Rust operations to the desktop frontend through Tauri commands, events, and channels.
+- Provide a CLI package named `hypertextual` with the executable name `hyped`.
+
+### Non-functional requirements
+
+- Support macOS, Linux, and Windows desktop platforms.
+- Embed frontend assets so installed applications run without Bun, Node, or a development server.
+- Keep document behavior reusable through shared Rust and TypeScript libraries.
+- Support frontend hot module replacement and automatic Rust rebuilds during development.
+- Keep the HTMD libraries and Svelte package private.
+
+## Design
+
+### Project structure
+
+```text
+hypertextual/
+├── apps/
+│   ├── hypertextual-desktop/  Tauri shell and Rust backend
+│   ├── hypertextual-svelte/   Svelte frontend
+│   └── hypertextual-cli/      Rust CLI, executable hyped
+└── libs/
+    ├── htmd-rs/               Shared Rust document library
+    └── htmd-ts/               Frontend TypeScript document library
+```
+
+### Component boundaries
+
+![Component boundaries](diagrams/component-boundaries.svg)
+
+- `hypertextual-svelte` renders the interface inside Tauri's webview and can run independently in a browser.
+- `hypertextual-desktop` owns the native application window and Rust backend, with Tauri providing the communication boundary.
+- Commands carry frontend requests to Rust and return results, while events and channels carry updates from Rust to the frontend.
+- `hypertextual-cli` provides the `hyped` executable through the Cargo package named `hypertextual`.
+- `htmd-rs` defines the shared document layer for Rust consumers, and `htmd-ts` defines the frontend library boundary.
+- Dashed arrows show the intended shared-library dependencies, while the current library packages remain independent starters.
+
+### Development flow
+
+![Development flow](diagrams/development.svg)
+
+- The desktop development task starts Vite at `http://127.0.0.1:1420` and loads that URL inside the Tauri window.
+- Vite applies frontend changes without restarting Rust, while Rust changes rebuild and restart the desktop process.
+- Bun manages the Svelte app and TypeScript library through the root package workspace, with one shared dependency-install task.
+
+### Packaging flow
+
+![Packaging flow](diagrams/packaging.svg)
+
+- The desktop build runs the frontend build first, then embeds `apps/hypertextual-svelte/dist` into the application.
+- Installed desktop applications load their embedded assets and do not connect to a frontend development server.
+- The root Cargo workspace contains the CLI, while the desktop app and Rust library use independent Cargo manifests.
+
+## Implementation
+
+Supported desktop platforms:
+
+- macOS.
+- Linux.
+- Windows.
+
+## References
+
+- [Development guide](../development.md).
+- [Product requirements](../../prd/0001-hypertextual-app/README.md).
+- [Design prototype](../../designs/prototypes/hypertextual-v0/README.md).
+- [Premise](https://github.com/cloudvoyant/premise).
+- [Tauri frontend and Rust communication](https://v2.tauri.app/develop/calling-rust/).
+- [Tauri and Vite integration](https://v2.tauri.app/start/frontend/vite/).

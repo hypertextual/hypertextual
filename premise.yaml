@@ -1,0 +1,49 @@
+workspace:
+  name: hypertextual
+  kind: monorepo
+  schema-version: '0.2'
+  package_managers:
+    - cargo
+    - bun
+  providers:
+    ci: github
+    tools: mise
+    tasks: mise
+    infra: none
+    versioning: svu
+  projects:
+    - name: hypertextual
+      template: cloudvoyant/premise-cargo:premise-clap-cli
+      path: apps/hypertextual-cli
+      answers:
+        name: hyped
+    - name: hypertextual-desktop
+      template: cloudvoyant/premise-cargo:premise-tauri-app
+      path: apps/hypertextual-desktop
+      ci:
+        check_platforms:
+          - linux
+          - macos
+          - windows
+        release_platforms:
+          - linux
+          - macos
+          - windows
+      answers:
+        identifier: com.hypertextual.desktop
+        name: hypertextual-desktop
+    - name: hypertextual-svelte
+      template: cloudvoyant/premise-bun:premise-svelte-app
+      path: apps/hypertextual-svelte
+      answers:
+        name: hypertextual-svelte
+    - name: htmd-rs
+      template: cloudvoyant/premise-cargo:premise-rust-lib
+      path: libs/htmd-rs
+      answers:
+        name: htmd-rs
+    - name: htmd-ts
+      template: cloudvoyant/premise-bun:premise-ts-lib
+      path: libs/htmd-ts
+      answers:
+        name: htmd-ts

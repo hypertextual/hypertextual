@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "hypertextual-desktop",
+  "version": "0.1.0",
+  "identifier": "com.hypertextual.desktop",
+  "build": {
+    "beforeDevCommand": "mise run //apps/hypertextual-svelte:dev",
+    "beforeBuildCommand": "mise run //apps/hypertextual-svelte:build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../hypertextual-svelte/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "hypertextual-desktop",
+        "width": 800,
+        "height": 600,
+        "theme": "Dark",
+        "titleBarStyle": "Transparent",
+        "backgroundColor": "#000000"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "targets": ["deb", "appimage", "dmg", "msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

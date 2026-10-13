@@ -1,0 +1,11 @@
+[package]
+name = "htmd-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A minimal Rust library template that exports a hello greeting."
+publish = false
+
+[dependencies]
+anyhow = "1.0.104"
+thiserror = "2.0.20"

@@ -1,0 +1,4 @@
+[workspace]
+members = ["apps/hypertextual-cli"]
+exclude = ["apps/hypertextual-desktop", "libs/htmd-rs"]
+resolver = "3"
