@@ -1,22 +1,10 @@
 # Hypertextual
 
-A Tauri + Svelte desktop app starter with a Rust CLI and internal HTMD libraries. This is a [Premise](https://github.com/cloudvoyant/premise) project.
-
-## Stack
-
-Tauri 2 / Svelte 5 / TypeScript / Vite 8 / Rust 2024 / Clap 4 / Bun / Mise / Premise
+Hypertextual is an Obsidian/Google Docs/Notion replacement with a focus on extensible, agent-friendly markdown-based file format extensions that bring the convenience of "Agent artifacts" with the first-class editing support of conventional document editing tools
 
 ## Features
 
-- Tauri desktop starter with an embedded Svelte frontend.
-- Vite hot module replacement inside the desktop window.
-- Rust CLI package `hypertextual`, with executable `hyped`.
-- Internal Rust and TypeScript library starters for shared HTMD behavior.
-- Private Svelte and TypeScript packages with npm publication disabled.
-- Premise tasks for installation, development, builds, and checks.
-- Native desktop installers for macOS, Linux, and Windows.
-
-Document editing, HTMD processing, library integration, and MCP support remain future work.
+WIP
 
 ## Quick start
 
