@@ -37,4 +37,4 @@ pm run hypertextual-desktop:dev
 
 ## License
 
-The Rust package manifests declare MIT.
+License determination pending.
