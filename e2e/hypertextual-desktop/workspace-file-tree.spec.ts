@@ -94,6 +94,105 @@ test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-t
     ).toBeVisible()
   })
 
+  test('User can correct a conflicting folder rename in the invalid inline field', async ({
+    page,
+    workspace,
+  }) => {
+    // Arrange
+    const original = await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')
+    const input = page.getByRole('textbox', { name: 'Name', exact: true })
+    await contextAction(page, 'Drafts', 'Rename')
+
+    // Act
+    await input.fill('Empty')
+    await input.press('Enter')
+
+    // Assert
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('Empty')
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAccessibleDescription(/already exists/)
+    await expect(page.getByRole('alert')).toContainText('already exists')
+    expect(await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')).toBe(original)
+    expect((await stat(join(workspace.root, 'Empty'))).isDirectory()).toBe(true)
+    await page.screenshot({ path: test.info().outputPath('rename-conflict.png') })
+
+    // Act
+    await input.fill('Reference')
+    // Assert
+    await expect(input).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    // Act
+    await input.press('Enter')
+    // Assert
+    await expect(input).toHaveCount(0)
+    await expect(entry(page, 'Reference')).toBeVisible()
+    expect(await exists(join(workspace.root, 'Drafts'))).toBe(false)
+    expect(await readFile(join(workspace.root, 'Reference/one.md'), 'utf8')).toBe(original)
+    await page.reload()
+    await expect(entry(page, 'Reference')).toBeVisible()
+  })
+
+  test('User can cancel a conflicting folder rename and start again without stale errors', async ({
+    page,
+    workspace,
+  }) => {
+    // Arrange
+    const input = page.getByRole('textbox', { name: 'Name', exact: true })
+    await contextAction(page, 'Drafts', 'Rename')
+    // Act
+    await input.fill('Empty')
+    await input.press('Enter')
+    // Assert
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toBeFocused()
+    // Act
+    await input.press('Escape')
+    // Assert
+    await expect(input).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    expect((await stat(join(workspace.root, 'Drafts'))).isDirectory()).toBe(true)
+    expect((await stat(join(workspace.root, 'Empty'))).isDirectory()).toBe(true)
+    // Act
+    await contextAction(page, 'Drafts', 'Rename')
+    // Assert
+    await expect(input).toHaveValue('Drafts')
+    await expect(input).not.toHaveAttribute('aria-invalid', 'true')
+    await input.press('Escape')
+  })
+
+  test('User can correct a conflicting article filename without overwriting either article', async ({
+    page,
+    workspace,
+  }) => {
+    // Arrange
+    await entry(page, 'Drafts').getByRole('button', { name: 'Drafts', exact: true }).click()
+    await entry(page, 'Drafts/one.md').click()
+    const original = await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')
+    const existing = await readFile(join(workspace.root, 'Drafts/two.htmd'), 'utf8')
+    const input = page.getByRole('textbox', { name: 'Name', exact: true })
+    await contextAction(page, 'Drafts/one.md', 'Rename')
+    // Act
+    await input.fill('two.htmd')
+    await input.press('Enter')
+    // Assert
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('two.htmd')
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAccessibleDescription(/already exists/)
+    expect(await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')).toBe(original)
+    expect(await readFile(join(workspace.root, 'Drafts/two.htmd'), 'utf8')).toBe(existing)
+    // Act
+    await input.fill('renamed.md')
+    await input.press('Enter')
+    // Assert
+    await expect(input).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(page.locator('.document-path')).toHaveAttribute('title', 'Drafts/renamed.md')
+    expect(await readFile(join(workspace.root, 'Drafts/renamed.md'), 'utf8')).toBe(original)
+    expect(await readFile(join(workspace.root, 'Drafts/two.htmd'), 'utf8')).toBe(existing)
+  })
+
   test('User can manage nested articles and folders through context menus', async ({
     page,
     workspace,

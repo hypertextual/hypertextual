@@ -10,6 +10,7 @@
     indexPath,
     errors,
     renameErrors,
+    onedit,
     oncancel,
     contextItems,
     onaction,
@@ -18,6 +19,7 @@
     indexPath: number[]
     errors: Record<string, string>
     renameErrors: Record<string, string>
+    onedit?: (value: string) => void
     contextItems?: (
       node: TreeNode,
     ) => { value: string; label: string; shortcut?: string; destructive?: boolean }[]
@@ -25,6 +27,8 @@
     oncancel?: (value: string) => void
   } = $props()
   const tree = useTreeViewContext()
+  const id = $props.id()
+  const renameErrorId = `${id}-rename-error`
   function action(value: string) {
     // Let Ark close the menu and restore focus before starting another interaction.
     requestAnimationFrame(() =>
@@ -66,6 +70,10 @@
                 >
                 <ArkTreeView.NodeRenameInput
                   aria-label="Name"
+                  aria-invalid={Boolean(renameErrors[node.value])}
+                  data-invalid={renameErrors[node.value] ? '' : undefined}
+                  aria-describedby={renameErrors[node.value] ? renameErrorId : undefined}
+                  oninput={() => onedit?.(node.value)}
                   onkeydown={(event) => {
                     if (event.key === 'Escape') oncancel?.(node.value)
                   }}
@@ -84,6 +92,7 @@
                 indexPath={[...indexPath, index]}
                 {errors}
                 {renameErrors}
+                {onedit}
                 {oncancel}
                 {contextItems}
                 {onaction}
@@ -108,6 +117,10 @@
               >
               <ArkTreeView.NodeRenameInput
                 aria-label="Name"
+                aria-invalid={Boolean(renameErrors[node.value])}
+                data-invalid={renameErrors[node.value] ? '' : undefined}
+                aria-describedby={renameErrors[node.value] ? renameErrorId : undefined}
+                oninput={() => onedit?.(node.value)}
                 onkeydown={(event) => {
                   if (event.key === 'Escape') oncancel?.(node.value)
                 }}
@@ -116,7 +129,11 @@
           {/snippet}
         </ContextMenu>
       {/if}
-      {#if renameErrors[node.value]}<p class="tree-message" role="alert">
+      {#if renameErrors[node.value]}<p
+          id={renameErrorId}
+          class="tree-message tree-rename-error"
+          role="alert"
+        >
           {renameErrors[node.value]}
         </p>{/if}
     {/snippet}

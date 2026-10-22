@@ -50,6 +50,10 @@
   // Replace the cache so collections also update for branches created after mount.
   let loaded = $state.raw<Record<string, TreeNode[]>>({})
   let errors = $state<Record<string, string>>({})
+  function clearRename(value: string) {
+    delete renameErrors[value]
+    delete attempts[value]
+  }
   function hydrate(node: TreeNode): TreeNode {
     const base = loaded[node.value] ?? node.children
     const children =
@@ -84,7 +88,7 @@
       void (async () => {
         try {
           await onrename(value, label)
-          delete attempts[value]
+          clearRename(value)
         } catch (error) {
           renameErrors[value] = error instanceof Error ? error.message : String(error)
           attempts[value] = label
@@ -152,9 +156,11 @@
         indexPath={[index]}
         {errors}
         {renameErrors}
-        oncancel={(value) => {
+        onedit={(value) => {
           delete renameErrors[value]
-          delete attempts[value]
+        }}
+        oncancel={(value) => {
+          clearRename(value)
           oncancel?.(value)
         }}
         {contextItems}
@@ -213,6 +219,14 @@
     background: var(--background);
     color: var(--foreground);
     font: inherit;
+    outline: none;
+  }
+  :global(.helical-tree-view [data-part='node-rename-input'][aria-invalid='true']) {
+    border-color: var(--destructive);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 18%, transparent);
+  }
+  :global(.helical-tree-view .tree-rename-error) {
+    color: var(--destructive);
   }
   :global(.helical-tree-view [data-part='branch-content']) {
     position: relative;
