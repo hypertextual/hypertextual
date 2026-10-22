@@ -7,10 +7,13 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      '**/dist-e2e/**',
       '**/.output/**',
       '**/.svelte-kit/**',
       '**/build/**',
       '**/coverage/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
       '**/routeTree.gen.ts',
     ],
   },

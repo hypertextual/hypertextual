@@ -6,8 +6,8 @@
   "packageManager": "bun@1.4.2",
   "scripts": {
     "build": "vite build",
-    "clean": "rm -rf dist coverage",
-    "test": "bun test",
+    "clean": "rm -rf dist dist-e2e coverage test-results playwright-report",
+    "test": "bun test src",
     "dev": "vite",
     "start": "vite preview"
   },
@@ -19,9 +19,19 @@
     "svelte": "5.57.0",
     "svelte-check": "4.7.6",
     "typescript": "7.0.2",
-    "vite": "8.3.0"
+    "vite": "8.3.0",
+    "tailwindcss": "4.3.3",
+    "@tailwindcss/vite": "4.3.3",
+    "@tailwindcss/typography": "0.5.19"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.12.3"
+    "@tauri-apps/api": "2.12.3",
+    "@cloudvoyant/helical-svelte": "0.19.0",
+    "@cloudvoyant/helical-ui": "0.19.0",
+    "htmd-ts": "workspace:*",
+    "@tiptap/core": "3.31.4",
+    "manim-web": "0.3.24",
+    "@hypertextual/ui": "workspace:*",
+    "lucide-svelte": "0.577.0"
   }
 }

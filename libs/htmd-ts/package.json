@@ -27,5 +27,16 @@
     "@types/bun": "1.4.2",
     "prettier": "3.9.8",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@tiptap/markdown": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@tiptap/extension-task-list": "3.31.4",
+    "@tiptap/extension-task-item": "3.31.4",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-heading": "3.31.4",
+    "@tiptap/extension-paragraph": "3.31.4",
+    "@tiptap/extension-blockquote": "3.31.4",
+    "@tiptap/extension-list": "3.31.4"
   }
 }

@@ -8,7 +8,7 @@ run = 'echo "Workspace dependencies installed"'
 
 [tasks.build]
 description = "Build the static application"
-depends = ["install"]
+depends = ["install", "//libs/htmd-ts:build"]
 run = "bun run build"
 
 [tasks.clean]
@@ -17,7 +17,7 @@ run = "bun run clean"
 
 [tasks.test]
 description = "Run the Bun test suite"
-depends = ["install"]
+depends = ["install", "//libs/htmd-ts:build"]
 run = "bun run test"
 
 [tasks.lint]
@@ -89,10 +89,6 @@ fi
 [tasks.deploy]
 description = "Report deferred deployment"
 run = 'echo "deploy: no deployment target configured"'
-
-[tasks.e2e]
-description = "Run the finite application smoke test"
-run = "sh -c 'bun run test'"
 
 [tasks.typecheck]
 description = "Run project-specific type checks"

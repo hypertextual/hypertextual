@@ -34,7 +34,8 @@ hypertextual/
 │   └── hypertextual-cli/      Rust CLI, executable hyped
 └── libs/
     ├── htmd-rs/               Shared Rust document library
-    └── htmd-ts/               Frontend TypeScript document library
+    ├── htmd-ts/               Markdown conversion for the editor
+    └── ui/                    Private Svelte wrappers around Ark UI primitives
 ```
 
 ### Component boundaries
@@ -45,8 +46,8 @@ hypertextual/
 - `hypertextual-desktop` owns the native application window and Rust backend, with Tauri providing the communication boundary.
 - Commands carry frontend requests to Rust and return results, while events and channels carry updates from Rust to the frontend.
 - `hypertextual-cli` provides the `hyped` executable through the Cargo package named `hypertextual`.
-- `htmd-rs` defines the shared document layer for Rust consumers, and `htmd-ts` defines the frontend library boundary.
-- Dashed arrows show the intended shared-library dependencies, while the current library packages remain independent starters.
+- `htmd-rs` defines the shared document layer for Rust consumers, and `htmd-ts` converts supported Markdown source to and from the editor document format.
+- The frontend consumes `htmd-ts`. The Rust document library remains a starter.
 
 ### Development flow
 
@@ -64,6 +65,16 @@ hypertextual/
 - Installed desktop applications load their embedded assets and do not connect to a frontend development server.
 - The root Cargo workspace contains the CLI, while the desktop app and Rust library use independent Cargo manifests.
 
+### Workspace and save flow
+
+Tauri owns access to `~/.hypertextual/workspace`. Its commands list folders, read articles, and write edits. Each command rejects paths outside the workspace. The frontend never receives unrestricted access to the filesystem.
+
+The Svelte interface uses the helical editor and layout components from npm. The editor represents content as Tiptap JSON, a structured document format. The `htmd-ts` library converts supported Markdown to this format and converts edits back to source. Unsupported source stays read-only.
+
+Each selected article owns an autosave queue. The queue waits briefly after typing and sends one write at a time. Each write includes the revision from the last successful read or write. A revision is a hash of the file contents. The backend checks that revision before it replaces the file.
+
+The backend writes through a temporary file in the same directory. It retains file permissions and rejects external changes. The frontend drains pending writes before an article switch, window close, or app quit. Failed writes keep the draft open for retry or copying. The app keeps no selected article or folder state across launches.
+
 ## Implementation
 
 Supported desktop platforms:
@@ -80,3 +91,5 @@ Supported desktop platforms:
 - [Premise](https://github.com/cloudvoyant/premise).
 - [Tauri frontend and Rust communication](https://v2.tauri.app/develop/calling-rust/).
 - [Tauri and Vite integration](https://v2.tauri.app/start/frontend/vite/).
+
+The workspace sidebar uses the published Helical Sidebar components. The private `@hypertextual/ui` library supplies a Helical-style wrapper around [Ark UI Tree View](https://ark-ui.com/docs/components/tree-view). Ark owns tree navigation and accessibility; the app owns workspace reads, article selection, and file and folder creation.

@@ -19,3 +19,8 @@ RELEASE_NOTES.md
 .codevoyant/
 .worktrees/
 .tmp/
+
+**/test-results/
+**/playwright-report/
+
+**/dist-e2e/
