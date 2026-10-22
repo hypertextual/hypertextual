@@ -119,7 +119,7 @@ test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-t
     await page.getByRole('menuitem', { name: 'Rename', exact: false }).click()
     await name.fill('Renamed.md')
     await name.press('Enter')
-    await expect(page.locator('.document-path')).toHaveText('Drafts/Renamed.md')
+    await expect(page.locator('.document-path')).toHaveAttribute('title', 'Drafts/Renamed.md')
     await edit(page, ' Still editable.')
     await expect
       .poll(() => readFile(join(workspace.root, 'Drafts/Renamed.md'), 'utf8'))
@@ -240,7 +240,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         // Act
         await renameEntry(page, 'Untitled.md', 'Renamed.md')
         // Assert
-        await expect(page.locator('.document-path')).toHaveText('Renamed.md')
+        await expect(page.locator('.document-path')).toHaveAttribute('title', 'Renamed.md')
         expect(await exists(original)).toBe(false)
         expect(await readFile(renamed, 'utf8')).toContain('# Untitled')
 
@@ -312,12 +312,12 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       const saved = join(workspace.root, 'Research/Nested.md')
       await expect.poll(() => readFile(saved, 'utf8')).toContain('Nested article.')
       expect(await exists(join(workspace.root, 'Research/Untitled.md'))).toBe(false)
-      await expect(page.locator('.document-path')).toHaveText('Research/Nested.md')
+      await expect(page.locator('.document-path')).toHaveAttribute('title', 'Research/Nested.md')
 
       // Act
       await renameEntry(page, 'Research', 'Archive')
       // Assert
-      await expect(page.locator('.document-path')).toHaveText('Archive/Nested.md')
+      await expect(page.locator('.document-path')).toHaveAttribute('title', 'Archive/Nested.md')
       expect(await exists(join(workspace.root, 'Research'))).toBe(false)
       expect(await readFile(join(workspace.root, 'Archive/Nested.md'), 'utf8')).toContain(
         'Nested article.',
@@ -350,7 +350,10 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await contextAction(page, 'Research/Sources', 'New article')
       // Assert
       const saved = join(workspace.root, 'Research/Sources/Untitled.md')
-      await expect(page.locator('.document-path')).toHaveText('Research/Sources/Untitled.md')
+      await expect(page.locator('.document-path')).toHaveAttribute(
+        'title',
+        'Research/Sources/Untitled.md',
+      )
       expect(await readFile(saved, 'utf8')).toContain('# Untitled')
 
       // Act

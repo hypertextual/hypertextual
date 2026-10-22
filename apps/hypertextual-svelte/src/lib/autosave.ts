@@ -16,6 +16,7 @@ export class Autosave {
   private state: SaveState = { status: 'saved', error: null }
   private disposed = false
   private discarding = false
+  private needsSave = false
 
   constructor(
     source: string,
@@ -37,8 +38,8 @@ export class Autosave {
     if (this.disposed) return
     this.source = source
     clearTimeout(this.timer)
-    this.notify(this.running ? 'saving' : source === this.persisted ? 'saved' : 'pending')
-    if (!this.running && source !== this.persisted) {
+    this.notify(this.running ? 'saving' : this.dirty ? 'pending' : 'saved')
+    if (!this.running && this.dirty) {
       this.timer = setTimeout(() => {
         void this.flush()
       }, this.delay)
@@ -46,7 +47,14 @@ export class Autosave {
   }
 
   get dirty() {
-    return this.source !== this.persisted || Boolean(this.running)
+    return this.needsSave || this.source !== this.persisted || Boolean(this.running)
+  }
+
+  /** Persist filename metadata even when the article's source bytes are unchanged. */
+  requestSave(): Promise<boolean> {
+    if (this.disposed) return Promise.resolve(true)
+    this.needsSave = true
+    return this.flush()
   }
 
   flush(): Promise<boolean> {
@@ -64,11 +72,12 @@ export class Autosave {
 
   private async drain(): Promise<boolean> {
     this.notify('saving')
-    while (!this.discarding && this.source !== this.persisted) {
+    while (!this.discarding && (this.needsSave || this.source !== this.persisted)) {
       const snapshot = this.source
       try {
         this.revision = await this.write(snapshot, this.revision)
         this.persisted = snapshot
+        this.needsSave = false
       } catch (error) {
         this.notify('error', errorMessage(error))
         return false
@@ -85,6 +94,7 @@ export class Autosave {
     this.disposed = true
     await this.running
     this.source = this.persisted
+    this.needsSave = false
   }
 
   dispose() {

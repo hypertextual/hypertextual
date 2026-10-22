@@ -148,8 +148,12 @@ test.describe(
       // Assert
       await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('One')
       await page.keyboard.type('Renamed title ')
-      await expect(page.locator('.document-path')).toHaveText('Drafts/Renamed title.md')
-      await expect(page.locator('.document-status')).toContainText('Renamed title.md')
+      await expect(page.locator('.document-path')).toHaveText('Renamed title')
+      await expect(page.locator('.document-path')).toHaveAttribute(
+        'title',
+        'Drafts/Renamed title.md',
+      )
+      await expect(page.locator('.document-status > span').first()).toHaveText('Renamed title')
       await expect
         .poll(() => readFile(join(workspace.root, 'Drafts/Renamed title.md'), 'utf8'))
         .toContain('Renamed title&#32;')
@@ -181,6 +185,58 @@ test.describe(
       )
       await expect(page.getByText('No article selected')).toBeVisible()
     })
+
+    for (const extension of ['md', 'htmd']) {
+      test(`User sees the saved article title in both bars and its legacy ${extension} filename is synchronized on disk`, async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange: an older article already has a title, but retains its generated filename.
+        const oldPath = `Untitled 4.${extension}`
+        const source = '\uFEFF# A saved article\r\n\r\nEarlier writing.\r\n'
+        const collision = extension === 'md'
+        const savedPath = `A saved article${collision ? ' 2' : ''}.${extension}`
+        await writeFile(join(workspace.root, oldPath), source)
+        if (collision)
+          await writeFile(join(workspace.root, 'A saved article.md'), '# Another article\n')
+        await page.reload()
+        const oldEntry = page.locator(`[role="treeitem"][data-value="${oldPath}"]`)
+        await expect(oldEntry.locator('.tree-label')).toHaveText('A saved article')
+        expect(await readFile(join(workspace.root, oldPath), 'utf8')).toBe(source)
+
+        // Act
+        await oldEntry.click()
+
+        // Assert: the bars agree with the tree, while hover exposes the actual path.
+        await expect(page.locator('.document-path')).toHaveText('A saved article')
+        await expect(page.locator('.document-status > span').first()).toHaveText('A saved article')
+        await expect(page.locator('.document-path')).toHaveAttribute('title', savedPath)
+        await expect(page.locator('.document-status > span').first()).toHaveAttribute(
+          'title',
+          savedPath,
+        )
+        expect(await readFile(join(workspace.root, savedPath), 'utf8')).toBe(source)
+        expect(await readdir(workspace.root)).not.toContain(oldPath)
+        if (collision)
+          expect(await readFile(join(workspace.root, 'A saved article.md'), 'utf8')).toBe(
+            '# Another article\n',
+          )
+
+        // Act: continue editing after the rename and reopen the resulting file.
+        await edit(page, ' Still editable.')
+        await expect
+          .poll(() => readFile(join(workspace.root, savedPath), 'utf8'))
+          .toContain('Still editable.')
+        await page.reload()
+        await page.locator(`[role="treeitem"][data-value="${savedPath}"]`).click()
+
+        // Assert
+        await expect(page.locator('.ProseMirror')).toContainText('Still editable.')
+        await expect(page.locator('.document-path')).toHaveText('A saved article')
+        await expect(page.locator('.document-status > span').first()).toHaveText('A saved article')
+        await expect(page.locator('.document-path')).toHaveAttribute('title', savedPath)
+      })
+    }
 
     test('User can reopen an autosaved notice with its edited title, type and body', async ({
       page,
@@ -358,6 +414,9 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         const block = page.locator(`.ProseMirror ${widget.selector}`)
         // Act
         await insertBlock(page, widget.name)
+        await expect(page.locator('.ProseMirror h1')).toHaveText(
+          initialWorkspace === 'empty' ? 'Untitled' : 'Markdown',
+        )
         await (widget.name === 'Code Block' ? block.locator('code') : block).click()
         await editorSettled(page)
         await page.keyboard.type('Widget text')

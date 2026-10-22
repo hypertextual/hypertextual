@@ -277,6 +277,13 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
 
 export async function edit(page: Page, text: string) {
   await page.locator('.ProseMirror').click()
+  // Let Helical finish scheduled autofocus before positioning the caret for typing.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  )
   await page.keyboard.press('ControlOrMeta+End')
   await page.keyboard.type(text)
 }

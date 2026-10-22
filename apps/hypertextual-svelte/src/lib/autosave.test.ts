@@ -29,6 +29,45 @@ describe('autosave lifecycle', () => {
     saver.dispose()
   })
 
+  test('can persist filename metadata once without editing source bytes', async () => {
+    const writes: string[] = []
+    const saver = new Autosave(
+      'original',
+      'r0',
+      async (source) => {
+        writes.push(source)
+        return 'r1'
+      },
+      () => {},
+    )
+    expect(await saver.requestSave()).toBe(true)
+    expect(await saver.flush()).toBe(true)
+    expect(writes).toEqual(['original'])
+    expect(saver.dirty).toBe(false)
+    saver.dispose()
+  })
+
+  test('metadata failures remain dirty and can be retried', async () => {
+    let attempts = 0
+    const saver = new Autosave(
+      'original',
+      'r0',
+      async (source, revision) => {
+        expect(source).toBe('original')
+        expect(revision).toBe('r0')
+        if (++attempts === 1) throw new Error('Cannot rename file')
+        return 'r1'
+      },
+      () => {},
+    )
+    expect(await saver.requestSave()).toBe(false)
+    expect(saver.dirty).toBe(true)
+    expect(await saver.flush()).toBe(true)
+    expect(attempts).toBe(2)
+    expect(saver.dirty).toBe(false)
+    saver.dispose()
+  })
+
   test('serializes rapid edits and drains before a switch/close', async () => {
     const first = deferred<string>()
     const second = deferred<string>()

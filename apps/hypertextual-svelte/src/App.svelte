@@ -68,6 +68,9 @@
     { label: 'Add workspace… (coming soon)', value: '__add__', disabled: true },
   ])
   let titles = $state<Record<string, string>>({})
+  const selectedTitle = $derived(
+    selected ? (titles[selected.path] ?? selected.name) : 'No article selected',
+  )
 
   async function loadTitles(items: WorkspaceEntry[]) {
     await Promise.all(
@@ -177,7 +180,12 @@
       save = { status: 'saved', error: null }
       if (article.editable) {
         let currentPath = entry.path
-        let persistedTitle = articleTitle(article.content)
+        const title = articleTitle(article.content)
+        const synchronizeFilename =
+          /^untitled(?:[ -]?\d+)?\.(md|htmd)$/i.test(entry.name) &&
+          Boolean(title) &&
+          title !== entry.name.replace(/\.(md|htmd)$/i, '')
+        let persistedTitle = synchronizeFilename ? '' : title
         saver = new Autosave(
           read.content,
           read.revision,
@@ -216,6 +224,7 @@
             }
           },
         )
+        if (synchronizeFilename) await saver.requestSave()
       }
     } catch (error) {
       if (id === requestId) openingError = errorMessage(error)
@@ -564,7 +573,7 @@
     <main class="document-pane" aria-label="Article">
       {#if selected}
         <div class="document-heading">
-          <span class="document-path" title={selected.path}>{selected.path}</span>
+          <span class="document-path" title={selected.path}>{selectedTitle}</span>
           <span class="format-label">{selected.name.split('.').at(-1)?.toUpperCase()}</span>
         </div>
       {/if}
@@ -611,7 +620,7 @@
         </div>
       {/if}
       <footer class="document-status" role="status" aria-live="polite">
-        <span>{selected ? selected.name : 'No article selected'}</span>
+        <span title={selected?.path}>{selectedTitle}</span>
         <span class:error={Boolean(codecError || save.error)}>
           {article?.editable
             ? codecError || save.error
