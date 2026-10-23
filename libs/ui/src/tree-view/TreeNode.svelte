@@ -1,8 +1,18 @@
 <script lang="ts">
-  import { Folder, FolderOpen, FileText, Image } from 'lucide-svelte'
-  import ContextMenu from '../ContextMenu.svelte'
+  import { Folder, FolderOpen, FileText } from 'lucide-svelte'
+  import type { Snippet } from 'svelte'
+  import ContextMenu from '../context-menu/ContextMenu.svelte'
   import { TreeView as ArkTreeView, useTreeViewContext } from '@ark-ui/svelte/tree-view'
-  import { cn, sidebarMenuButtonVariants } from '@cloudvoyant/helical-ui'
+  import {
+    treeViewListBase,
+    treeViewBranchContentBase,
+    treeViewRowVariants,
+    treeViewLabelBase,
+    treeViewIconBase,
+    treeViewIndentGuideBase,
+    treeViewRenameInputBase,
+    treeViewMessageVariants,
+  } from './styles'
   import TreeNodeView from './TreeNode.svelte'
   import type { TreeNode } from './types'
   let {
@@ -10,6 +20,7 @@
     indexPath,
     errors,
     renameErrors,
+    icon,
     onedit,
     oncancel,
     contextItems,
@@ -19,6 +30,7 @@
     indexPath: number[]
     errors: Record<string, string>
     renameErrors: Record<string, string>
+    icon?: Snippet<[TreeNode, boolean]>
     onedit?: (value: string) => void
     contextItems?: (
       node: TreeNode,
@@ -38,16 +50,15 @@
       }),
     )
   }
-  const rowClass = cn(sidebarMenuButtonVariants({ size: 'sm' }), 'helical-tree-row')
+  const rowClass = treeViewRowVariants()
 </script>
 
-{#snippet icon(folder: boolean, expanded = false)}
-  <span class="tree-icon" aria-hidden="true">
-    {#if folder}{#if expanded}<FolderOpen size={13} strokeWidth={1.5} />{:else}<Folder
+{#snippet nodeIcon(folder: boolean, expanded = false)}
+  <span class={treeViewIconBase} aria-hidden="true">
+    {#if icon}{@render icon(node, expanded)}{:else if folder}{#if expanded}<FolderOpen
           size={13}
           strokeWidth={1.5}
-        />{/if}
-    {:else if /\.(png|jpe?g|gif|webp)$/i.test(node.label)}<Image size={13} strokeWidth={1.5} />
+        />{:else}<Folder size={13} strokeWidth={1.5} />{/if}
     {:else}<FileText size={13} strokeWidth={1.5} />{/if}
   </span>
 {/snippet}
@@ -56,7 +67,7 @@
   <ArkTreeView.NodeContext>
     {#snippet render(state)}
       {#if node.branch}
-        <ArkTreeView.Branch aria-label={node.displayLabel ?? node.label}>
+        <ArkTreeView.Branch aria-label={node.displayLabel ?? node.label} class={treeViewListBase}>
           <ContextMenu items={contextItems?.(node) ?? []} onaction={action}>
             {#snippet children(triggerProps)}
               <ArkTreeView.BranchControl
@@ -64,12 +75,13 @@
                 class={rowClass}
                 title={node.description ?? node.value}
               >
-                {@render icon(true, state().expanded)}
-                <ArkTreeView.BranchText class="tree-label" hidden={state().renaming}
+                {@render nodeIcon(true, state().expanded)}
+                <ArkTreeView.BranchText class={treeViewLabelBase} hidden={state().renaming}
                   >{node.displayLabel ?? node.label}</ArkTreeView.BranchText
                 >
                 <ArkTreeView.NodeRenameInput
                   aria-label="Name"
+                  class={treeViewRenameInputBase}
                   aria-invalid={Boolean(renameErrors[node.value])}
                   data-invalid={renameErrors[node.value] ? '' : undefined}
                   aria-describedby={renameErrors[node.value] ? renameErrorId : undefined}
@@ -81,17 +93,18 @@
               </ArkTreeView.BranchControl>
             {/snippet}
           </ContextMenu>
-          {#if errors[node.value]}<p class="tree-message" role="alert">
-              {errors[node.value]} Expand the folder to retry.
+          {#if errors[node.value]}<p class={treeViewMessageVariants()} role="alert">
+              {errors[node.value]} Expand to retry.
             </p>{/if}
-          <ArkTreeView.BranchContent>
-            <ArkTreeView.BranchIndentGuide class="tree-indent-guide" />
+          <ArkTreeView.BranchContent class={treeViewBranchContentBase}>
+            <ArkTreeView.BranchIndentGuide class={treeViewIndentGuideBase} />
             {#each node.children ?? [] as child, index (child.value)}
               <TreeNodeView
                 node={child}
                 indexPath={[...indexPath, index]}
                 {errors}
                 {renameErrors}
+                {icon}
                 {onedit}
                 {oncancel}
                 {contextItems}
@@ -111,12 +124,13 @@
                 : (node.displayLabel ?? node.label)}
               title={node.value}
             >
-              {@render icon(false)}
-              <ArkTreeView.ItemText class="tree-label" hidden={state().renaming}
+              {@render nodeIcon(false)}
+              <ArkTreeView.ItemText class={treeViewLabelBase} hidden={state().renaming}
                 >{node.displayLabel ?? node.label}</ArkTreeView.ItemText
               >
               <ArkTreeView.NodeRenameInput
                 aria-label="Name"
+                class={treeViewRenameInputBase}
                 aria-invalid={Boolean(renameErrors[node.value])}
                 data-invalid={renameErrors[node.value] ? '' : undefined}
                 aria-describedby={renameErrors[node.value] ? renameErrorId : undefined}
@@ -131,7 +145,7 @@
       {/if}
       {#if renameErrors[node.value]}<p
           id={renameErrorId}
-          class="tree-message tree-rename-error"
+          class={treeViewMessageVariants({ variant: 'error' })}
           role="alert"
         >
           {renameErrors[node.value]}

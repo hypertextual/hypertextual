@@ -4,10 +4,11 @@
     createTreeCollection,
     useTreeView,
   } from '@ark-ui/svelte/tree-view'
-  import { tick, untrack } from 'svelte'
+  import { tick, untrack, type Snippet } from 'svelte'
   import { cn } from '@cloudvoyant/helical-ui'
   import TreeNodeView from './TreeNode.svelte'
   import type { TreeNode } from './types'
+  import { treeViewRootBase, treeViewListBase } from './styles'
 
   let {
     nodes,
@@ -23,6 +24,7 @@
     onselect,
     loadChildren,
     label = 'Files',
+    icon,
     getLabel = (node) => node.label,
     class: className = '',
   }: {
@@ -36,6 +38,7 @@
     renameValue?: string
     onrename?: (value: string, name: string) => Promise<void>
     oncancel?: (value: string) => void
+    icon?: Snippet<[TreeNode, boolean]>
     getLabel?: (node: TreeNode) => string
     nodes: TreeNode[]
     selected?: string | null
@@ -145,17 +148,18 @@
 
 <ArkTreeView.RootProvider
   value={tree}
-  class={cn('helical-tree-view', className)}
+  class={cn(treeViewRootBase, className)}
   lazyMount
   unmountOnExit
 >
-  <ArkTreeView.Tree aria-label={label}>
+  <ArkTreeView.Tree aria-label={label} class={treeViewListBase}>
     {#each collection.rootNode.children ?? [] as node, index (node.value)}
       <TreeNodeView
         {node}
         indexPath={[index]}
         {errors}
         {renameErrors}
+        {icon}
         onedit={(value) => {
           delete renameErrors[value]
         }}
@@ -169,82 +173,3 @@
     {/each}
   </ArkTreeView.Tree>
 </ArkTreeView.RootProvider>
-
-<style>
-  :global(.helical-tree-view [data-part='tree']),
-  :global(.helical-tree-view [data-part='branch-content']) {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  :global(.helical-tree-view [data-part='branch']) {
-    list-style: none;
-  }
-  :global(.helical-tree-view [data-part='branch-indicator']) {
-    width: 10px;
-    flex-shrink: 0;
-    transition: transform 120ms;
-  }
-  :global(.helical-tree-view [data-part='branch-indicator'][data-state='open']) {
-    transform: rotate(90deg);
-  }
-  :global(.helical-tree-view .helical-tree-row) {
-    height: 24px;
-    font-size: 12px;
-    padding-block: 0;
-    padding-inline-start: calc(10px + (var(--depth) - 1) * 16px);
-    cursor: pointer;
-  }
-  :global(.helical-tree-view .helical-tree-row[data-selected]) {
-    background: var(--sidebar-accent);
-    color: var(--sidebar-accent-foreground);
-  }
-  :global(.helical-tree-view .tree-label) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  :global(.helical-tree-view .tree-message) {
-    margin: 4px 12px;
-    font-size: 11px;
-    color: var(--muted-foreground);
-  }
-  :global(.helical-tree-view [data-part='node-rename-input']) {
-    width: 100%;
-    min-width: 0;
-    height: 22px;
-    padding: 0 3px;
-    border: 1px solid var(--sidebar-ring);
-    border-radius: 2px;
-    background: var(--background);
-    color: var(--foreground);
-    font: inherit;
-    outline: none;
-  }
-  :global(.helical-tree-view [data-part='node-rename-input'][aria-invalid='true']) {
-    border-color: var(--destructive);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 18%, transparent);
-  }
-  :global(.helical-tree-view .tree-rename-error) {
-    color: var(--destructive);
-  }
-  :global(.helical-tree-view [data-part='branch-content']) {
-    position: relative;
-  }
-  :global(.helical-tree-view .tree-indent-guide) {
-    position: absolute;
-    pointer-events: none;
-    top: 0;
-    bottom: 0;
-    left: calc(17px + (var(--depth) - 1) * 16px);
-    border-left: 1px solid var(--sidebar-border, #e2e8f0);
-  }
-  :global(.helical-tree-view .tree-icon) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
-    flex: 0 0 14px;
-  }
-</style>

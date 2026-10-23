@@ -38,7 +38,7 @@
   }}
 >
   <DialogBackdrop />
-  <DialogContent positionerClass="draft-recovery-positioner">
+  <DialogContent positionerClass="z-[150] [--z-index:150]!">
     <DialogHeader>
       <DialogTitle>Changes need attention</DialogTitle>
       <DialogDescription
@@ -61,9 +61,3 @@
     </DialogFooter>
   </DialogContent>
 </Dialog>
-
-<style>
-  :global(.draft-recovery-positioner) {
-    z-index: 150;
-  }
-</style>

@@ -95,9 +95,11 @@ Select a file to open it in the helical editor. The sidebar loads saved article 
 
 The app installs `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui` from npm. Both packages are pinned to `0.19.0`. The local `~/Projects/helical-ui` checkout is a reference for components. The app does not need that checkout to build or run. The published component exports also require the `manim-web` dependency.
 
+Helical 0.19.0 supplies editor JSON, shared node factories, upload hooks, and change notifications. It has no Markdown load/save API. The Svelte app keeps the temporary Markdown adapter and its round-trip checks in `src/lib`; `htmd-ts` remains a format SDK starter without editor dependencies. The adapter extends upstream Tiptap handlers and Helical notice/image factories rather than defining those editor nodes again.
+
 The editor supports headings, paragraphs, bold and italic text, links, lists, task lists, quotes, notices, and code blocks. It supports these forms in `.md` and Markdown-compatible `.htmd` files. It shows other syntax as the original source without editing. Examples include HTML, tables, metadata at the start of an article, and rich HTMD blocks. A complete rich HTMD format remains future work.
 
-Opening an article does not rewrite it. Unchanged content keeps its original bytes. Edited articles use standard Markdown formatting and keep their original line endings and byte-order mark. A byte-order mark is an optional marker at the start of a text file. If an editor feature cannot convert back to Markdown, the app retains the draft and shows an error.
+Opening a legacy generated filename reconciles its name as described above; otherwise opening an article does not rewrite it. Unchanged content keeps its original bytes. Edited articles use standard Markdown formatting and keep their original line endings and byte-order mark. A byte-order mark is an optional marker at the start of a text file. If an editor feature cannot convert back to Markdown, the app retains the draft and shows an error.
 
 A save uses a temporary file beside the article, then replaces the article after the write completes. The app retains the file permissions. If the file changes outside the app, autosave stops and retains the local draft. Use Copy draft before you discard it. Retry autosave after you resolve a write failure, or use Discard draft and reload to read the current file. The recovery dialog lets you keep editing or explicitly discard the draft.
 

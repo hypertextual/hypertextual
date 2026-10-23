@@ -8,7 +8,7 @@ run = 'echo "Workspace dependencies installed"'
 
 [tasks.build]
 description = "Build the static application"
-depends = ["install", "//libs/htmd-ts:build"]
+depends = ["install"]
 run = "bun run build"
 
 [tasks.clean]
@@ -17,7 +17,7 @@ run = "bun run clean"
 
 [tasks.test]
 description = "Run the Bun test suite"
-depends = ["install", "//libs/htmd-ts:build"]
+depends = ["install"]
 run = "bun run test"
 
 [tasks.lint]

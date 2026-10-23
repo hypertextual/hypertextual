@@ -593,17 +593,24 @@ async function removeBlock(page: Page, block: Locator) {
     return
   }
   await block.scrollIntoViewIfNeeded()
+  // Establish editor focus through a rendered block before selecting it. Focusing the
+  // root alone can race ProseMirror's focus selection and reset the range to the title.
+  await block.click()
   await page.locator('.ProseMirror').focus()
   await editorSettled(page)
-  // Select the rendered block, then delete through the keyboard. Do not call editor commands.
-  await block.evaluate((element) => {
-    const range = document.createRange()
-    range.selectNode(element.closest('.ProseMirror > *') ?? element)
-    const selection = window.getSelection()!
-    selection.removeAllRanges()
-    selection.addRange(range)
-  })
-  await editorSettled(page)
+  // ProseMirror may normalize the selection just after focus. Reapply this browser
+  // selection until it stays selected; never retry deletion or call editor commands.
+  await expect(async () => {
+    await block.evaluate((element) => {
+      const range = document.createRange()
+      range.selectNode(element.closest('.ProseMirror > *') ?? element)
+      const selection = window.getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })
+    await editorSettled(page)
+    expect(await page.evaluate(() => window.getSelection()?.isCollapsed)).toBe(false)
+  }).toPass({ timeout: 3000, intervals: [100, 250] })
   await page.keyboard.press('Backspace')
   // Editable wrappers can first empty their content; Backspace again lifts the empty block.
   for (let attempt = 0; attempt < 3 && (await block.count()); attempt++) {

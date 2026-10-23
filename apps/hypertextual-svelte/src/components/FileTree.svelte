@@ -1,5 +1,6 @@
 <script lang="ts">
   import { TreeView, type TreeNode } from '@hypertextual/ui'
+  import { Folder, FolderOpen, FileText, Image } from 'lucide-svelte'
   import type { WorkspaceClient, WorkspaceEntry } from '../lib/workspace'
 
   let {
@@ -80,4 +81,14 @@
     for (const entry of children) listed[entry.path] = entry
     return children.map(toNode)
   }}
-/>
+>
+  {#snippet icon(node, expanded)}
+    {#if node.branch}
+      {#if expanded}<FolderOpen size={13} strokeWidth={1.5} />{:else}<Folder
+          size={13}
+          strokeWidth={1.5}
+        />{/if}
+    {:else if /\.(png|jpe?g|gif|webp)$/i.test(node.label)}<Image size={13} strokeWidth={1.5} />
+    {:else}<FileText size={13} strokeWidth={1.5} />{/if}
+  {/snippet}
+</TreeView>

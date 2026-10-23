@@ -6,7 +6,16 @@ import Blockquote from '@tiptap/extension-blockquote'
 import { ListItem, OrderedList } from '@tiptap/extension-list'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Node, decodeHtmlEntities, encodeHtmlEntities, type JSONContent } from '@tiptap/core'
+import { decodeHtmlEntities, encodeHtmlEntities, type JSONContent } from '@tiptap/core'
+import {
+  createNoticeNode,
+  createImageNode,
+  type NodeViewFactory,
+  type NoticeVariant,
+} from '@cloudvoyant/helical-ui'
+
+// Helical 0.19.0 exchanges Tiptap JSON and has no Markdown persistence API.
+// This app adapter adds Markdown handlers to upstream extensions, not a second editor schema.
 
 // Markdown trims literal boundary whitespace. Numeric character references preserve it as
 // text, without introducing raw HTML or changing the editor's content during typing.
@@ -79,20 +88,14 @@ const noticeVariants: Record<string, string> = {
   WARNING: 'warning',
   CAUTION: 'error',
 }
-const noticeMarkers: Record<string, string> = {
+const noticeMarkers: Record<NoticeVariant, string> = {
   info: 'NOTE',
   success: 'TIP',
   warning: 'WARNING',
   error: 'CAUTION',
 }
 
-const ArticleNotice = Node.create({
-  name: 'notice',
-  group: 'block',
-  content: 'block+',
-  addAttributes() {
-    return { variant: { default: 'info' }, title: { default: 'Note' } }
-  },
+const ArticleNotice = createNoticeNode().extend({
   markdownTokenizer: {
     name: 'notice',
     level: 'block',
@@ -121,7 +124,7 @@ const ArticleNotice = Node.create({
     )
   },
   renderMarkdown(node, helpers) {
-    const marker = noticeMarkers[node.attrs?.variant ?? 'info']
+    const marker = noticeMarkers[(node.attrs?.variant ?? 'info') as NoticeVariant]
     if (!marker) throw new Error('Unsupported notice variant.')
     const title = preserveBoundaryWhitespace(
       encodeHtmlEntities(node.attrs?.title ?? 'Note')
@@ -139,18 +142,9 @@ const ArticleNotice = Node.create({
   },
 })
 
-const ArticleImage = Node.create({
-  name: 'imageNode',
-  group: 'block',
-  atom: true,
-  addAttributes() {
-    return {
-      src: { default: null },
-      srcset: { default: null },
-      alt: { default: '' },
-      caption: { default: '' },
-    }
-  },
+// MarkdownManager reads extension metadata only; it never mounts a node view.
+const schemaView: NodeViewFactory = () => () => ({ dom: document.createElement('span') })
+const ArticleImage = createImageNode(schemaView).extend({
   markdownTokenName: 'image',
   parseMarkdown(token, helpers) {
     return helpers.createNode('imageNode', {

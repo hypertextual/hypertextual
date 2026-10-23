@@ -34,7 +34,7 @@ hypertextual/
 │   └── hypertextual-cli/      Rust CLI, executable hyped
 └── libs/
     ├── htmd-rs/               Shared Rust document library
-    ├── htmd-ts/               Markdown conversion for the editor
+    ├── htmd-ts/               Reserved TypeScript HTMD format SDK starter
     └── ui/                    Private Svelte wrappers around Ark UI primitives
 ```
 
@@ -46,8 +46,8 @@ hypertextual/
 - `hypertextual-desktop` owns the native application window and Rust backend, with Tauri providing the communication boundary.
 - Commands carry frontend requests to Rust and return results, while events and channels carry updates from Rust to the frontend.
 - `hypertextual-cli` provides the `hyped` executable through the Cargo package named `hypertextual`.
-- `htmd-rs` defines the shared document layer for Rust consumers, and `htmd-ts` converts supported Markdown source to and from the editor document format.
-- The frontend consumes `htmd-ts`. The Rust document library remains a starter.
+- The HTMD libraries are format SDK starters; they do not own editor schemas, UI state, or Markdown editor adapters.
+- The frontend uses the published Helical editor and its shared TypeScript node factories. Its local Markdown adapter bridges editor JSON and files until Helical exposes a persistence API.
 
 ### Development flow
 
@@ -69,7 +69,7 @@ hypertextual/
 
 Tauri owns access to `~/.hypertextual/workspace`. Its commands list folders, read articles, and write edits. Each command rejects paths outside the workspace. The frontend never receives unrestricted access to the filesystem.
 
-The Svelte interface uses the helical editor and layout components from npm. The editor represents content as Tiptap JSON, a structured document format. The `htmd-ts` library converts supported Markdown to this format and converts edits back to source. Unsupported source stays read-only.
+The Svelte interface uses the helical editor and layout components from npm. The editor represents content as Tiptap JSON, a structured document format. The app-local Markdown adapter converts supported Markdown to this format and converts edits back to source, reusing Helical notice/image factories and upstream Tiptap extensions and types. Unsupported source stays read-only.
 
 Each selected article owns an autosave queue. The queue waits briefly after typing and sends one write at a time. Each write includes the revision from the last successful read or write. A revision is a hash of the file contents. The backend checks that revision before it replaces the file.
 

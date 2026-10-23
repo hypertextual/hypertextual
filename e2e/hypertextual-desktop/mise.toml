@@ -9,13 +9,13 @@ run = "bunx --no-install playwright install chromium webkit"
 
 [tasks.test]
 description = "Run desktop workspace and editor browser journeys"
-depends = ["//:install", "//libs/htmd-ts:build"]
+depends = ["//:install"]
 dir = "{{config_root}}/../.."
 run = "bunx --no-install playwright test --config e2e/hypertextual-desktop/playwright.config.ts"
 
 [tasks.smoke]
 description = "Run representative workspace and editor journeys"
-depends = ["//:install", "//libs/htmd-ts:build"]
+depends = ["//:install"]
 dir = "{{config_root}}/../.."
 run = "bunx --no-install playwright test --config e2e/hypertextual-desktop/playwright.config.ts --grep @smoke"
 

@@ -17,7 +17,7 @@
     SelectItem,
     SelectItemText,
   } from '@cloudvoyant/helical-svelte'
-  import { DraftRecoveryDialog } from '@hypertextual/ui'
+  import DraftRecoveryDialog from './components/DraftRecoveryDialog.svelte'
   import { FilePlus2, FolderPlus, PanelLeft, FileText, ChevronDown } from 'lucide-svelte'
   import { articleTitle, displayImages, mapImages } from './lib/article-images'
   import { listen } from '@tauri-apps/api/event'

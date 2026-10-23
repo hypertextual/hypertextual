@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { articleIdentity, decodeArticle, encodeArticle } from './document.js'
+import { articleIdentity, decodeArticle, encodeArticle } from './editor-markdown'
 
 const examples = [
   '# Article\n\nA **bold** and *italic* [link](https://example.com).\n',
@@ -10,7 +10,7 @@ const examples = [
   '\uFEFF# Windows\r\n\r\nA paragraph.\r\n',
 ]
 
-describe('portable article conversion', () => {
+describe('editor Markdown persistence', () => {
   for (const source of examples) {
     test(`unchanged source stays byte-for-byte: ${JSON.stringify(source.slice(0, 30))}`, () => {
       const article = decodeArticle(source)

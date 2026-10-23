@@ -10,6 +10,14 @@ Use the Lucide icon package used by Helical for application and tree icons. Keep
 
 Persist uploaded images in `.images` beside their article with relative Markdown references. Runtime image URLs must never leak into Markdown. Recovery must work in the native Tauri app: use Helical/Ark alert dialogs or toasts for actionable errors, and never native browser confirm/alert dialogs or ad hoc error banners. The workspace chooser belongs in the top bar beside the app name and must show a short workspace name with an Add workspace placeholder until multi-workspace support is implemented. Leave the sidebar footer empty.
 
+# Helical component conventions
+
+Keep `libs/ui` generic and portable to Helical. Put application-specific compositions, messages, and flows in `apps/hypertextual-svelte/src/components`; the draft recovery dialog belongs there. Group related parts and their styles under one component directory, such as `context-menu/` or `tree-view/`. Export only the public components and types from the library entry point.
+
+Follow `~/Projects/helical-ui/libs/helical-ui/src` and `libs/helical-svelte/src` when adding wrappers. Keep framework-neutral base class strings and `cva` variants in a colocated `styles.ts` module. Derive variant types with `VariantProps`, compose published Helical variants where available, and merge caller classes with the published `cn` utility. Use Tailwind utilities and Helical semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark `data-*` states. Do not add component-specific global CSS selectors, hard-coded palette colors, or copied Helical implementations. Add or extend theme tokens when a component needs a new semantic value. Ensure the consuming app scans the library's source for utility classes.
+
+Reuse published Helical editor contracts and node factories, and use upstream Tiptap types for editor documents. Keep temporary Markdown persistence glue inside the Svelte app; do not turn `htmd-ts` into a UI/editor package. The HTMD libraries remain reserved for format SDK design. Continue using npm dependencies; changes needed in Helical itself belong in a separate upstream change.
+
 # Test organization
 
 Keep end-to-end tests in TypeScript under root-level `e2e/`, outside Rust applications and their test/example directories. Use Playwright Test for the single `e2e/hypertextual-desktop` suite. Keep exactly two feature specs for now: `workspace-file-tree.spec.ts` and `editor.spec.ts`. Keep browser configuration, entry points, shared lifecycle fixtures, and the suite's Mise tasks alongside them; do not add a root `e2e/mise.toml` or duplicate app-local E2E runners. Rust tests cover unit and service behavior, not browser journeys.
