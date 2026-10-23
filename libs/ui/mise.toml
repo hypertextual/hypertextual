@@ -1,0 +1,13 @@
+[tasks.install]
+depends = ["//:install"]
+run = 'echo "Workspace dependencies installed"'
+
+[tasks.build]
+description = "Check the private Svelte UI library"
+depends = ["install"]
+run = "bun run build"
+
+[tasks.lint]
+description = "Check UI types and component diagnostics"
+depends = ["install"]
+run = "bun run lint"
