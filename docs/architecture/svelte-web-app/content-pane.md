@@ -1,8 +1,8 @@
-# Article pane
+# Content pane
 
 ## Overview
 
-The article pane presents the selected document, image, or empty workspace preview. It shows the current article title and save status.
+The content pane presents the selected document, image, or empty workspace preview. It shows the current article title and save status.
 
 ## Design
 
@@ -72,10 +72,10 @@ The selected article has a 40 px heading bar. Only the document body scrolls. It
 
 ### Public API
 
-`ArticlePaneProps` contains a `WorkspaceService`. DocumentEditor receives the active document and reports serialized changes or typed failures.
+`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives the active document and reports serialized changes or typed failures.
 
 ```svelte
-<ArticlePane {workspace} />
+<ContentPane {workspace} />
 ```
 
 ### State and Data Flow

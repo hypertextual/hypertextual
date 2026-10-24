@@ -1,8 +1,8 @@
-# File tree
+# Workspace explorer
 
 ## Overview
 
-The file tree presents workspace entries inside the shell sidebar. It connects workspace actions to the reusable TreeView.
+The workspace explorer presents workspace entries inside the shell sidebar. It connects workspace actions to the reusable TreeView.
 
 ## Design
 
@@ -52,15 +52,15 @@ The tree fills the sidebar width below the Workspace actions. Folder icons occup
 
 ### Public API
 
-`FileTreeProps` contains one `WorkspaceService`. The component forwards the service view model to TreeView and supplies workspace icons.
+`WorkspaceExplorerProps` is declared inside the component and contains one `WorkspaceService`. The component forwards the service view model to TreeView and supplies workspace icons.
 
 ```svelte
-<FileTree {workspace} />
+<WorkspaceExplorer {workspace} />
 ```
 
 ### State and Data Flow
 
-The workspace service owns known entries, pending creation, title labels, and folder refresh requests. FileTree keeps no entry cache. Selection opens the editor through the workspace service.
+The workspace service owns known entries, pending creation, title labels, and folder refresh requests. WorkspaceExplorer keeps no entry cache. Selection opens the editor through the workspace service.
 
 ### Styling and Responsiveness
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The shell is the desktop workspace frame. It composes navigation, file actions, the article pane, and draft recovery.
+The shell is the desktop workspace frame. It composes navigation, file actions, the workspace explorer, the content pane, and draft recovery.
 
 ## Design
 
@@ -70,7 +70,7 @@ Sidebar collapsed:
 +----------------------------------------------------------------------------------------------+
 ```
 
-The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer is empty. The article pane fills the remaining width, with its status bar at the bottom.
+The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer is empty. The content pane fills the remaining width, with its status bar at the bottom.
 
 ### Behavior
 

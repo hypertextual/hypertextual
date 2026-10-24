@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { DraftRecoveryDialogProps } from './types'
   import {
     Button,
     Dialog,
@@ -11,6 +10,16 @@
     DialogFooter,
   } from '@cloudvoyant/helical-svelte'
   // Props ---------------------------------------------------------------------
+  interface DraftRecoveryDialogProps {
+    open: boolean
+    message: string
+    copyStatus?: string
+    busy?: boolean
+    onclose: () => void
+    oncopy: () => void
+    ondiscard: () => void
+    onretry?: () => void
+  }
   let {
     open,
     message,

@@ -19,13 +19,16 @@
   import { FilePlus2, FolderPlus, PanelLeft, ChevronDown } from 'lucide-svelte'
   import { isTauri } from '@tauri-apps/api/core'
   import { WorkspaceService } from '../services/workspaceService.svelte'
-  import { attachDesktopLifecycle } from '../services/desktopLifecycle'
-  import FileTree from './FileTree.svelte'
-  import ArticlePane from './ArticlePane.svelte'
+  import { attachDesktopLifecycle } from './desktopLifecycle'
+  import WorkspaceExplorer from './WorkspaceExplorer.svelte'
+  import ContentPane from './ContentPane.svelte'
   import DraftRecoveryDialog from './DraftRecoveryDialog.svelte'
-  import type { ShellProps } from './types'
+  import type { WorkspaceClient } from '../clients/workspaceClient'
 
   // Props ---------------------------------------------------------------------
+  interface ShellProps {
+    client: WorkspaceClient
+  }
   let { client }: ShellProps = $props()
 
   // State ---------------------------------------------------------------------
@@ -117,11 +120,11 @@
             Your workspace is empty. Create your first article with New article.
           </p>
         {:else}
-          {#key workspace.treeVersion}<FileTree {workspace} />{/key}
+          {#key workspace.treeVersion}<WorkspaceExplorer {workspace} />{/key}
         {/if}
       </SidebarContent>
     </Sidebar>
-    <ArticlePane {workspace} />
+    <ContentPane {workspace} />
   </Row>
 </SidebarProvider>
 

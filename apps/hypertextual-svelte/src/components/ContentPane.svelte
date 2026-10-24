@@ -3,10 +3,13 @@
   import { Button } from '@cloudvoyant/helical-svelte'
   import { DocumentEditor, type EditorHandle } from '@hypertextual/ui'
   import { FileText } from 'lucide-svelte'
-  import type { ArticlePaneProps } from './types'
+  import type { WorkspaceService } from '../services/workspaceService.svelte'
 
   // Props ---------------------------------------------------------------------
-  let { workspace }: ArticlePaneProps = $props()
+  interface ContentPaneProps {
+    workspace: WorkspaceService
+  }
+  let { workspace }: ContentPaneProps = $props()
 
   // State ---------------------------------------------------------------------
   let view = $state<EditorHandle>()

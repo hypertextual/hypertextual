@@ -4,7 +4,6 @@ import {
   type EditorChange,
   type EditorFailure,
 } from '@hypertextual/ui'
-import { MediaClient } from '../clients/mediaClient'
 import {
   errorMessage,
   type WorkspaceClient,
@@ -36,14 +35,11 @@ export class EditorService {
   private saver: Autosave | undefined
   private requestId = 0
   private active = true
-  private media: MediaClient
 
   constructor(
     private client: WorkspaceClient,
     private observer: EditorObserver,
-  ) {
-    this.media = new MediaClient(client)
-  }
+  ) {}
 
   get dirty() {
     return Boolean(this.saver?.dirty || this.codecError)
@@ -91,13 +87,22 @@ export class EditorService {
       if (entry.kind === 'unavailable')
         throw new Error('This file is unavailable or links outside the workspace.')
       if (/\.(png|jpe?g|gif|webp)$/i.test(entry.name)) {
-        const url = await this.media.preview(entry.path)
-        if (this.isCurrent(id)) this.image = url
+        const asset = await this.client.readImage('', entry.path)
+        if (this.isCurrent(id)) this.image = asset.url
         return
       }
       const read = await this.client.read(entry.path)
       if (!this.isCurrent(id)) return
-      const document = await EditorDocument.open(read.content, this.media.forArticle(entry.path))
+      const document = await EditorDocument.open(read.content, {
+        resolve: async (source) => (await this.client.readImage(entry.path, source)).url,
+        upload: async (file) => {
+          const asset = await this.client.importImage(
+            entry.path,
+            Array.from(new Uint8Array(await file.arrayBuffer())),
+          )
+          return { source: asset.source, src: asset.url }
+        },
+      })
       if (!this.isCurrent(id)) return
       this.document = document
       this.version++

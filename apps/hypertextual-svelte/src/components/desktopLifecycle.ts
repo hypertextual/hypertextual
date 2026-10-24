@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { errorMessage } from '../clients/workspaceClient'
-import type { EditorService } from './editorService.svelte'
+import type { EditorService } from '../services/editorService.svelte'
 
 export function attachDesktopLifecycle(editor: EditorService) {
   let active = true

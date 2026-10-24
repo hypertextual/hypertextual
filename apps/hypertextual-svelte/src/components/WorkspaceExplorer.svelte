@@ -1,10 +1,13 @@
 <script lang="ts">
   import { TreeView } from '@hypertextual/ui'
   import { Folder, FolderOpen, FileText, Image } from 'lucide-svelte'
-  import type { FileTreeProps } from './types'
+  import type { WorkspaceService } from '../services/workspaceService.svelte'
 
   // Props ---------------------------------------------------------------------
-  let { workspace }: FileTreeProps = $props()
+  interface WorkspaceExplorerProps {
+    workspace: WorkspaceService
+  }
+  let { workspace }: WorkspaceExplorerProps = $props()
 </script>
 
 <TreeView

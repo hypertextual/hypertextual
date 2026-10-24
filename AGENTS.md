@@ -32,7 +32,7 @@ Run checks through the suite's Mise tasks. Use `mise run //e2e/hypertextual-desk
 
 # Component organization
 
-Declare named prop types before destructuring. Keep UI-library prop contracts in each component directory's `types.ts`. Keep Svelte scripts in this order when sections apply: Props, State, Derived, Lifecycle, Methods. Use `// Section ---` separators through column 80 and omit empty sections. Keep application components lean by placing workspace and editor view models in `src/services` and Tauri adapters in `src/clients`.
+Declare named prop types before destructuring. Keep application-only prop types inside their owning Svelte component. Keep UI-library prop contracts in each component directory's `types.ts`. Keep Svelte scripts in this order when sections apply: Props, State, Derived, Lifecycle, Methods. Use `// Section ---` separators through column 80 and omit empty sections. Keep application components lean by placing workspace and editor view models in `src/services` and Tauri adapters in `src/clients`. Services are stateful classes; keep desktop close and quit event wiring beside the shell component.
 
 # Documentation
 
