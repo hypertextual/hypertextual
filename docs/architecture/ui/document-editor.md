@@ -8,23 +8,53 @@ DocumentEditor wraps the published Helical editor with a portable document API. 
 
 ### Layout
 
-```text
-Editable document
-  Helical text, blocks, slash menu, and media
+Editable document, including an inserted notice:
 
-Unsupported document
-  Reason
-  Original source
+```text
++------------------------------------------------------------------+
+|                                                                  |
+|  A saved article                                                 |
+|                                                                  |
+|                                                                  |
+|  Start writing your article here.                                |
+|                                                                  |
+|  +------------------------------------------------------------+  |
+|  | [i] Note                                                   |  |
+|  |     Add the notice body here.                              |  |
+|  +------------------------------------------------------------+  |
+|                                                                  |
+|                                                                  |
++------------------------------------------------------------------+
 ```
 
-The host supplies the reading width and surrounding controls. Helical supplies editing controls and block views.
+Unsupported source:
+
+```text
++------------------------------------------------------------------+
+|                                                                  |
+|  This article contains syntax the editor cannot preserve.        |
+|  The original source is shown read-only.                         |
+|                                                                  |
+|  :::chart                                                        |
+|  {"series": [1, 2, 3]}                                           |
+|  :::                                                             |
+|                                                                  |
+|                                                                  |
+|                                                                  |
+|                                                                  |
++------------------------------------------------------------------+
+```
+
+The wrapper occupies the host content area without a toolbar or footer of its own. Helical renders the editable blocks. The source fallback places its reason above the original text.
 
 ### Behavior
 
-- Default: Open supported source for editing. Preserve unsupported source as read-only text.
-- Interaction: Emit serialized content and title changes. Upload and resolve images through the supplied asset adapter.
-- Loading, empty, and error: EditorDocument prepares source before mounting. Failed conversion retains the draft and reports a typed failure.
-- Accessibility: Published Helical editor controls retain their keyboard behavior. The source fallback has an accessible label.
+- Open supported source as an editable document with headings, text, lists, notices, code blocks, and images.
+- Type `/` to find and insert a block. Edit notice titles, types, and bodies directly in the document.
+- Display inserted images inline and retain their captions when reopening the document.
+- Show unsupported source as read-only text with a reason instead of replacing or losing its content.
+- Keep the current draft available when a change cannot be represented in the document format.
+- Support keyboard selection in the slash menu, with Enter to insert and Escape to dismiss.
 
 ## Implementation
 

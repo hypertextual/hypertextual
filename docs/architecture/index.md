@@ -64,7 +64,8 @@ Storage and asset adapters allow the editor to serve other applications. The pla
 
 ## References
 
-- [UI component architecture](ui/index.md)
+- [UI library components](ui/index.md)
+- [Svelte web app components](svelte-web-app/index.md)
 - [Development commands](../development.md)
 - [Product requirements](../../prd/0001-hypertextual-app/README.md)
 - [Helical editor service follow-up](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and)

@@ -8,21 +8,36 @@ ContextMenu is a generic action menu built on Ark UI Menu. Workspace branches an
 
 ### Layout
 
+Open menu over the sidebar and adjacent article area:
+
 ```text
-+-------------------------+
-| Action         Shortcut |
-| Destructive action      |
-+-------------------------+
++--------------------------------------------------------------------------+
+| Workspace       [+] [+d]   |  A saved article                            |
+|                            |                                             |
+| Drafts/  x                 |                                             |
+|          +-------------------+                                           |
+| | First a| New article       |    A saved article                        |
+|          | New folder        |                                           |
+| | Researc| Rename         F2 |                                           |
+|          | Move to Trash     |    Start writing here.                    |
+| Archive/ +-------------------+                                           |
+|                            |                                             |
+|                            |                                             |
+|                            |                                             |
+|                            |                                             |
+|                            |                                             |
+|                            |                                             |
++--------------------------------------------------------------------------+
 ```
 
-The compact menu opens beside the context trigger. A portal keeps it above the sidebar.
+`x` marks the right-click position on the Drafts row. The menu opens below that point and overlays both the tree and the adjacent pane. It has a minimum width of 164 px, with 25 px compact rows. Shortcut labels align at the right edge.
 
 ### Behavior
 
-- Default: Stay closed until the context trigger activates.
-- Interaction: Ark handles keyboard navigation, item selection, focus return, and dismissal.
-- Loading, empty, and error: The caller supplies the current action list and handles action failures.
-- Accessibility: Ark supplies menu roles and focus behavior. Visible labels identify actions.
+- Right-click an item to open its actions at the cursor position.
+- Choose an action to run it and close the menu.
+- Use the arrow keys to move between actions and Enter to choose one.
+- Press Escape or click outside to close the menu without choosing an action.
 
 ## Implementation
 

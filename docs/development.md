@@ -53,5 +53,6 @@ Open traces with `bunx playwright show-trace <trace.zip>`. Reports and traces re
 ## Further reading
 
 - [Architecture](architecture/index.md)
-- [UI component behavior and APIs](architecture/ui/index.md)
+- [UI library components](architecture/ui/index.md)
+- [Svelte web app components](architecture/svelte-web-app/index.md)
 - [Repository UI and testing rules](../AGENTS.md)

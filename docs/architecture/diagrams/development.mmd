@@ -1,9 +1,0 @@
-flowchart LR
-    Svelte["Svelte source"] --> Vite["Vite dev server"]
-    Vite -->|Hot reload| Desktop["Tauri desktop app"]
-    Rust["Rust source"] --> Cargo["Cargo rebuild"]
-    Cargo -->|Restart| Desktop
-
-    class Svelte,Rust source;
-    class Vite,Cargo tool;
-    class Desktop runtime;

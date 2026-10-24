@@ -8,21 +8,37 @@ TreeView is a reusable Ark UI tree wrapper with Helical styling. The workspace f
 
 ### Layout
 
+Expanded and collapsed branches:
+
 ```text
-Branch row
-| Child row
-| Rename field
-| Inline validation message
+Drafts/
+|-- First article
+`-- Research/
+    `-- Source notes
+Archive/
 ```
 
-Rows contain a fixed icon area and a truncated label. Branch guides show nesting.
+Conflicting inline rename:
+
+```text
+Drafts/
+|-- First article
+`-- [ Existing name          ]
+    A file or folder with this
+    name already exists.
+Archive/
+```
+
+Rows are 24 px tall. Each nesting level adds 16 px of indentation, with a 14 px icon box and a truncated label. During renaming, a 22 px input replaces the label. Its error appears below that row.
 
 ### Behavior
 
-- Default: Render supplied nodes with controlled selection and collapsed branches.
-- Interaction: Ark handles navigation, expansion, F2, Enter, Escape, and type-ahead behavior.
-- Loading, empty, and error: Load children on demand. Retain failed rename attempts with an invalid field and an accessible error.
-- Accessibility: Ark supplies tree semantics. Rename errors connect to their fields through accessible descriptions.
+- Show the supplied hierarchy with folders collapsed at first.
+- Expand or collapse a branch to reveal or hide its children. Select a leaf to choose that item.
+- If a branch cannot open, show an error and allow another expansion attempt to retry.
+- Press F2 to rename the focused item. Enter submits the name, and Escape cancels.
+- A failed rename retains the attempted name in an invalid field with an error below it. Typing clears the error so the name can be corrected.
+- Use arrow keys to move through the tree. Keyboard focus remains visible as selection and expansion change.
 
 ## Implementation
 
