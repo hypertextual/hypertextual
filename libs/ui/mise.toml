@@ -11,3 +11,8 @@ run = "bun run build"
 description = "Check UI types and component diagnostics"
 depends = ["install"]
 run = "bun run lint"
+
+[tasks.test]
+description = "Test portable editor document behavior"
+depends = ["install"]
+run = "bun run test"

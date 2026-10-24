@@ -1,15 +1,17 @@
 <script lang="ts">
+  import type { TreeViewProps } from './types'
   import {
     TreeView as ArkTreeView,
     createTreeCollection,
     useTreeView,
   } from '@ark-ui/svelte/tree-view'
-  import { tick, untrack, type Snippet } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import { cn } from '@cloudvoyant/helical-ui'
   import TreeNodeView from './TreeNode.svelte'
   import type { TreeNode } from './types'
   import { treeViewRootBase, treeViewListBase } from './styles'
 
+  // Props ---------------------------------------------------------------------
   let {
     nodes,
     renameValue,
@@ -27,47 +29,17 @@
     icon,
     getLabel = (node) => node.label,
     class: className = '',
-  }: {
-    refresh?: { path: string; version: number }
-    pendingNode?: TreeNode
-    parentValue?: string
-    contextItems?: (
-      node: TreeNode,
-    ) => { value: string; label: string; shortcut?: string; destructive?: boolean }[]
-    onaction?: (value: string, action: string) => void
-    renameValue?: string
-    onrename?: (value: string, name: string) => Promise<void>
-    oncancel?: (value: string) => void
-    icon?: Snippet<[TreeNode, boolean]>
-    getLabel?: (node: TreeNode) => string
-    nodes: TreeNode[]
-    selected?: string | null
-    onselect?: (value: string) => void
-    loadChildren?: (node: TreeNode) => Promise<TreeNode[]>
-    label?: string
-    class?: string
-  } = $props()
+  }: TreeViewProps = $props()
 
+  // State ---------------------------------------------------------------------
   let renameErrors = $state<Record<string, string>>({})
   let attempts = $state<Record<string, string>>({})
   // Replace the cache so collections also update for branches created after mount.
   let loaded = $state.raw<Record<string, TreeNode[]>>({})
   let errors = $state<Record<string, string>>({})
-  function clearRename(value: string) {
-    delete renameErrors[value]
-    delete attempts[value]
-  }
-  function hydrate(node: TreeNode): TreeNode {
-    const base = loaded[node.value] ?? node.children
-    const children =
-      pendingNode && parentValue === node.value ? [pendingNode, ...(base ?? [])] : base
-    return {
-      ...node,
-      displayLabel: getLabel(node),
-      label: attempts[node.value] ?? node.label,
-      children: children?.map(hydrate),
-    }
-  }
+  const id = $props.id()
+
+  // Derived -------------------------------------------------------------------
   const collection = $derived(
     createTreeCollection<TreeNode>({
       rootNode: { value: '__root__', label, children: nodes.map(hydrate) },
@@ -78,7 +50,6 @@
   )
   // Keep article selection controlled by the caller so failed draft flushes cannot
   // leave the tree pointing at a different article than the editor.
-  const id = $props.id()
   const tree = useTreeView<TreeNode>(() => ({
     id,
     collection,
@@ -119,6 +90,7 @@
       if (node && !node.branch) onselect?.(node.value)
     },
   }))
+  // Lifecycle -----------------------------------------------------------------
   $effect(() => {
     const request = refresh
     if (request && loadChildren) {
@@ -144,6 +116,23 @@
         tree().startRenaming(value)
       })
   })
+
+  // Methods -------------------------------------------------------------------
+  function clearRename(value: string) {
+    delete renameErrors[value]
+    delete attempts[value]
+  }
+  function hydrate(node: TreeNode): TreeNode {
+    const base = loaded[node.value] ?? node.children
+    const children =
+      pendingNode && parentValue === node.value ? [pendingNode, ...(base ?? [])] : base
+    return {
+      ...node,
+      displayLabel: getLabel(node),
+      label: attempts[node.value] ?? node.label,
+      children: children?.map(hydrate),
+    }
+  }
 </script>
 
 <ArkTreeView.RootProvider

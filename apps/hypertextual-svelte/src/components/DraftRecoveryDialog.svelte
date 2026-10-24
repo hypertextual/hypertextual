@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { DraftRecoveryDialogProps } from './types'
   import {
     Button,
     Dialog,
@@ -9,6 +10,7 @@
     DialogDescription,
     DialogFooter,
   } from '@cloudvoyant/helical-svelte'
+  // Props ---------------------------------------------------------------------
   let {
     open,
     message,
@@ -18,16 +20,7 @@
     ondiscard,
     onretry,
     busy = false,
-  }: {
-    open: boolean
-    message: string
-    copyStatus?: string
-    busy?: boolean
-    onclose: () => void
-    oncopy: () => void
-    ondiscard: () => void
-    onretry?: () => void
-  } = $props()
+  }: DraftRecoveryDialogProps = $props()
 </script>
 
 <Dialog

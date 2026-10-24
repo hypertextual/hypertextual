@@ -1,6 +1,6 @@
 <script lang="ts">
+  import type { TreeNodeViewProps } from './types'
   import { Folder, FolderOpen, FileText } from 'lucide-svelte'
-  import type { Snippet } from 'svelte'
   import ContextMenu from '../context-menu/ContextMenu.svelte'
   import { TreeView as ArkTreeView, useTreeViewContext } from '@ark-ui/svelte/tree-view'
   import {
@@ -14,7 +14,7 @@
     treeViewMessageVariants,
   } from './styles'
   import TreeNodeView from './TreeNode.svelte'
-  import type { TreeNode } from './types'
+  // Props ---------------------------------------------------------------------
   let {
     node,
     indexPath,
@@ -25,22 +25,14 @@
     oncancel,
     contextItems,
     onaction,
-  }: {
-    node: TreeNode
-    indexPath: number[]
-    errors: Record<string, string>
-    renameErrors: Record<string, string>
-    icon?: Snippet<[TreeNode, boolean]>
-    onedit?: (value: string) => void
-    contextItems?: (
-      node: TreeNode,
-    ) => { value: string; label: string; shortcut?: string; destructive?: boolean }[]
-    onaction?: (value: string, action: string) => void
-    oncancel?: (value: string) => void
-  } = $props()
+  }: TreeNodeViewProps = $props()
+  // State ---------------------------------------------------------------------
   const tree = useTreeViewContext()
   const id = $props.id()
   const renameErrorId = `${id}-rename-error`
+  const rowClass = treeViewRowVariants()
+
+  // Methods -------------------------------------------------------------------
   function action(value: string) {
     // Let Ark close the menu and restore focus before starting another interaction.
     requestAnimationFrame(() =>
@@ -50,7 +42,6 @@
       }),
     )
   }
-  const rowClass = treeViewRowVariants()
 </script>
 
 {#snippet nodeIcon(folder: boolean, expanded = false)}

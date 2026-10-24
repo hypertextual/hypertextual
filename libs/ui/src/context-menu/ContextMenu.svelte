@@ -1,28 +1,16 @@
 <script lang="ts">
+  import type { ContextMenuProps } from './types'
   import ContextMenuPositioner from './ContextMenuPositioner.svelte'
   import { Menu } from '@ark-ui/svelte/menu'
   import { Portal } from '@ark-ui/svelte/portal'
-  import type { Snippet } from 'svelte'
   import { cn } from '@cloudvoyant/helical-ui'
   import {
     contextMenuContentBase,
     contextMenuItemVariants,
     contextMenuShortcutBase,
-    type ContextMenuItemVariants,
   } from './styles'
-  let {
-    children,
-    items,
-    onaction,
-    size = 'sm',
-    class: className = '',
-  }: {
-    children: Snippet<[Record<string, unknown>]>
-    items: { value: string; label: string; shortcut?: string; destructive?: boolean }[]
-    size?: ContextMenuItemVariants['size']
-    class?: string
-    onaction: (value: string) => void
-  } = $props()
+  // Props ---------------------------------------------------------------------
+  let { children, items, onaction, size = 'sm', class: className = '' }: ContextMenuProps = $props()
 </script>
 
 <Menu.Root onSelect={({ value }) => onaction(value)} positioning={{ placement: 'bottom-start' }}>

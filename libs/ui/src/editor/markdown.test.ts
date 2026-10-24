@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { articleIdentity, decodeArticle, encodeArticle } from './editor-markdown'
+import { articleIdentity, decodeArticle, encodeArticle } from './markdown'
 
 const examples = [
   '# Article\n\nA **bold** and *italic* [link](https://example.com).\n',

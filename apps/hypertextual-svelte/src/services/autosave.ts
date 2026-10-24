@@ -1,4 +1,4 @@
-import { errorMessage } from './workspace'
+import { errorMessage } from '../clients/workspaceClient'
 
 export type SaveStatus = 'saved' | 'pending' | 'saving' | 'error'
 export interface SaveState {

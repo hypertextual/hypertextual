@@ -15,7 +15,7 @@ import {
 } from '@cloudvoyant/helical-ui'
 
 // Helical 0.19.0 exchanges Tiptap JSON and has no Markdown persistence API.
-// This app adapter adds Markdown handlers to upstream extensions, not a second editor schema.
+// This portable adapter adds Markdown handlers to upstream extensions, not a second editor schema.
 
 // Markdown trims literal boundary whitespace. Numeric character references preserve it as
 // text, without introducing raw HTML or changing the editor's content during typing.

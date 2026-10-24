@@ -1,6 +1,6 @@
 import { getSchema, type JSONContent } from '@tiptap/core'
 import { buildExtensions, type NodeViewFactory } from '@cloudvoyant/helical-ui'
-import { articleIdentity, decodeArticle as decodeSource, type Article } from './editor-markdown'
+import { articleIdentity, decodeArticle as decodeSource, type Article } from './markdown'
 
 // Schema inspection does not instantiate node views or mount an editor.
 const schemaView: NodeViewFactory = () => () => ({ dom: document.createElement('span') })
@@ -38,4 +38,4 @@ export function decodeArticle(source: string): Article {
   }
 }
 
-export { encodeArticle, type Article } from './editor-markdown'
+export { encodeArticle, type Article } from './markdown'

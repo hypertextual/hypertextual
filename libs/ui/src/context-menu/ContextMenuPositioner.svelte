@@ -1,9 +1,15 @@
 <script lang="ts">
   import { Menu, useMenuContext } from '@ark-ui/svelte/menu'
-  import { tick, type Snippet } from 'svelte'
+  import { tick } from 'svelte'
   import { contextMenuPositionerBase } from './styles'
-  let { children }: { children?: Snippet } = $props()
+  import type { ContextMenuPositionerProps } from './types'
+
+  // Props ---------------------------------------------------------------------
+  let { children }: ContextMenuPositionerProps = $props()
+
+  // State ---------------------------------------------------------------------
   const menu = useMenuContext()
+  // Lifecycle -----------------------------------------------------------------
   $effect(() => {
     if (menu().open) void tick().then(() => requestAnimationFrame(() => menu().reposition()))
   })

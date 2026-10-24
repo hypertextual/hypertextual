@@ -16,7 +16,7 @@ Keep `libs/ui` generic and portable to Helical. Put application-specific composi
 
 Follow `~/Projects/helical-ui/libs/helical-ui/src` and `libs/helical-svelte/src` when adding wrappers. Keep framework-neutral base class strings and `cva` variants in a colocated `styles.ts` module. Derive variant types with `VariantProps`, compose published Helical variants where available, and merge caller classes with the published `cn` utility. Use Tailwind utilities and Helical semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark `data-*` states. Do not add component-specific global CSS selectors, hard-coded palette colors, or copied Helical implementations. Add or extend theme tokens when a component needs a new semantic value. Ensure the consuming app scans the library's source for utility classes.
 
-Reuse published Helical editor contracts and node factories, and use upstream Tiptap types for editor documents. Keep temporary Markdown persistence glue inside the Svelte app; do not turn `htmd-ts` into a UI/editor package. The HTMD libraries remain reserved for format SDK design. Continue using npm dependencies; changes needed in Helical itself belong in a separate upstream change.
+Reuse published Helical editor contracts and node factories, and use upstream Tiptap types for editor documents. Keep portable document conversion behind the reusable editor wrapper in `libs/ui`; application services own workspace storage and autosave policy. Do not turn `htmd-ts` into a UI/editor package. The HTMD libraries remain reserved for format SDK design. Continue using npm dependencies; changes needed in Helical itself belong in a separate upstream change.
 
 # Test organization
 
@@ -29,3 +29,13 @@ Use Playwright fixtures for per-test lifecycle and cleanup, without mutable modu
 The current browser suite mounts the production Svelte application with a filesystem-backed substitute for Tauri IPC. Keep this boundary explicit: it checks browser UI and file persistence, not the native window runtime, Rust filesystem safety, or system Trash integration. Test those service guarantees with Rust unit tests. Never use the person's real workspace in automated tests.
 
 Run checks through the suite's Mise tasks. Use `mise run //e2e/hypertextual-desktop:smoke` for quick checks, or pass a spec path, `--grep`, or `--project` to `:test` for narrower runs. During iteration, run only relevant cases and reuse passing evidence for unchanged code. Run the full suite for final validation or shared-fixture changes. Keep generated builds, browser traces, screenshots, and reports ignored. Do not commit or publish unless requested.
+
+# Component organization
+
+Declare named prop types before destructuring. Keep UI-library prop contracts in each component directory's `types.ts`. Keep Svelte scripts in this order when sections apply: Props, State, Derived, Lifecycle, Methods. Use `// Section ---` separators through column 80 and omit empty sections. Keep application components lean by placing workspace and editor view models in `src/services` and Tauri adapters in `src/clients`.
+
+# Documentation
+
+Use the installed Difflab software architecture template for system boundaries, responsibilities, control flow, and contracts. Use the UI component architecture template for each public UI component under `docs/architecture/ui`. Put developer commands and setup in `docs/development.md`; keep algorithms and source walkthroughs out of that guide.
+
+Always use `~/.difflab/templates/pull-request-description.md` when drafting or updating PR descriptions. Fill Intent, Changes, Validation, Further Work, and References with actual changes and verified evidence. Do not leave a new PR description empty.
