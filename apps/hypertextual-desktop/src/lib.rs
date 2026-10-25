@@ -1,3 +1,5 @@
+mod error;
+mod models;
 mod workspace;
 
 use std::sync::{
@@ -33,7 +35,7 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
                 None => app.path().home_dir()?,
             };
             app.manage(workspace::WorkspaceService(Arc::new(Mutex::new(
-                workspace::Workspace::from_home(home),
+                models::Workspace::from_home(home),
             ))));
             Ok(())
         })

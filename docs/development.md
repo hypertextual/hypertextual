@@ -46,7 +46,7 @@ mise run //e2e/hypertextual-desktop:test
 mise run //e2e/hypertextual-desktop:lint
 ```
 
-Run relevant cases during development and the full suite before completing shared UI changes. Each test owns a temporary workspace. The suite tests the production UI through a filesystem-backed Tauri substitute. Rust unit tests cover native filesystem guarantees.
+Run relevant cases during development and the full suite before completing shared UI changes. Each test owns a temporary workspace. The suite tests the production UI through a filesystem-backed Tauri substitute. Rust behavior tests cover native filesystem guarantees.
 
 Open traces with `bunx playwright show-trace <trace.zip>`. Reports and traces remain under `e2e/hypertextual-desktop` and are ignored by Git.
 

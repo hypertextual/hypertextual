@@ -92,7 +92,7 @@ The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer
 
 ### State and Data Flow
 
-One `WorkspaceService` owns one `EditorService`. The shell starts workspace loading and attaches desktop close and quit handlers. Unmounting releases handlers and services.
+One `WorkspaceService` owns one `EditorService`. The shell starts workspace loading and registers desktop close and quit handlers in `onMount`. These handlers call `EditorService.close`, which saves pending changes before running the native close or quit operation. A failed save keeps the document open. Unmounting releases handlers and services.
 
 ### Styling and Responsiveness
 

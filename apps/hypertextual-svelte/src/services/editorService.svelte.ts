@@ -64,6 +64,21 @@ export class EditorService {
     return (await this.saver?.flush()) ?? true
   }
 
+  async close(finish: () => Promise<void>): Promise<boolean> {
+    if (this.closing) return false
+    this.closing = true
+    try {
+      if (await this.flush()) {
+        await finish()
+        return true
+      }
+    } catch (error) {
+      this.openingError = errorMessage(error)
+    }
+    this.closing = false
+    return false
+  }
+
   async open(entry: WorkspaceEntry) {
     if (this.busy || this.closing || (this.selected?.path === entry.path && !this.openingError))
       return

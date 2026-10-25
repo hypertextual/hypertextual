@@ -17,9 +17,11 @@
     SelectItemText,
   } from '@cloudvoyant/helical-svelte'
   import { FilePlus2, FolderPlus, PanelLeft, ChevronDown } from 'lucide-svelte'
-  import { isTauri } from '@tauri-apps/api/core'
+  import { invoke, isTauri } from '@tauri-apps/api/core'
+  import { listen } from '@tauri-apps/api/event'
+  import { getCurrentWindow } from '@tauri-apps/api/window'
+  import { errorMessage } from '../clients/workspaceClient'
   import { WorkspaceService } from '../services/workspaceService.svelte'
-  import { attachDesktopLifecycle } from './desktopLifecycle'
   import WorkspaceExplorer from './WorkspaceExplorer.svelte'
   import ContentPane from './ContentPane.svelte'
   import DraftRecoveryDialog from './DraftRecoveryDialog.svelte'
@@ -37,10 +39,35 @@
 
   // Lifecycle -----------------------------------------------------------------
   onMount(() => {
+    let active = true
+    const unlisteners: (() => void)[] = []
     void workspace.open()
-    const detach = attachDesktopLifecycle(editor)
+    if (isTauri()) {
+      void Promise.all(
+        [
+          getCurrentWindow().onCloseRequested((event) => {
+            event.preventDefault()
+            void editor.close(() => getCurrentWindow().destroy())
+          }),
+          listen('workspace-quit-requested', () => {
+            void editor.close(() => invoke('workspace_finish_quit'))
+          }),
+        ].map(async (registration) => {
+          const stop = await registration
+          if (active) unlisteners.push(stop)
+          else stop()
+        }),
+      )
+        .then(async () => {
+          if (active) await invoke('workspace_frontend_ready')
+        })
+        .catch((error) => {
+          if (active) editor.openingError = errorMessage(error)
+        })
+    }
     return () => {
-      detach()
+      active = false
+      unlisteners.forEach((stop) => stop())
       workspace.dispose()
     }
   })

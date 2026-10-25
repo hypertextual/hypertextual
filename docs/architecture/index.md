@@ -32,8 +32,9 @@ flowchart LR
   Workspace --> Client[Tauri clients]
   Editor --> Client
   Editor --> UI
-  Client --> Rust[Rust workspace service]
-  Rust --> Files[Local files]
+  Client --> Rust[Tauri workspace commands]
+  Rust --> Model[Workspace model]
+  Model --> Files[Local files]
 ```
 
 - The shell composes navigation, the article pane, and recovery controls.
@@ -50,13 +51,15 @@ A failed save retains the draft. Switching articles or closing the window requir
 
 ### Interfaces and Contracts
 
-Workspace clients expose file operations and revision-aware writes. A revision identifies the content version that the caller expects to replace. Media clients supply article-scoped asset adapters. The reusable editor accepts those adapters without knowing workspace paths or storage conventions.
+The workspace client exposes file operations, image reads and imports, and revision-aware writes. A revision identifies the content version that the caller expects to replace. The editor service supplies image callbacks to the reusable editor without exposing workspace paths or storage conventions.
 
 ## Implementation
 
 ### Ownership boundaries
 
 Application-specific components and services live in the Svelte app. Generic components and editor conversion live in the private UI library. The desktop backend retains native filesystem and window integration.
+
+Rust models and their methods live under `apps/hypertextual-desktop/src/models`. `Workspace` owns filesystem operations. Separate model files define entries, loaded documents, saved articles, image assets, and workspace listings. `error.rs` defines the shared workspace error contract. `workspace.rs` contains Tauri commands and serializes access to the workspace model.
 
 ### Extension points
 
