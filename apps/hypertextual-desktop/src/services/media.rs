@@ -91,7 +91,7 @@ impl<'a> MediaService<'a> {
             .strip_prefix(root)
             .map_err(|_| error("outsideWorkspace", "Image is outside the workspace."))?
             .to_string_lossy()
-            .into_owned();
+            .replace(std::path::MAIN_SEPARATOR, "/");
         let path = self.workspace.resolve(&relative)?;
         if fs::metadata(&path)?.len() > MAX_BYTES {
             return Err(error("tooLarge", "Image is too large."));
@@ -195,7 +195,13 @@ mod tests {
         #[test]
         fn it_rejects_references_outside_the_workspace() {
             let fixture = WorkspaceFixture::new();
-            for source in ["../escape.png", "/escape.png"] {
+            for source in [
+                "../escape.png",
+                "/escape.png",
+                ".images/../escape.png",
+                r".images\escape.png",
+                r"C:\escape.png",
+            ] {
                 // When
                 let result = fixture.media().read("Article.md", source);
 

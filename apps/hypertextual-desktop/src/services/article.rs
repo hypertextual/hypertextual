@@ -31,11 +31,12 @@ impl<'a> ArticleService<'a> {
                 format!("Untitled {number}")
             };
             let name = format!("{title}.md");
+            let path = root.join(&name);
             // Exclusive creation also treats existing directories and symlinks as occupied names.
             match fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(root.join(&name))
+                .open(&path)
             {
                 Ok(mut file) => {
                     file.write_all(format!("# {title}\n\n").as_bytes())?;
@@ -46,7 +47,13 @@ impl<'a> ArticleService<'a> {
                         kind: "file",
                     });
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                // Windows can report AccessDenied when a directory occupies the name.
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::AlreadyExists
+                        || fs::symlink_metadata(&path).is_ok() =>
+                {
+                    continue;
+                }
                 Err(e) => return Err(e.into()),
             }
         }
