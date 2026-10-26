@@ -4,7 +4,7 @@ use tauri::State;
 
 use crate::{
     error::{Result, error},
-    models::{ArticleContent, ArticleMetadata, Entry, ImageAsset, WorkspaceListing},
+    models::{ArticleContent, ArticleMetadata, ImageAsset, WorkspaceListing, WorkspaceNode},
     services::{ArticleService, MediaService, WorkspaceService},
 };
 
@@ -35,12 +35,12 @@ pub async fn workspace_open(state: State<'_, WorkspaceState>) -> Result<Workspac
 pub async fn workspace_list(
     state: State<'_, WorkspaceState>,
     relative_path: String,
-) -> Result<Vec<Entry>> {
+) -> Result<Vec<WorkspaceNode>> {
     run(state, move |w| w.list(&relative_path)).await
 }
 
 #[tauri::command]
-pub async fn workspace_create(state: State<'_, WorkspaceState>) -> Result<Entry> {
+pub async fn workspace_create(state: State<'_, WorkspaceState>) -> Result<WorkspaceNode> {
     run(state, |w| ArticleService::new(w).create()).await
 }
 
@@ -49,7 +49,7 @@ pub async fn workspace_create_folder(
     state: State<'_, WorkspaceState>,
     name: String,
     parent_path: Option<String>,
-) -> Result<Entry> {
+) -> Result<WorkspaceNode> {
     run(state, move |w| {
         w.create_folder_in(&name, parent_path.as_deref().unwrap_or(""))
     })
@@ -61,7 +61,7 @@ pub async fn workspace_create_file(
     state: State<'_, WorkspaceState>,
     name: String,
     parent_path: Option<String>,
-) -> Result<Entry> {
+) -> Result<WorkspaceNode> {
     run(state, move |w| {
         ArticleService::new(w).create_file(&name, parent_path.as_deref().unwrap_or(""))
     })
@@ -73,7 +73,7 @@ pub async fn workspace_rename(
     state: State<'_, WorkspaceState>,
     relative_path: String,
     name: String,
-) -> Result<Entry> {
+) -> Result<WorkspaceNode> {
     run(state, move |w| w.rename(&relative_path, &name)).await
 }
 

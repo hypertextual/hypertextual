@@ -2,7 +2,7 @@ import { documentTitle, type TreeNode, type ContextMenuItem } from '@hypertextua
 import {
   errorMessage,
   type WorkspaceClient,
-  type WorkspaceEntry,
+  type WorkspaceNode,
   type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { EditorService } from './editorService.svelte'
@@ -15,17 +15,17 @@ export interface FolderRefresh {
 /** Workspace view model. Rust retains filesystem ownership and path validation. */
 export class WorkspaceService {
   root = $state('~/.hypertextual/workspace')
-  entries = $state<WorkspaceEntry[]>([])
+  entries = $state<WorkspaceNode[]>([])
   loading = $state(true)
   error = $state<string | null>(null)
   creationError = $state<string | null>(null)
-  pendingEntry = $state<WorkspaceEntry | null>(null)
+  pendingEntry = $state<WorkspaceNode | null>(null)
   pendingParent = $state('')
   refreshFolder = $state<FolderRefresh | undefined>()
   treeVersion = $state(0)
   busy = $state(false)
   titles = $state<Record<string, string>>({})
-  private listed = $state<Record<string, WorkspaceEntry>>({})
+  private listed = $state<Record<string, WorkspaceNode>>({})
   private active = true
   readonly editor: EditorService
 
@@ -102,7 +102,7 @@ export class WorkspaceService {
     if (this.cannotCreate) return
     this.busy = true
     this.creationError = null
-    let created: WorkspaceEntry | undefined
+    let created: WorkspaceNode | undefined
     try {
       if (!(await this.editor.flush())) return
       const siblings = await this.client.list(parent)
@@ -139,7 +139,7 @@ export class WorkspaceService {
   async commitEntry(path: string, name: string) {
     if (this.blocked) throw new Error('Wait for the current operation to finish.')
     this.busy = true
-    let openNext: WorkspaceEntry | undefined
+    let openNext: WorkspaceNode | undefined
     try {
       if (!(await this.editor.flush()))
         throw new Error('Save or resolve the current draft before changing files.')
@@ -247,7 +247,7 @@ export class WorkspaceService {
       if (parent) this.refresh(parent)
     }
   }
-  private async loadTitles(items: WorkspaceEntry[]) {
+  private async loadTitles(items: WorkspaceNode[]) {
     await Promise.all(
       items
         .filter((entry) => entry.kind === 'file' && /\.(md|htmd)$/i.test(entry.name))
@@ -262,7 +262,7 @@ export class WorkspaceService {
         }),
     )
   }
-  private toNode(entry: WorkspaceEntry): TreeNode {
+  private toNode(entry: WorkspaceNode): TreeNode {
     return {
       value: entry.path,
       label: entry.name,

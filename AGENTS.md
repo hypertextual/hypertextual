@@ -1,49 +1,114 @@
-# UI requirements
+# Repository Guidance
 
-Use the published npm packages `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui` for application UI. This is a hard requirement. Use `~/Projects/helical-ui` as the reference for component composition and style; do not replace npm dependencies with local paths or copy existing Helical components. Use existing Helical components when available, including its Sidebar parts.
+## Hard Rules
 
-When Helical lacks a component, build a reusable Svelte wrapper around the corresponding Ark UI primitive in `libs/ui`, following the Helical component style. The `@hypertextual/ui` workspace library must remain private and non-publishable. Use Ark UI for component behavior, accessibility, keyboard navigation, and state; do not reimplement those behaviors with application-specific DOM handlers. The workspace file tree must use the local Ark UI Tree View wrapper inside the published Helical Sidebar. Keep filesystem and article logic in the app.
+- Use the published npm packages `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`.
+- Reference `~/Projects/helical-ui` for composition and style. Never copy its components or replace npm dependencies with local paths.
+- Prefer existing [Mise tasks](mise.toml). See [development commands](docs/development.md).
+- Commit or publish only when requested.
+- Fill every section of `~/.difflab/templates/pull-request-description.md` with actual changes and verified evidence.
+- Keep this file to terse, imperative bullets in simple English, with at most 500 source lines.
+- Merge duplicate rules, replace contradictory rules, and link to maintained docs for details.
+- Mark inferred or uncertain rules `[Proposed]` unless the user explicitly requires them.
 
-Keep browser checks focused on visible behavior, accessibility, and persistence. Run the applicable mise lint, build, and browser tasks before completing UI changes. Do not commit or publish unless requested.
+## Organization
 
-Use the Lucide icon package used by Helical for application and tree icons. Keep folder icons in a fixed-size alignment box; use branch indentation guides instead of separate chevrons. New articles open directly in the editor; the first heading is the source of the article title and saved filename. Use inline tree naming for folders and explicit filename renames, not for initial article-title editing.
+### Repository layout
 
-Persist uploaded images in `.images` beside their article with relative Markdown references. Runtime image URLs must never leak into Markdown. Recovery must work in the native Tauri app: use Helical/Ark alert dialogs or toasts for actionable errors, and never native browser confirm/alert dialogs or ad hoc error banners. The workspace chooser belongs in the top bar beside the app name and must show a short workspace name with an Add workspace placeholder until multi-workspace support is implemented. Leave the sidebar footer empty.
+- Keep reusable UI in private, non-publishable `libs/ui`.
+- Keep application compositions, messages, and recovery flows in `apps/hypertextual-svelte/src/components`.
+- Keep Svelte view models in `src/services` and Tauri adapters in `src/clients`.
+- Group related Rust models in one domain module, including workspace nodes, workspace listings, and workspace data.
+- Keep native persistence services under `apps/hypertextual-desktop/src/services`, divided into workspace, article, and media operations.
+- Reserve the HTMD libraries for format SDK work.
+- Put reusable UI docs under `docs/architecture/ui` and app component docs under `docs/architecture/svelte-web-app`.
+- Keep setup and commands in [the development guide](docs/development.md). Omit algorithms and source walkthroughs there.
 
-# Helical component conventions
+### File layout
 
-Keep `libs/ui` generic and portable to Helical. Put application-specific compositions, messages, and flows in `apps/hypertextual-svelte/src/components`; the draft recovery dialog belongs there. Group related parts and their styles under one component directory, such as `context-menu/` or `tree-view/`. Export only the public components and types from the library entry point.
+- Group reusable component parts and styles in one component directory.
+- Export only public UI components and types from the library entry point.
+- Declare named prop types before destructuring.
+- Declare app-only prop types inside their owning Svelte component.
+- Keep UI-library prop contracts in the component directory's `types.ts`.
+- Order Svelte script sections as Props, State, Derived, Lifecycle, and Methods.
+- Use `// Section ---` dividers through column 80. Omit empty sections.
 
-Follow `~/Projects/helical-ui/libs/helical-ui/src` and `libs/helical-svelte/src` when adding wrappers. Keep framework-neutral base class strings and `cva` variants in a colocated `styles.ts` module. Derive variant types with `VariantProps`, compose published Helical variants where available, and merge caller classes with the published `cn` utility. Use Tailwind utilities and Helical semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark `data-*` states. Do not add component-specific global CSS selectors, hard-coded palette colors, or copied Helical implementations. Add or extend theme tokens when a component needs a new semantic value. Ensure the consuming app scans the library's source for utility classes.
+## Style
 
-Reuse published Helical editor contracts and node factories, and use upstream Tiptap types for editor documents. Keep portable document conversion behind the reusable editor wrapper in `libs/ui`; application services own workspace storage and autosave policy. Do not turn `htmd-ts` into a UI/editor package. The HTMD libraries remain reserved for format SDK design. Continue using npm dependencies; changes needed in Helical itself belong in a separate upstream change.
+### Rust
 
-# Test organization
+- Document every model and field, including private fields, with brief `///` comments using the `simple-english` skill.
+- Explain each field's meaning, path base, units, or constraints where relevant.
+- Limit model methods to validation, factories, mapping, derived values, and in-memory business rules.
+- Keep filesystem access and persistence out of models.
+- Share workspace containment checks across native services.
+- Keep Tauri commands as transport adapters and serialize filesystem operations across services.
 
-Keep end-to-end tests in TypeScript under root-level `e2e/`, outside Rust applications and their test/example directories. Use Playwright Test for the single `e2e/hypertextual-desktop` suite. Keep exactly two feature specs for now: `workspace-file-tree.spec.ts` and `editor.spec.ts`. Keep browser configuration, entry points, shared lifecycle fixtures, and the suite's Mise tasks alongside them; do not add a root `e2e/mise.toml` or duplicate app-local E2E runners. Rust tests cover unit and service behavior, not browser journeys.
+### Svelte and Helical
 
-Organize specs with native `test.describe('When …')` state groups and native `test` cases for individual observable behaviors. Cover empty and existing workspaces separately. Use suite/feature tags and mark representative journeys `@smoke`. Separate Arrange, Act, and Assert blocks with comments, repeating them when a longer journey needs another check. Keep assertions explicit; do not build a custom step runner or wrap entire test cases in helper aliases.
+- Use existing Helical components, including its Sidebar parts.
+- Wrap missing components around the corresponding Ark UI primitive in `libs/ui`.
+- Use Ark for behavior, accessibility, keyboard navigation, and interaction state. Do not recreate these with app-specific DOM handlers.
+- Put framework-neutral base classes and CVA variants in colocated `styles.ts` files.
+- Derive variant types with `VariantProps` and merge caller classes with published Helical `cn`.
+- Compose published Helical variants and use Tailwind utilities with semantic theme tokens.
+- Use semantic tokens for colors, borders, focus, disabled, invalid, and Ark states. Extend tokens when needed.
+- Avoid component-specific global CSS and hard-coded palette colors.
+- Scan the library source for Tailwind utilities in the consuming app.
+- Reuse published Helical editor contracts, node factories, and upstream Tiptap document types.
+- Keep portable document conversion behind the reusable editor wrapper. Keep storage and autosave policy in app services.
+- Implement services as stateful classes.
+- Register desktop close and quit handlers in the shell lifecycle.
+- Keep pending-save flushing and overlapping-close guards in the editor service.
 
-Use Playwright fixtures for per-test lifecycle and cleanup, without mutable module-level state. Each case owns a temporary workspace and browser context; cleanup must only remove run-owned files. Assert visible behavior, accessible controls, actual file contents and paths, and persistence after reopening. Drive editor changes through rendered controls and keyboard input, not internal editor commands. Keep fixture helpers separate from cases and export only helpers used by another module.
+### Workspace UI
 
-The current browser suite mounts the production Svelte application with a filesystem-backed substitute for Tauri IPC. Keep this boundary explicit: it checks browser UI and file persistence, not the native window runtime, Rust filesystem safety, or system Trash integration. Test those service guarantees with Rust behavior tests. Never use the person's real workspace in automated tests.
+- Render the local Ark Tree View wrapper inside the published Helical Sidebar.
+- Use the Lucide icon package used by Helical for application and tree icons.
+- Keep folder icons in fixed alignment boxes. Use nesting guides instead of separate chevrons.
+- Open new articles directly in the editor.
+- Derive article titles and saved filenames from the first heading.
+- Use inline naming for folders and explicit filename renames, not initial article-title editing.
+- Store uploaded images in `.images` beside their article, with relative Markdown references.
+- Keep runtime image URLs out of saved Markdown.
+- Use Helical or Ark alert dialogs and toasts for actionable errors. Avoid browser dialogs and ad hoc error banners.
+- Put the workspace chooser beside the app name, with a short label and a disabled Add workspace placeholder.
+- Leave the sidebar footer empty.
 
-Colocate Rust behavior tests with the tested entity in a `#[cfg(test)] mod tests` block inside its source file. Do not create a separate directory just for that entity's tests. Use nested `given_*` modules for optional preconditions, `when_*` modules for operations, and `it_*` test functions for observable outcomes. Separate setup, action, and assertions with Given, When, and Then comments. Prefer service operations against real temporary files over tests of private helpers. Share fixture setup code within the parent test scope, but create a fresh fixture per test. Let each fixture own its temporary directory so cleanup follows its lifetime. Do not add shared mutable module fixtures or a custom BDD runner.
+### Documentation
 
-Run checks through the suite's Mise tasks. Use `mise run //e2e/hypertextual-desktop:smoke` for quick checks, or pass a spec path, `--grep`, or `--project` to `:test` for narrower runs. During iteration, run only relevant cases and reuse passing evidence for unchanged code. Run the full suite for final validation or shared-fixture changes. Keep generated builds, browser traces, screenshots, and reports ignored. Do not commit or publish unless requested.
+- Use the installed Difflab software architecture and UI component templates.
+- Keep diagrams inline in Markdown. Do not add separate diagram sources or rendered assets.
+- Draw aligned UI skeletons with spacing and proportions grounded in actual styles. Show separate states when useful.
+- Show trees as indented text and context menus beside their clicked element.
+- Put Public API and State and Data Flow under Design in every Svelte component doc.
+- Explain component behavior with Mermaid state diagrams. Add bullets only when a diagram is insufficient.
+- Keep Implementation to terse maintainer notes that parent architecture docs do not already cover.
+- Omit Styling and Responsiveness and separate Maintainer Notes subsections.
 
-# Rust style
+## Testing
 
-Document every model and each of its fields with a short `///` Rustdoc comment, including private fields. Explain the model's purpose and what each field contains. Use the `simple-english` skill and keep each comment brief. State path bases, units, or constraints when they affect the field's meaning.
-
-Group related model types in one domain module, such as workspace data and its listing, or article content and metadata. Models can own validation, factory methods, mappings, derived values, and in-memory business rules. Models must never perform filesystem access or persistence. Keep those operations in `src/services`, divided into workspace, article, and media responsibilities. Share workspace containment checks across those services. Keep Tauri commands as transport adapters and serialize filesystem operations across services.
-
-# Component organization
-
-Declare named prop types before destructuring. Keep application-only prop types inside their owning Svelte component. Keep UI-library prop contracts in each component directory's `types.ts`. Keep Svelte scripts in this order when sections apply: Props, State, Derived, Lifecycle, Methods. Use `// Section ---` separators through column 80 and omit empty sections. Keep application components lean by placing workspace and editor view models in `src/services` and Tauri adapters in `src/clients`. Services are stateful classes. Keep desktop close and quit event registration in the shell lifecycle; the editor service owns flushing pending saves and preventing overlapping close requests.
-
-# Documentation
-
-Use the installed Difflab software architecture template for system boundaries, responsibilities, control flow, and contracts. Use the UI component architecture template for pure UI-library components under `docs/architecture/ui`. Put Svelte application component docs under `docs/architecture/svelte-web-app`. Keep diagrams inline in Markdown. Layout sketches must show aligned UI skeletons with spacing and proportions grounded in the actual styles, including separate states where useful. Show trees as indented text and show context menus beside the clicked element. For every Svelte component doc, place Public API and State and Data Flow under Design. Replace Behavior prose with inline Mermaid state diagrams that explain visible actions, transitions, feedback, and recovery. Add bullets only for behavior that the diagrams cannot explain clearly. Keep Implementation to terse simple-English bullets containing only useful maintainer details not already covered by parent architecture docs. Omit Styling and Responsiveness and separate Maintainer Notes subsections. Use Mermaid where it explains architecture, instead of separate diagram sources or rendered assets. Put developer commands and setup in `docs/development.md`; keep algorithms and source walkthroughs out of that guide.
-
-Always use `~/.difflab/templates/pull-request-description.md` when drafting or updating PR descriptions. Fill Intent, Changes, Validation, Further Work, and References with actual changes and verified evidence. Do not leave a new PR description empty.
+- Keep TypeScript end-to-end tests under root `e2e/`, outside Rust applications and their test directories.
+- Use one Playwright suite at `e2e/hypertextual-desktop`, with only `workspace-file-tree.spec.ts` and `editor.spec.ts` as feature specs.
+- Colocate browser configuration, entry points, fixtures, and Mise tasks with that suite.
+- Do not add a root `e2e/mise.toml` or duplicate app-local browser runners.
+- Use native `test.describe('When …')` groups and individual tests for observable behavior.
+- Cover empty and existing workspaces separately, with suite and feature tags and representative `@smoke` journeys.
+- Separate Arrange, Act, and Assert blocks with comments. Keep assertions explicit and avoid custom step runners or test aliases.
+- Give each case its own temporary workspace and browser context through fixtures. Avoid mutable module state.
+- Clean up only run-owned files. Never test against the person's real workspace.
+- Assert visible behavior, accessible controls, file contents, paths, and persistence after reopening.
+- Edit through rendered controls and keyboard input, never internal editor commands.
+- Keep fixture helpers separate from cases and export only helpers used by another module.
+- Keep the browser suite's filesystem-backed Tauri substitute explicit. It does not test native windows, Rust filesystem safety, or system Trash.
+- Cover native filesystem guarantees with Rust service behavior tests against real temporary files.
+- Colocate Rust tests inside their source file in `#[cfg(test)] mod tests`. Do not create a separate entity test directory.
+- Use optional `given_*` modules, `when_*` operation modules, and `it_*` outcome tests with Given, When, and Then comments.
+- Share fixture setup code, but create one fixture per test and let it own its temporary directory.
+- Avoid tests of private helpers, shared mutable fixtures, and custom BDD runners.
+- Run browser checks through [the suite's Mise tasks](e2e/hypertextual-desktop/mise.toml).
+- Use `:smoke` or targeted `:test` arguments during iteration. Reuse passing evidence for unchanged code.
+- Run the full browser suite for final validation or shared-fixture changes.
+- Run applicable Mise lint, build, and browser tasks before completing UI changes.
+- Ignore generated builds, traces, screenshots, and reports.

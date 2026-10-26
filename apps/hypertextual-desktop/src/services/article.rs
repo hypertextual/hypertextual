@@ -7,7 +7,7 @@ use std::{
 use super::{MAX_BYTES, WorkspaceService};
 use crate::{
     error::{Result, WorkspaceError, error},
-    models::{ArticleContent, ArticleMetadata, Entry},
+    models::{ArticleContent, ArticleMetadata, WorkspaceNode},
 };
 
 /// Creates, reads, and saves articles within one workspace.
@@ -22,7 +22,7 @@ impl<'a> ArticleService<'a> {
         Self { workspace }
     }
 
-    pub(crate) fn create(&self) -> Result<Entry> {
+    pub(crate) fn create(&self) -> Result<WorkspaceNode> {
         let root = self.workspace.root()?;
         for number in 1..=10_000 {
             let title = if number == 1 {
@@ -41,7 +41,7 @@ impl<'a> ArticleService<'a> {
                 Ok(mut file) => {
                     file.write_all(format!("# {title}\n\n").as_bytes())?;
                     file.sync_all()?;
-                    return Ok(Entry {
+                    return Ok(WorkspaceNode {
                         path: name.clone(),
                         name,
                         kind: "file",
@@ -63,8 +63,8 @@ impl<'a> ArticleService<'a> {
         ))
     }
 
-    pub(crate) fn create_file(&self, name: &str, parent: &str) -> Result<Entry> {
-        let name = Entry::validate_name(name)?;
+    pub(crate) fn create_file(&self, name: &str, parent: &str) -> Result<WorkspaceNode> {
+        let name = WorkspaceNode::validate_name(name)?;
         let name = if Path::new(name).extension().is_none() {
             format!("{name}.md")
         } else {
@@ -78,7 +78,7 @@ impl<'a> ArticleService<'a> {
             .open(self.workspace.resolve(parent)?.join(&name))?;
         file.write_all(format!("# {title}\n\n").as_bytes())?;
         file.sync_all()?;
-        Ok(Entry {
+        Ok(WorkspaceNode {
             path: if parent.is_empty() {
                 name.clone()
             } else {
@@ -110,7 +110,7 @@ impl<'a> ArticleService<'a> {
         let stem = stem.trim().trim_matches('.').trim();
         let current = Path::new(relative);
         let extension = current.extension().unwrap().to_string_lossy();
-        let mut entry = Entry {
+        let mut entry = WorkspaceNode {
             path: relative.to_owned(),
             name: current.file_name().unwrap().to_string_lossy().into_owned(),
             kind: "file",

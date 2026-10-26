@@ -65,7 +65,7 @@ The workspace client exposes file operations, image reads and imports, and revis
 
 Application-specific components and services live in the Svelte app. Generic components and editor conversion live in the private UI library. The desktop backend retains native filesystem and window integration.
 
-Rust models live under `apps/hypertextual-desktop/src/models`. Related types share a file. `workspace.rs` defines the workspace location and its listing. `article.rs` defines article content and metadata. Models validate values and construct data without accessing the filesystem.
+Rust models live under `apps/hypertextual-desktop/src/models`. Related types share a file. `workspace.rs` defines the workspace location, its nodes, and its listing. `article.rs` defines article content and metadata. Models validate values and construct data without accessing the filesystem.
 
 Native services live under `src/services`. WorkspaceService owns browsing, folder creation, renaming, deletion, and containment checks. ArticleService owns article creation, reads, and saves. MediaService owns image imports and reads. Article and media services share the workspace boundary. Their behavior tests live inside their source files and use isolated temporary directories.
 

@@ -7,7 +7,7 @@ import {
 import {
   errorMessage,
   type WorkspaceClient,
-  type WorkspaceEntry,
+  type WorkspaceNode,
   type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { Autosave, type SaveState } from './autosave'
@@ -19,7 +19,7 @@ export interface EditorObserver {
 
 /** One selection and autosave lifecycle per workspace window. */
 export class EditorService {
-  selected = $state<WorkspaceEntry | null>(null)
+  selected = $state<WorkspaceNode | null>(null)
   document = $state.raw<EditorDocument | null>(null)
   image = $state<string | null>(null)
   loading = $state(false)
@@ -79,7 +79,7 @@ export class EditorService {
     return false
   }
 
-  async open(entry: WorkspaceEntry) {
+  async open(entry: WorkspaceNode) {
     if (this.busy || this.closing || (this.selected?.path === entry.path && !this.openingError))
       return
     this.busy = true

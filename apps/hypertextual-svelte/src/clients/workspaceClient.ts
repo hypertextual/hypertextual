@@ -1,6 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 
-export interface WorkspaceEntry {
+export interface WorkspaceNode {
   path: string
   name: string
   kind: 'directory' | 'file' | 'unavailable'
@@ -27,13 +27,13 @@ export interface WorkspaceClient {
   ): Promise<ArticleMetadata>
   importImage(path: string, bytes: number[]): Promise<ImageAsset>
   readImage(path: string, source: string): Promise<ImageAsset>
-  open(): Promise<{ root: string; entries: WorkspaceEntry[] }>
-  list(path: string): Promise<WorkspaceEntry[]>
-  create(): Promise<WorkspaceEntry>
-  createFile(name: string, parentPath?: string): Promise<WorkspaceEntry>
+  open(): Promise<{ root: string; entries: WorkspaceNode[] }>
+  list(path: string): Promise<WorkspaceNode[]>
+  create(): Promise<WorkspaceNode>
+  createFile(name: string, parentPath?: string): Promise<WorkspaceNode>
   delete(path: string): Promise<void>
-  rename(path: string, name: string): Promise<WorkspaceEntry>
-  createFolder(name: string, parentPath?: string): Promise<WorkspaceEntry>
+  rename(path: string, name: string): Promise<WorkspaceNode>
+  createFolder(name: string, parentPath?: string): Promise<WorkspaceNode>
   read(path: string): Promise<ArticleContent>
   write(path: string, content: string, revision: string): Promise<string>
 }

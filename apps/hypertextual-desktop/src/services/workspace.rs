@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     error::{Result, error},
-    models::{ArticleContent, Entry, Workspace, WorkspaceListing},
+    models::{ArticleContent, Workspace, WorkspaceListing, WorkspaceNode},
 };
 
 /// Browses and changes entries within one local workspace.
@@ -58,7 +58,7 @@ impl WorkspaceService {
         })
     }
 
-    pub(crate) fn list(&self, relative: &str) -> Result<Vec<Entry>> {
+    pub(crate) fn list(&self, relative: &str) -> Result<Vec<WorkspaceNode>> {
         let directory = self.resolve(relative)?;
         let root = self.root()?;
         let mut entries = Vec::new();
@@ -83,7 +83,7 @@ impl WorkspaceService {
                 Ok(p) if p.starts_with(&root) && p.is_file() => "file",
                 _ => "unavailable",
             };
-            entries.push(Entry { path, name, kind });
+            entries.push(WorkspaceNode { path, name, kind });
         }
         entries.sort_by(|a, b| {
             (a.kind != "directory")
@@ -94,8 +94,8 @@ impl WorkspaceService {
         Ok(entries)
     }
 
-    pub(crate) fn create_folder_in(&self, name: &str, parent: &str) -> Result<Entry> {
-        let name = Entry::validate_name(name)?;
+    pub(crate) fn create_folder_in(&self, name: &str, parent: &str) -> Result<WorkspaceNode> {
+        let name = WorkspaceNode::validate_name(name)?;
         fs::create_dir(self.resolve(parent)?.join(name)).map_err(|e| {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
                 error(
@@ -106,7 +106,7 @@ impl WorkspaceService {
                 e.into()
             }
         })?;
-        Ok(Entry {
+        Ok(WorkspaceNode {
             path: if parent.is_empty() {
                 name.to_owned()
             } else {
@@ -117,8 +117,8 @@ impl WorkspaceService {
         })
     }
 
-    pub(crate) fn rename(&self, relative: &str, name: &str) -> Result<Entry> {
-        let name = Entry::validate_name(name)?;
+    pub(crate) fn rename(&self, relative: &str, name: &str) -> Result<WorkspaceNode> {
+        let name = WorkspaceNode::validate_name(name)?;
         let source = self.resolve(relative)?;
         let root = self.root()?;
         // Rename the workspace entry itself; reject symlinks rather than renaming their targets.
@@ -173,7 +173,7 @@ impl WorkspaceService {
             .unwrap()
             .to_string_lossy()
             .replace('\\', "/");
-        Ok(Entry {
+        Ok(WorkspaceNode {
             path,
             name: name.to_owned(),
             kind,
