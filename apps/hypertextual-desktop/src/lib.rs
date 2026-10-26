@@ -1,5 +1,6 @@
 mod error;
 mod models;
+mod services;
 mod workspace;
 
 use std::sync::{
@@ -21,10 +22,6 @@ fn workspace_finish_quit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-pub fn greeting() -> &'static str {
-    "hello hypertextual-desktop!"
-}
-
 /// Construct the app; an explicit home is used by the isolated desktop smoke harness.
 pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tauri::Wry> {
     tauri::Builder::default()
@@ -34,8 +31,8 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
                 Some(home) => home,
                 None => app.path().home_dir()?,
             };
-            app.manage(workspace::WorkspaceService(Arc::new(Mutex::new(
-                models::Workspace::from_home(home),
+            app.manage(workspace::WorkspaceState(Arc::new(Mutex::new(
+                services::WorkspaceService::from_home(home),
             ))));
             Ok(())
         })
@@ -84,14 +81,4 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Tauri application")
         .run(handle_event);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::greeting;
-
-    #[test]
-    fn greeting_uses_the_template_name() {
-        assert_eq!(greeting(), "hello hypertextual-desktop!");
-    }
 }

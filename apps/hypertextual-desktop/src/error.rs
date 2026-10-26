@@ -1,9 +1,12 @@
 use serde::Serialize;
 
+/// A workspace failure returned to the application.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceError {
+    /// A stable code that identifies the failure.
     pub(crate) code: &'static str,
+    /// A message that explains the failure to the user.
     pub(crate) message: String,
 }
 

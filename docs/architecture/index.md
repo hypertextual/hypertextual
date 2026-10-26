@@ -33,8 +33,14 @@ flowchart LR
   Editor --> Client
   Editor --> UI
   Client --> Rust[Tauri workspace commands]
-  Rust --> Model[Workspace model]
-  Model --> Files[Local files]
+  Rust --> WorkspaceService[Native workspace service]
+  Rust --> ArticleService[Native article service]
+  Rust --> MediaService[Native media service]
+  ArticleService --> WorkspaceService
+  MediaService --> WorkspaceService
+  WorkspaceService --> Files[Local files]
+  ArticleService --> Files
+  MediaService --> Files
 ```
 
 - The shell composes navigation, the article pane, and recovery controls.
@@ -59,7 +65,11 @@ The workspace client exposes file operations, image reads and imports, and revis
 
 Application-specific components and services live in the Svelte app. Generic components and editor conversion live in the private UI library. The desktop backend retains native filesystem and window integration.
 
-Rust models and their methods live under `apps/hypertextual-desktop/src/models`. `Workspace` owns filesystem operations. Separate model files define entries, loaded documents, saved articles, image assets, and workspace listings. `error.rs` defines the shared workspace error contract. `workspace.rs` contains Tauri commands and serializes access to the workspace model.
+Rust models live under `apps/hypertextual-desktop/src/models`. Related types share a file. `workspace.rs` defines the workspace location and its listing. `article.rs` defines article content and metadata. Models validate values and construct data without accessing the filesystem.
+
+Native services live under `src/services`. WorkspaceService owns browsing, folder creation, renaming, deletion, and containment checks. ArticleService owns article creation, reads, and saves. MediaService owns image imports and reads. Article and media services share the workspace boundary. Their behavior tests live inside their source files and use isolated temporary directories.
+
+`error.rs` defines the shared workspace error contract. The top-level `workspace.rs` contains Tauri commands and serializes filesystem operations across all three services.
 
 ### Extension points
 

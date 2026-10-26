@@ -3,7 +3,7 @@ import {
   errorMessage,
   type WorkspaceClient,
   type WorkspaceEntry,
-  type SavedArticle,
+  type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { EditorService } from './editorService.svelte'
 
@@ -236,7 +236,7 @@ export class WorkspaceService {
   private refresh(path: string) {
     this.refreshFolder = { path, version: (this.refreshFolder?.version ?? 0) + 1 }
   }
-  private saved(oldPath: string, saved: SavedArticle, title: string) {
+  private saved(oldPath: string, saved: ArticleMetadata, title: string) {
     this.entries = this.entries.map((item) =>
       item.path === oldPath ? { ...item, path: saved.path, name: saved.name } : item,
     )

@@ -5,11 +5,11 @@ export interface WorkspaceEntry {
   name: string
   kind: 'directory' | 'file' | 'unavailable'
 }
-export interface WorkspaceDocument {
+export interface ArticleContent {
   content: string
   revision: string
 }
-export interface SavedArticle {
+export interface ArticleMetadata {
   path: string
   name: string
   revision: string
@@ -19,7 +19,12 @@ export interface ImageAsset {
   url: string
 }
 export interface WorkspaceClient {
-  saveArticle(path: string, content: string, revision: string, title: string): Promise<SavedArticle>
+  saveArticle(
+    path: string,
+    content: string,
+    revision: string,
+    title: string,
+  ): Promise<ArticleMetadata>
   importImage(path: string, bytes: number[]): Promise<ImageAsset>
   readImage(path: string, source: string): Promise<ImageAsset>
   open(): Promise<{ root: string; entries: WorkspaceEntry[] }>
@@ -29,7 +34,7 @@ export interface WorkspaceClient {
   delete(path: string): Promise<void>
   rename(path: string, name: string): Promise<WorkspaceEntry>
   createFolder(name: string, parentPath?: string): Promise<WorkspaceEntry>
-  read(path: string): Promise<WorkspaceDocument>
+  read(path: string): Promise<ArticleContent>
   write(path: string, content: string, revision: string): Promise<string>
 }
 export const workspaceClient: WorkspaceClient = {

@@ -8,13 +8,13 @@ import {
   errorMessage,
   type WorkspaceClient,
   type WorkspaceEntry,
-  type SavedArticle,
+  type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { Autosave, type SaveState } from './autosave'
 
 export interface EditorObserver {
   titleChanged: (path: string, title: string) => void
-  saved: (oldPath: string, saved: SavedArticle, title: string) => void
+  saved: (oldPath: string, saved: ArticleMetadata, title: string) => void
 }
 
 /** One selection and autosave lifecycle per workspace window. */

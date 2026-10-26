@@ -1,17 +1,19 @@
-//! Tauri commands serialize access to the workspace model.
+//! Tauri commands serialize filesystem operations across native services.
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
 use crate::{
     error::{Result, error},
-    models::{Document, Entry, ImageAsset, OpenedWorkspace, SavedArticle, Workspace},
+    models::{ArticleContent, ArticleMetadata, Entry, ImageAsset, WorkspaceListing},
+    services::{ArticleService, MediaService, WorkspaceService},
 };
 
-pub struct WorkspaceService(pub Arc<Mutex<Workspace>>);
+/// Shared workspace access for Tauri command handlers.
+pub struct WorkspaceState(pub Arc<Mutex<WorkspaceService>>);
 
 async fn run<T: Send + 'static>(
-    state: State<'_, WorkspaceService>,
-    operation: impl FnOnce(&Workspace) -> Result<T> + Send + 'static,
+    state: State<'_, WorkspaceState>,
+    operation: impl FnOnce(&WorkspaceService) -> Result<T> + Send + 'static,
 ) -> Result<T> {
     let workspace = state.0.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -25,26 +27,26 @@ async fn run<T: Send + 'static>(
 }
 
 #[tauri::command]
-pub async fn workspace_open(state: State<'_, WorkspaceService>) -> Result<OpenedWorkspace> {
-    run(state, Workspace::open).await
+pub async fn workspace_open(state: State<'_, WorkspaceState>) -> Result<WorkspaceListing> {
+    run(state, WorkspaceService::open).await
 }
 
 #[tauri::command]
 pub async fn workspace_list(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
 ) -> Result<Vec<Entry>> {
     run(state, move |w| w.list(&relative_path)).await
 }
 
 #[tauri::command]
-pub async fn workspace_create(state: State<'_, WorkspaceService>) -> Result<Entry> {
-    run(state, Workspace::create).await
+pub async fn workspace_create(state: State<'_, WorkspaceState>) -> Result<Entry> {
+    run(state, |w| ArticleService::new(w).create()).await
 }
 
 #[tauri::command]
 pub async fn workspace_create_folder(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     name: String,
     parent_path: Option<String>,
 ) -> Result<Entry> {
@@ -56,19 +58,19 @@ pub async fn workspace_create_folder(
 
 #[tauri::command]
 pub async fn workspace_create_file(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     name: String,
     parent_path: Option<String>,
 ) -> Result<Entry> {
     run(state, move |w| {
-        w.create_file(&name, parent_path.as_deref().unwrap_or(""))
+        ArticleService::new(w).create_file(&name, parent_path.as_deref().unwrap_or(""))
     })
     .await
 }
 
 #[tauri::command]
 pub async fn workspace_rename(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
     name: String,
 ) -> Result<Entry> {
@@ -77,7 +79,7 @@ pub async fn workspace_rename(
 
 #[tauri::command]
 pub async fn workspace_delete(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
 ) -> Result<()> {
     run(state, move |w| w.delete(&relative_path)).await
@@ -85,51 +87,57 @@ pub async fn workspace_delete(
 
 #[tauri::command]
 pub async fn workspace_save_article(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
     content: String,
     expected_revision: String,
     title: String,
-) -> Result<SavedArticle> {
+) -> Result<ArticleMetadata> {
     run(state, move |w| {
-        w.save_article(&relative_path, &content, &expected_revision, &title)
+        ArticleService::new(w).save(&relative_path, &content, &expected_revision, &title)
     })
     .await
 }
 #[tauri::command]
 pub async fn workspace_import_image(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     article_path: String,
     bytes: Vec<u8>,
 ) -> Result<ImageAsset> {
-    run(state, move |w| w.import_image(&article_path, &bytes)).await
+    run(state, move |w| {
+        MediaService::new(w).import(&article_path, &bytes)
+    })
+    .await
 }
 #[tauri::command]
 pub async fn workspace_read_image(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     article_path: String,
     source: String,
 ) -> Result<ImageAsset> {
-    run(state, move |w| w.read_image(&article_path, &source)).await
+    run(state, move |w| {
+        MediaService::new(w).read(&article_path, &source)
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn workspace_read(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
-) -> Result<Document> {
-    run(state, move |w| w.read(&relative_path)).await
+) -> Result<ArticleContent> {
+    run(state, move |w| ArticleService::new(w).read(&relative_path)).await
 }
 
 #[tauri::command]
 pub async fn workspace_write(
-    state: State<'_, WorkspaceService>,
+    state: State<'_, WorkspaceState>,
     relative_path: String,
     content: String,
     expected_revision: String,
 ) -> Result<String> {
     run(state, move |w| {
-        w.write(&relative_path, &content, &expected_revision)
+        ArticleService::new(w).write(&relative_path, &content, &expected_revision)
     })
     .await
 }
