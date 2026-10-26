@@ -1,0 +1,5 @@
+{
+  "extends": "../../apps/hypertextual-svelte/tsconfig.json",
+  "compilerOptions": { "types": ["bun", "vite/client"], "noUnusedLocals": true },
+  "include": ["./**/*.ts", "../../apps/hypertextual-svelte/src/vite-env.d.ts"]
+}

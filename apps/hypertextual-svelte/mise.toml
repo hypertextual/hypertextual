@@ -90,10 +90,6 @@ fi
 description = "Report deferred deployment"
 run = 'echo "deploy: no deployment target configured"'
 
-[tasks.e2e]
-description = "Run the finite application smoke test"
-run = "sh -c 'bun run test'"
-
 [tasks.typecheck]
 description = "Run project-specific type checks"
 hide = true

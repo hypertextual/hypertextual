@@ -1,15 +1,10 @@
 <script lang="ts">
-  import { greeting } from './lib/greeting'
+  import Shell from './components/Shell.svelte'
+  import { workspaceClient } from './clients/workspaceClient'
+  import type { AppProps } from './types'
 
-  const message = greeting('')
+  // Props ---------------------------------------------------------------------
+  let { client = workspaceClient }: AppProps = $props()
 </script>
 
-<svelte:head>
-  <title>hypertextual-svelte</title>
-</svelte:head>
-
-<main aria-labelledby="app-title">
-  <p class="eyebrow">Svelte + Vite</p>
-  <h1 id="app-title">{message}</h1>
-  <p>A client-only static application ready to build into <code>dist/</code>.</p>
-</main>
+<Shell {client} />

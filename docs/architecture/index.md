@@ -1,82 +1,85 @@
-# Architecture
+# Hypertextual software architecture
 
 ## Overview
 
-Hypertextual combines a Tauri desktop application, a Svelte frontend, a Rust CLI, and shared HTMD libraries. The desktop application hosts the frontend and its Rust backend in one installed application.
+Hypertextual is a desktop workspace for local articles. Writers browse files, edit articles, and save changes without a separate save action. The current scope is one local workspace. Tabs, cloud synchronization, and multiple workspaces remain future work.
 
-The project uses Tauri 2, Svelte 5, TypeScript, Vite 8, Rust 2024, and Clap 4. [Premise](https://github.com/cloudvoyant/premise) manages project tasks, with Mise providing tools and Bun and Cargo managing dependencies.
+## Requirement
 
-## Requirements
+### Functional
 
-### Functional requirements
+- Browse, create, rename, and delete articles and folders.
+- Edit supported articles and retain drafts when saving fails.
+- Store article images beside their articles and preserve portable references.
 
-- Run the Svelte interface inside the desktop application and in a browser.
-- Expose Rust operations to the desktop frontend through Tauri commands, events, and channels.
-- Provide a CLI package named `hypertextual` with the executable name `hyped`.
+### Non-Functional
 
-### Non-functional requirements
-
-- Support macOS, Linux, and Windows desktop platforms.
-- Embed frontend assets so installed applications run without Bun, Node, or a development server.
-- Keep document behavior reusable through shared Rust and TypeScript libraries.
-- Support frontend hot module replacement and automatic Rust rebuilds during development.
-- Keep the HTMD libraries and Svelte package private.
+- Support macOS, Linux, and Windows.
+- Keep filesystem access within the selected workspace.
+- Keep reusable UI independent of storage and application policy.
+- Preserve existing content when the editor cannot represent it.
 
 ## Design
 
-### Project structure
+### Components and Responsibilities
 
-```text
-hypertextual/
-├── apps/
-│   ├── hypertextual-desktop/  Tauri shell and Rust backend
-│   ├── hypertextual-svelte/   Svelte frontend
-│   └── hypertextual-cli/      Rust CLI, executable hyped
-└── libs/
-    ├── htmd-rs/               Shared Rust document library
-    └── htmd-ts/               Frontend TypeScript document library
+```mermaid
+flowchart LR
+  Writer --> Shell[Workspace shell]
+  Shell --> Workspace[Workspace service]
+  Shell --> Editor[Editor service]
+  Shell --> UI[Reusable UI]
+  Workspace --> Client[Tauri clients]
+  Editor --> Client
+  Editor --> UI
+  Client --> Rust[Tauri workspace commands]
+  Rust --> WorkspaceService[Native workspace service]
+  Rust --> ArticleService[Native article service]
+  Rust --> MediaService[Native media service]
+  ArticleService --> WorkspaceService
+  MediaService --> WorkspaceService
+  WorkspaceService --> Files[Local files]
+  ArticleService --> Files
+  MediaService --> Files
 ```
 
-### Component boundaries
+- The shell composes navigation, the article pane, and recovery controls.
+- Application services own workspace operations, article selection, and autosave policy.
+- The private UI library supplies portable editor, tree, and menu interfaces using published Helical packages and Ark UI.
+- Tauri clients connect application services to Rust. Rust owns filesystem access and workspace safety.
+- The HTMD libraries remain reserved for format SDK design. The CLI is a separate Rust consumer.
 
-![Component boundaries](diagrams/component-boundaries.svg)
+### Data and Control Flow
 
-- `hypertextual-svelte` renders the interface inside Tauri's webview and can run independently in a browser.
-- `hypertextual-desktop` owns the native application window and Rust backend, with Tauri providing the communication boundary.
-- Commands carry frontend requests to Rust and return results, while events and channels carry updates from Rust to the frontend.
-- `hypertextual-cli` provides the `hyped` executable through the Cargo package named `hypertextual`.
-- `htmd-rs` defines the shared document layer for Rust consumers, and `htmd-ts` defines the frontend library boundary.
-- Dashed arrows show the intended shared-library dependencies, while the current library packages remain independent starters.
+Opening a workspace supplies the tree with its entries. Selecting an article opens an editor document through the editor service. The reusable editor emits serialized content and title changes. Autosave writes those changes through the Tauri client, and the workspace service reflects the saved filename.
 
-### Development flow
+A failed save retains the draft. Switching articles or closing the window requires pending writes to finish. Application state belongs to one window and resets on startup.
 
-![Development flow](diagrams/development.svg)
+### Interfaces and Contracts
 
-- The desktop development task starts Vite at `http://127.0.0.1:1420` and loads that URL inside the Tauri window.
-- Vite applies frontend changes without restarting Rust, while Rust changes rebuild and restart the desktop process.
-- Bun manages the Svelte app and TypeScript library through the root package workspace, with one shared dependency-install task.
-
-### Packaging flow
-
-![Packaging flow](diagrams/packaging.svg)
-
-- The desktop build runs the frontend build first, then embeds `apps/hypertextual-svelte/dist` into the application.
-- Installed desktop applications load their embedded assets and do not connect to a frontend development server.
-- The root Cargo workspace contains the CLI, while the desktop app and Rust library use independent Cargo manifests.
+The workspace client exposes file operations, image reads and imports, and revision-aware writes. A revision identifies the content version that the caller expects to replace. The editor service supplies image callbacks to the reusable editor without exposing workspace paths or storage conventions.
 
 ## Implementation
 
-Supported desktop platforms:
+### Ownership boundaries
 
-- macOS.
-- Linux.
-- Windows.
+Application-specific components and services live in the Svelte app. Generic components and editor conversion live in the private UI library. The desktop backend retains native filesystem and window integration.
+
+Rust models live under `apps/hypertextual-desktop/src/models`. Related types share a file. `workspace.rs` defines the workspace location, its nodes, and its listing. `article.rs` defines article content and metadata. Models validate values and construct data without accessing the filesystem.
+
+Native services live under `src/services`. WorkspaceService owns browsing, folder creation, renaming, deletion, and containment checks. ArticleService owns article creation, reads, and saves. MediaService owns image imports and reads. Article and media services share the workspace boundary. Their behavior tests live inside their source files and use isolated temporary directories.
+
+`error.rs` defines the shared workspace error contract. The top-level `workspace.rs` contains Tauri commands and serializes filesystem operations across all three services.
+
+### Extension points
+
+Storage and asset adapters allow the editor to serve other applications. The planned Helical editor service and shared Rust filesystem library can replace these boundaries without moving workspace policy into UI components.
 
 ## References
 
-- [Development guide](../development.md).
-- [Product requirements](../../prd/0001-hypertextual-app/README.md).
-- [Design prototype](../../designs/prototypes/hypertextual-v0/README.md).
-- [Premise](https://github.com/cloudvoyant/premise).
-- [Tauri frontend and Rust communication](https://v2.tauri.app/develop/calling-rust/).
-- [Tauri and Vite integration](https://v2.tauri.app/start/frontend/vite/).
+- [UI library components](ui/index.md)
+- [Svelte web app components](svelte-web-app/index.md)
+- [Development commands](../development.md)
+- [Product requirements](../../prd/0001-hypertextual-app/README.md)
+- [Helical editor service follow-up](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and)
+- [Shared Rust filesystem follow-up](https://linear.app/cloudvoyant/issue/DIFF-244/extract-shared-rust-hyped-fs-library-for-desktop-and-cli-file)

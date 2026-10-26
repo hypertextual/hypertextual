@@ -100,3 +100,12 @@ dist/
 *.swp
 .idea/
 .vscode/
+
+# Browser test artifacts
+**/test-results/
+**/playwright-report/
+
+# Keep the root dependency graph reproducible
+!/bun.lock
+
+**/dist-e2e/
