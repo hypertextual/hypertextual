@@ -6,6 +6,14 @@ TreeView is a reusable Ark UI tree wrapper with Helical styling. The workspace f
 
 ## Design
 
+### Public API
+
+`TreeViewProps` in `libs/ui/src/tree-view/types.ts` defines nodes, selection, loading, renaming, label/icon rendering, context actions, and refresh requests. Stable node values identify entries. Callers keep storage behavior outside the component.
+
+```svelte
+<TreeView {nodes} {selected} onselect={selectNode} {loadChildren} />
+```
+
 ### Layout
 
 Expanded and collapsed branches:
@@ -31,33 +39,40 @@ Archive/
 
 Rows are 24 px tall. Each nesting level adds 16 px of indentation, with a 14 px icon box and a truncated label. During renaming, a 22 px input replaces the label. Its error appears below that row.
 
-### Behavior
+### State and Data Flow
 
-- Show the supplied hierarchy with folders collapsed at first.
-- Expand or collapse a branch to reveal or hide its children. Select a leaf to choose that item.
-- If a branch cannot open, show an error and allow another expansion attempt to retry.
-- Press F2 to rename the focused item. Enter submits the name, and Escape cancels.
-- A failed rename retains the attempted name in an invalid field with an error below it. Typing clears the error so the name can be corrected.
-- Use arrow keys to move through the tree. Keyboard focus remains visible as selection and expansion change.
+Branch expansion:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Collapsed
+    Collapsed --> Loading: expand an unloaded branch
+    Loading --> Expanded: children load
+    Loading --> LoadFailed: children cannot load
+    LoadFailed --> Loading: expand again to retry
+    Expanded --> Collapsed: collapse the branch
+    Collapsed --> Expanded: expand a loaded branch
+```
+
+Inline naming:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Label
+    Label --> Naming: F2 or a requested rename
+    Naming --> Submitting: Enter
+    Submitting --> Label: rename succeeds
+    Submitting --> Invalid: rename fails and attempted name returns
+    Invalid --> Naming: typing clears the error
+    Naming --> Label: Escape cancels
+    Invalid --> Label: Escape cancels
+```
+
+- Arrow keys move focus through the hierarchy. Selecting a leaf reports its value to the caller.
 
 ## Implementation
 
-### Public API
-
-`TreeViewProps` in `libs/ui/src/tree-view/types.ts` defines nodes, selection, loading, renaming, label/icon rendering, context actions, and refresh requests. Stable node values identify entries. Callers keep storage behavior outside the component.
-
-```svelte
-<TreeView {nodes} {selected} onselect={selectNode} {loadChildren} />
-```
-
-### State and Data Flow
-
-The caller owns selected values and creation requests. Ark owns interaction state. The wrapper retains loaded children and operation errors. `TreeNode` renders recursive parts under the same contract.
-
-### Styling and Responsiveness
-
-`styles.ts` composes published Helical Sidebar and Input variants. Semantic theme tokens control selection, focus, guides, and invalid fields.
-
-### Maintainer Notes
-
-Do not turn a failed selection flush into a different visible selection. Preserve attempted names until correction or cancellation. Workspace browser journeys cover these interactions with real temporary files.
+- Keep selection controlled by `selected`. A failed draft save must leave the original leaf selected.
+- Replace the `loaded` cache object when children change. It uses `$state.raw`, so nested mutation does not refresh the collection.
+- Keep the attempted rename label separate from `displayLabel`, which supplies the normal row label.
+- Defer menu actions until menu focus restoration finishes. Starting a rename earlier can steal focus from its input.

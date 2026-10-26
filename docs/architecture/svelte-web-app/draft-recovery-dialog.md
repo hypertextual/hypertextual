@@ -6,6 +6,14 @@ The recovery dialog presents choices after document conversion or saving fails. 
 
 ## Design
 
+### Public API
+
+`DraftRecoveryDialogProps` declares `open`, `message`, `copyStatus`, `busy`, and callbacks for close, copy, discard, and optional retry.
+
+```svelte
+<DraftRecoveryDialog {open} {message} onclose={keepEditing} oncopy={copyDraft} ondiscard={reload} />
+```
+
 ### Layout
 
 Save failure:
@@ -42,32 +50,27 @@ Unsupported formatting:
 
 The modal is centered above the workspace. Retry appears only for a save failure. Busy operations disable Retry and Discard while the draft remains visible behind the modal.
 
-### Behavior
+### State and Data Flow
 
-- Open when saving or document conversion fails, with the failure reason and an explanation that the draft is retained.
-- Keep editing closes the dialog without losing the draft. Copy draft copies its current content.
-- Retry autosave appears for save failures and attempts to preserve the draft again.
-- Discard draft and reload replaces the draft with the saved file. Retry and Discard are disabled while an operation runs.
-- Keep keyboard focus inside the open dialog. Escape closes it without discarding the draft.
+```mermaid
+stateDiagram-v2
+    [*] --> Closed
+    Closed --> SaveFailed: a file write fails
+    Closed --> UnsupportedEdit: an edit cannot be saved as Markdown
+    SaveFailed --> Retrying: Retry autosave
+    Retrying --> Closed: save succeeds
+    Retrying --> SaveFailed: save fails again
+    SaveFailed --> SaveFailed: Copy draft updates copy feedback
+    UnsupportedEdit --> UnsupportedEdit: Copy draft updates copy feedback
+    SaveFailed --> Closed: Keep editing or Escape
+    UnsupportedEdit --> Closed: Keep editing or Escape
+    SaveFailed --> Closed: Discard draft and reload
+    UnsupportedEdit --> Closed: Discard draft and reload
+```
+
+- Focus stays inside the open dialog. While the host is busy, Retry and Discard are disabled.
 
 ## Implementation
 
-### Public API
-
-`DraftRecoveryDialogProps` declares `open`, `message`, `copyStatus`, `busy`, and callbacks for close, copy, discard, and optional retry.
-
-```svelte
-<DraftRecoveryDialog {open} {message} onclose={keepEditing} oncopy={copyDraft} ondiscard={reload} />
-```
-
-### State and Data Flow
-
-EditorService owns the draft and failure state. The dialog emits choices and never accesses files or editor JSON. Discard waits for any active write before reopening the file.
-
-### Styling and Responsiveness
-
-The dialog uses published Helical parts and sits above workspace menus. The host layout controls the available viewport.
-
-### Maintainer Notes
-
-Keep this composition in the application. Do not replace it with browser confirm dialogs. Browser tests cover retained drafts, retry, copying, and discard after external changes.
+- Keep `EditorService.reload()` waiting for active writes before reopening the file. A late write can otherwise replace the reloaded content.
+- Strip duplicate recovery instructions before adding the shared draft-retention explanation.

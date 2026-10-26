@@ -6,6 +6,14 @@ The content pane presents the selected document, image, or empty workspace previ
 
 ## Design
 
+### Public API
+
+`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives the active document and reports serialized changes or typed failures.
+
+```svelte
+<ContentPane {workspace} />
+```
+
 ### Layout
 
 No selection:
@@ -60,32 +68,37 @@ Article selected:
 
 The selected article has a 40 px heading bar. Only the document body scrolls. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
 
-### Behavior
+### State and Data Flow
 
-- With no selection, show the writing placeholder and an invitation to choose or create an article.
-- While opening a selection, show progress. Then show its editable document, image preview, or original read-only source.
-- Keep the title in the heading and status bars synchronized with the article. Hovering the title reveals the file path.
-- Show pending, saving, saved, or unsaved status as edits are preserved. Announce those changes to assistive technology.
-- If opening fails, show the reason and a Retry opening action. Save failures leave the draft available for recovery.
+```mermaid
+stateDiagram-v2
+    [*] --> NoSelection
+    NoSelection --> Opening: select or create an article
+    Opening --> Editing: supported article loads
+    Opening --> ReadOnly: source cannot be edited safely
+    Opening --> Image: image loads
+    Opening --> Failed: file cannot open
+    Failed --> Opening: Retry opening
+    ReadOnly --> Opening: choose another entry
+    Image --> Opening: choose another entry
+    Editing --> Opening: save and choose another entry
+
+    state Editing {
+        [*] --> Saved
+        Saved --> Pending: edit the article
+        Pending --> Saving: autosave starts
+        Saving --> Saved: write succeeds
+        Saving --> Unsaved: write fails
+        Pending --> Unsaved: edit cannot be saved as Markdown
+        Saved --> Unsaved: edit cannot be saved as Markdown
+        Unsaved --> Saving: retry a failed write
+        Unsaved --> Pending: correct unsupported formatting
+    }
+```
+
+- The heading and footer show the current article title. Hover either title to see its path.
 
 ## Implementation
 
-### Public API
-
-`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives the active document and reports serialized changes or typed failures.
-
-```svelte
-<ContentPane {workspace} />
-```
-
-### State and Data Flow
-
-EditorService owns the selected entry, document, loading state, and save queue. The pane owns only its editor handle. A focus request opens a newly created article for immediate editing.
-
-### Styling and Responsiveness
-
-The editor has a bounded reading width. Toolbars truncate long titles and expose the actual file path on hover.
-
-### Maintainer Notes
-
-Mount a new editor when the document session changes. Preserve the mounted editor during title-driven filename updates. Browser tests cover delayed reads, continued editing, title changes, and save status.
+- Key the editor by `editor.version`, not the selected path. Saving a new title can rename the file without replacing the editing session.
+- Wait for `tick()` before forwarding a focus request to a newly mounted editor.

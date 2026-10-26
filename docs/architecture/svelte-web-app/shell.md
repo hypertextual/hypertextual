@@ -6,6 +6,14 @@ The shell is the desktop workspace frame. It composes navigation, file actions, 
 
 ## Design
 
+### Public API
+
+`Shell` accepts a `WorkspaceClient`. `App` supplies the production Tauri client. Tests supply isolated Tauri behavior at the transport boundary.
+
+```svelte
+<Shell client={workspaceClient} />
+```
+
 ### Layout
 
 Sidebar expanded:
@@ -72,32 +80,32 @@ Sidebar collapsed:
 
 The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer is empty. The content pane fills the remaining width, with its status bar at the bottom.
 
-### Behavior
+### State and Data Flow
 
-- Start at the local workspace with no article selected.
-- Keep the workspace selector beside the app name. Add workspace is visible but unavailable.
-- New article opens a document for immediate editing. New folder opens an inline name field in the sidebar.
-- Toggle the sidebar to give the article more space without changing the selected document.
-- Show workspace loading and an empty-workspace prompt. If opening fails, show the reason and a Retry action.
+```mermaid
+stateDiagram-v2
+    [*] --> Opening
+    Opening --> Ready: workspace opens
+    Opening --> Failed: workspace cannot open
+    Failed --> Opening: Retry
+
+    Ready --> Ready: New article opens the editor
+    Ready --> Ready: New folder starts inline naming
+    Ready --> Closing: close or quit requested
+    Closing --> Ready: saving or native close fails
+    Closing --> [*]: pending changes saved and native close succeeds
+```
+
+Sidebar visibility changes independently of the selected document:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Visible
+    Visible --> Hidden: toggle sidebar
+    Hidden --> Visible: toggle sidebar
+```
 
 ## Implementation
 
-### Public API
-
-`Shell` accepts a `WorkspaceClient`. `App` supplies the production Tauri client. Tests supply isolated Tauri behavior at the transport boundary.
-
-```svelte
-<Shell client={workspaceClient} />
-```
-
-### State and Data Flow
-
-One `WorkspaceService` owns one `EditorService`. The shell starts workspace loading and registers desktop close and quit handlers in `onMount`. These handlers call `EditorService.close`, which saves pending changes before running the native close or quit operation. A failed save keeps the document open. Unmounting releases handlers and services.
-
-### Styling and Responsiveness
-
-The shell uses published Helical Sidebar and Select parts. The title bar contains the short workspace label. Add workspace remains a disabled placeholder.
-
-### Maintainer Notes
-
-Keep filesystem operations and document conversion out of this component. Browser tests cover the visible frame and sidebar toggle. Native close behavior uses the desktop integration boundary.
+- Notify Rust that the frontend is ready only after both close and quit listeners are registered.
+- Release listeners that finish registering after unmount. Otherwise, a closed shell can leave handlers active.

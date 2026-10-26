@@ -6,6 +6,14 @@ The workspace explorer presents workspace entries inside the shell sidebar. It c
 
 ## Design
 
+### Public API
+
+`WorkspaceExplorerProps` is declared inside the component and contains one `WorkspaceService`. The component forwards the service view model to TreeView and supplies workspace icons.
+
+```svelte
+<WorkspaceExplorer {workspace} />
+```
+
 ### Layout
 
 Folders collapsed:
@@ -39,33 +47,31 @@ Welcome
 
 The tree fills the sidebar width below the Workspace actions. Folder icons occupy a fixed box and change with expansion. Article labels use their headings, while pending folders show an inline input.
 
-### Behavior
+### State and Data Flow
 
-- Start with folders collapsed. Expanding a folder reveals its entries and nesting guides.
-- Select an article to open it. Its label follows the article heading as the user edits it.
-- Create a folder with its name immediately editable. Create an article directly in the editor.
-- Right-click a folder to create entries inside it. Right-click an entry or press F2 to rename it.
-- If a name conflicts, retain the attempted name and show an inline error. Escape cancels the rename.
-- Move to Trash removes the entry after the operation succeeds. A failed operation leaves the entry available.
+```mermaid
+stateDiagram-v2
+    [*] --> Browsing
+    Browsing --> Naming: create a folder or rename an entry
+    Naming --> SavingName: Enter
+    SavingName --> Browsing: name saved
+    SavingName --> InvalidName: name conflicts or cannot be saved
+    InvalidName --> Naming: change the attempted name
+    Naming --> Browsing: Escape cancels
+    InvalidName --> Browsing: Escape cancels
+
+    Browsing --> Browsing: select or create an article to open it
+    Browsing --> Browsing: first heading changes the displayed title
+    Browsing --> Browsing: failed save keeps the current selection
+
+    Browsing --> Removing: Move to Trash
+    Removing --> Browsing: remove succeeds and entry disappears
+    Removing --> Browsing: remove fails and entry remains
+```
+
+- Right-click a folder to create articles or folders inside it. Folder expansion and keyboard navigation follow the [TreeView states](../ui/tree-view.md#state-and-data-flow).
 
 ## Implementation
 
-### Public API
-
-`WorkspaceExplorerProps` is declared inside the component and contains one `WorkspaceService`. The component forwards the service view model to TreeView and supplies workspace icons.
-
-```svelte
-<WorkspaceExplorer {workspace} />
-```
-
-### State and Data Flow
-
-The workspace service owns known entries, pending creation, title labels, and folder refresh requests. WorkspaceExplorer keeps no entry cache. Selection opens the editor through the workspace service.
-
-### Styling and Responsiveness
-
-Icons use a fixed alignment box. The published Helical Sidebar controls the available width. Long labels truncate within tree rows.
-
-### Maintainer Notes
-
-Keep article naming and filesystem behavior in the service. Test empty and existing workspaces, nested operations, collisions, and persistence through the browser suite.
+- Use article headings for display labels. Keep tree values tied to entry paths.
+- Let rename failures reject the promise returned to TreeView. Resolving that promise ends the inline edit.

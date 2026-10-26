@@ -6,6 +6,16 @@ ContextMenu is a generic action menu built on Ark UI Menu. Workspace branches an
 
 ## Design
 
+### Public API
+
+`ContextMenuProps` declares `items`, `onaction`, a trigger snippet, size, and caller classes. `ContextMenuItem` contains a value, label, optional shortcut, and destructive flag.
+
+```svelte
+<ContextMenu items={actions} onaction={runAction}>
+  {#snippet children(_props)}<span>Open actions here</span>{/snippet}
+</ContextMenu>
+```
+
 ### Layout
 
 Open menu over the sidebar and adjacent article area:
@@ -32,33 +42,19 @@ Open menu over the sidebar and adjacent article area:
 
 `x` marks the right-click position on the Drafts row. The menu opens below that point and overlays both the tree and the adjacent pane. It has a minimum width of 164 px, with 25 px compact rows. Shortcut labels align at the right edge.
 
-### Behavior
+### State and Data Flow
 
-- Right-click an item to open its actions at the cursor position.
-- Choose an action to run it and close the menu.
-- Use the arrow keys to move between actions and Enter to choose one.
-- Press Escape or click outside to close the menu without choosing an action.
+```mermaid
+stateDiagram-v2
+    [*] --> Closed
+    Closed --> Open: right-click the trigger
+    Open --> Open: arrow keys focus another action
+    Open --> Closed: click an action or press Enter to run it
+    Open --> Closed: Escape or outside click cancels
+```
 
 ## Implementation
 
-### Public API
-
-`ContextMenuProps` declares `items`, `onaction`, a trigger snippet, size, and caller classes. `ContextMenuItem` contains a value, label, optional shortcut, and destructive flag.
-
-```svelte
-<ContextMenu items={actions} onaction={runAction}>
-  {#snippet children(_props)}<span>Open actions here</span>{/snippet}
-</ContextMenu>
-```
-
-### State and Data Flow
-
-Ark owns menu state. The wrapper emits the selected action value. `ContextMenuPositioner` refreshes portal positioning after opening and contains no application state.
-
-### Styling and Responsiveness
-
-Shared CVA variants and semantic tokens provide compact items, highlighted states, and destructive colors. The positioner stays above the sidebar layer.
-
-### Maintainer Notes
-
-Keep menu parts together under `context-menu/`. The planned upstream component is tracked in [CLO-198](https://linear.app/cloudvoyant/issue/CLO-198/add-a-generic-ark-ui-context-menu-using-the-hypertextual). Browser tests cover folder actions and inline rename entry from the menu.
+- Keep the portal outside sidebar clipping, with the positioner above the sidebar layer.
+- Reposition after `tick()` and the next animation frame. The menu needs its mounted dimensions to align with the cursor.
+- Upstream component work is tracked in [CLO-198](https://linear.app/cloudvoyant/issue/CLO-198/add-a-generic-ark-ui-context-menu-using-the-hypertextual).

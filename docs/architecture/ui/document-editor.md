@@ -79,31 +79,18 @@ Unsupported source:
 
 The wrapper occupies the host content area without a toolbar or footer of its own. Helical renders the editable blocks. The source fallback places its reason above the original text.
 
-### Behavior
-
-- Open supported source as an editable document with headings, text, lists, notices, code blocks, and images.
-- Type `/` to find and insert a block. Edit notice titles, types, and bodies directly in the document.
-- Display inserted images inline and retain their captions when reopening the document.
-- Show unsupported source as read-only text with a reason instead of replacing or losing its content.
-- Keep the current draft available when a change cannot be represented in the document format.
-- Support keyboard selection in the slash menu, with Enter to insert and Escape to dismiss.
-
-## Implementation
-
 ### State and Data Flow
-
-Document states:
 
 ```mermaid
 stateDiagram-v2
     state "Original source shown read-only" as ReadOnly
-    state "Editing a serializable draft" as Editable
-    state "Editing a draft that cannot serialize" as Retained
+    state "Editable document" as Editable
+    state "Unsupported edit retained" as Retained
 
-    [*] --> ReadOnly: open cannot preserve the source
-    [*] --> Editable: open can preserve the source
-    Editable --> Editable: update serializes successfully
-    Editable --> Retained: update cannot preserve the edit
+    [*] --> ReadOnly: source cannot be preserved by the editor
+    [*] --> Editable: source opens safely
+    Editable --> Editable: supported edits produce source and title
+    Editable --> Retained: edit cannot be saved as Markdown
     Retained --> Editable: undo or correct the unsupported edit
     Retained --> Retained: copyDraft returns the draft as JSON
     ReadOnly --> [*]: host replaces the document session
@@ -111,32 +98,11 @@ stateDiagram-v2
     Retained --> [*]: host replaces the document session
 ```
 
-An unsupported edit stays in the document. The user can continue editing or copy the draft while the host presents recovery choices.
+- In an editable document, `/` opens the block menu. Arrow keys choose an item, Enter inserts it, and Escape closes the menu.
 
-Edit data flow:
+## Implementation
 
-```mermaid
-flowchart TD
-    editor["Helical editor<br/>Content, cursor, and selection"]
-    update["EditorDocument.update<br/>Restore saved image paths and retain the draft"]
-    encode["markdown.ts: encodeArticle<br/>Serialize, parse again, and compare content"]
-    change["DocumentEditor: onchange<br/>Source text and title"]
-    failure["DocumentEditor: onerror<br/>Error message and title"]
-    host["Host<br/>File writes, save status, and recovery choices"]
-
-    editor -->|"changed JSON"| update
-    update -->|"draft JSON"| encode
-    encode -->|"content preserved"| change
-    encode -->|"conversion would lose content"| failure
-    change --> host
-    failure --> host
-```
-
-### Maintainer Notes
-
-- Before saving, replace image display URLs with the source references returned by the host, such as `.images/photo.png`.
-- If the document content is unchanged, return the original source exactly. This preserves its formatting and line endings.
-- If conversion loses content, report an error and retain the latest draft. `copyDraft()` returns JSON when Markdown conversion fails.
-- Test document sessions and image references in `document.test.ts`. Test Markdown conversion and supported blocks in `markdown.test.ts`.
-
-[CLO-197](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and) tracks moving document loading, conversion, and draft handling into Helical. Until then, keep these operations behind `EditorDocument`.
+- Restore saved image paths before serialization. Display URLs must never enter saved Markdown.
+- Return unchanged source exactly, including its line endings. Reject conversions that lose content and retain the latest draft.
+- Cover document sessions in `document.test.ts` and Markdown preservation in `markdown.test.ts`.
+- Editor ownership work is tracked in [HYPE-160](https://linear.app/cloudvoyant/issue/HYPE-160/vendor-the-helical-editor-for-development-inside-hypertextual) and [CLO-197](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and).
