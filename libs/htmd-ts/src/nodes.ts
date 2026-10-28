@@ -2,6 +2,7 @@ import {
   Node,
   Extension,
   createAtomBlockMarkdownSpec,
+  createBlockMarkdownSpec,
   createInlineMarkdownSpec,
   getExtensionField,
   decodeHtmlEntities,
@@ -120,6 +121,19 @@ export const Notice = Node.create({
   group: 'block',
   content: 'block+',
   defining: true,
+  ...createBlockMarkdownSpec({
+    nodeName: 'notice',
+    parseAttributes,
+    defaultAttributes: { title: 'Note', variant: 'info' },
+  }),
+  parseMarkdown(token, h) {
+    const content = h.parseChildren(token.tokens ?? [])
+    return h.createNode(
+      'notice',
+      { title: 'Note', variant: 'info', ...token.attributes },
+      content.length ? content : [{ type: 'paragraph' }],
+    )
+  },
   addAttributes: () => ({
     title: { default: 'Note' },
     variant: {

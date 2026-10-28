@@ -700,6 +700,73 @@ describe('When handling list-item', () => {
 })
 
 describe('When handling notice', () => {
+  describe('When opening directives from earlier editor versions', () => {
+    for (const [attributes, variant, title] of [
+      ['', 'info', 'Note'],
+      [' {variant="warning" title="Take care"}', 'warning', 'Take care'],
+    ]) {
+      it(`reads a legacy notice${attributes} and preserves edits when reopened`, () => {
+        // Given
+        const source = `# Original\n\n:::notice${attributes}\nAnd this should **save**!\n:::\n\n::paragraph\n`
+        const expected: JSONContent = {
+          type: 'notice',
+          attrs: { variant, title },
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'And this should ' },
+                { type: 'text', text: 'save', marks: [{ type: 'bold' }] },
+                { type: 'text', text: '!' },
+              ],
+            },
+          ],
+        }
+
+        // When
+        const result = parse(source)
+
+        // Then
+        expect(result.issues).toEqual([])
+        expect(result.content.content![1]).toEqual(expected)
+        expect(result.content.content![2]).toEqual({ type: 'paragraph' })
+        expect(serialize(result.content, { originalSource: source })).toBe(source)
+
+        // When
+        result.content.content![0]!.content![0]!.text = 'Edited'
+        const saved = serialize(result.content, { originalSource: source })
+
+        // Then
+        expect(saved).toContain('# Edited')
+        expect(parse(saved).content).toEqual(result.content)
+      })
+    }
+
+    it('opens an empty legacy notice with an editable body', () => {
+      // Given / When
+      const result = parse(':::notice\n:::')
+      // Then
+      expect(result.issues).toEqual([])
+      expect(result.content.content![0]).toEqual({
+        type: 'notice',
+        attrs: { variant: 'info', title: 'Note' },
+        content: [{ type: 'paragraph' }],
+      })
+      expect(parse(serialize(result.content)).content).toEqual(result.content)
+    })
+
+    it('retains legacy attributes it cannot preserve as unparsed source', () => {
+      // Given
+      const source = ':::notice {future="value"}\nBody\n:::'
+      // When
+      const result = parse(source)
+      // Then
+      expect(result.content.content![0]!.type).toBe('unparsedBlock')
+      expect(result.issues).toHaveLength(1)
+      expect(serialize(result.content, { originalSource: source })).toBe(source)
+    })
+  })
+
   describe('When parsing a notice with a formatted body', () => {
     it('produces the documented ProseMirror JSON and preserves it when written again', () => {
       // Given

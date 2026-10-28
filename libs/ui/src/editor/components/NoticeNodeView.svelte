@@ -3,14 +3,30 @@
   import type { NoticeNodeViewProps } from './types'
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
   import { NodeViewContent, NodeViewWrapper } from 'svelte-tiptap'
-  import { Notice } from '@cloudvoyant/helical-svelte'
+  import {
+    Notice,
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectIndicator,
+    SelectContent,
+    SelectItem,
+    SelectItemText,
+    SelectItemIndicator,
+  } from '@cloudvoyant/helical-svelte'
+  import { Check, ChevronsUpDown, Info, CircleCheck, TriangleAlert, CircleX } from 'lucide-svelte'
   type NoticeType = Exclude<NoticeVariants['variant'], null | undefined | 'none'>
 
   // Props ---------------------------------------------------------------------
   let { node, editor, getPos, updateAttributes }: NoticeNodeViewProps = $props()
 
   // State ---------------------------------------------------------------------
-  const variants: NoticeType[] = ['info', 'success', 'warning', 'error']
+  const variants = [
+    { value: 'info', label: 'Info', icon: Info },
+    { value: 'success', label: 'Success', icon: CircleCheck },
+    { value: 'warning', label: 'Warning', icon: TriangleAlert },
+    { value: 'error', label: 'Error', icon: CircleX },
+  ]
 
   // Derived -------------------------------------------------------------------
   const variant = $derived((node.attrs.variant as NoticeType | undefined) ?? 'info')
@@ -47,16 +63,28 @@
         class="min-w-0 flex-1 bg-transparent font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
         placeholder="Notice title"
       />
-      <select
-        aria-label="Notice type"
-        value={variant}
-        onchange={(event) => updateAttributes({ variant: event.currentTarget.value })}
-        class="rounded border border-input bg-background px-1.5 py-0.5 text-xs"
+      <Select
+        items={variants}
+        value={[variant]}
+        onValueChange={(details) => {
+          const next = details.value[0]
+          if (next) updateAttributes({ variant: next })
+        }}
       >
-        {#each variants as value (value)}
-          <option {value}>{value}</option>
-        {/each}
-      </select>
+        <SelectTrigger aria-label="Notice type" size="sm" class="min-w-36 justify-between text-xs">
+          <SelectValue />
+          <SelectIndicator><ChevronsUpDown class="size-3 opacity-50" /></SelectIndicator>
+        </SelectTrigger>
+        <SelectContent>
+          {#each variants as item (item.value)}
+            <SelectItem {item}>
+              <item.icon class="size-4" aria-hidden="true" />
+              <SelectItemText>{item.label}</SelectItemText>
+              <SelectItemIndicator><Check class="size-4" /></SelectItemIndicator>
+            </SelectItem>
+          {/each}
+        </SelectContent>
+      </Select>
     </div>
     <NodeViewContent class="[&_p]:m-0" />
   </Notice>

@@ -257,7 +257,8 @@ test.describe(
         .toContain('> [!NOTE] Note')
       await expect(page.getByRole('alert')).toHaveCount(0)
       await page.getByLabel('Notice title').fill('Remember this')
-      await page.getByLabel('Notice type').selectOption('warning')
+      await page.getByRole('combobox', { name: 'Notice type' }).click()
+      await page.getByRole('option', { name: 'Warning', exact: true }).click()
       await page.getByLabel('Notice title').press('Enter')
       await expect
         .poll(() => page.evaluate(() => document.activeElement?.classList.contains('ProseMirror')))
@@ -278,7 +279,7 @@ test.describe(
       await page.locator('[role="treeitem"][data-value$="two.htmd"]').click()
       await page.locator('[role="treeitem"][data-value="Drafts/one.md"]').click()
       await expect(page.getByLabel('Notice title')).toHaveValue('Remember this')
-      await expect(page.getByLabel('Notice type')).toHaveValue('warning')
+      await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
       await expect(page.locator('.editor-notice-node')).toContainText('Notice body')
       await expect(page.getByRole('alert')).toHaveCount(0)
     })
@@ -464,6 +465,53 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
     })
 
     test.describe('When saving every editor element', () => {
+      test('it opens legacy notice and empty paragraph directives as editable blocks', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = 'Legacy notice.md'
+        const source = '# Legacy notice\n\n:::notice\nAnd this should save!\n:::\n\n::paragraph\n'
+        await writeFile(join(workspace.root, path), source)
+
+        // Act
+        await page.reload()
+        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+
+        // Assert
+        const notice = page.locator('.editor-notice-node')
+        await expect(notice).toBeVisible()
+        await expect(notice).toContainText('And this should save!')
+        await expect(page.getByLabel('Notice title')).toHaveValue('Note')
+        await expect(page.locator('.ProseMirror [data-unparsed]')).toHaveCount(0)
+        expect(await readFile(join(workspace.root, path), 'utf8')).toBe(source)
+
+        // Act
+        await page.getByLabel('Notice title').fill('Remember this')
+        await page.getByRole('combobox', { name: 'Notice type' }).click()
+        await page.getByRole('option', { name: 'Warning', exact: true }).click()
+        await page.getByLabel('Notice title').press('Enter')
+        await editorSettled(page)
+        await page.keyboard.type('Updated. ')
+
+        // Assert
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('> [!WARNING] Remember this')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('Updated. And this should save!')
+
+        // Act
+        await reopen(page, path)
+
+        // Assert
+        await expect(page.getByLabel('Notice title')).toHaveValue('Remember this')
+        await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
+        await expect(notice).toContainText('Updated. And this should save!')
+        await expect(page.locator('.ProseMirror [data-unparsed]')).toHaveCount(0)
+      })
+
       test('it keeps unparsed blocks and inline syntax editable beside supported content', async ({
         page,
         workspace,
@@ -768,10 +816,22 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
             await expect(
               page.locator('.link-preview[data-type="bookmark"] a').first(),
             ).toHaveAttribute('href', media.url)
-          else
-            await expect(
-              page.locator('.link-preview[data-type="embed"] [data-youtube-id]'),
-            ).toHaveAttribute('data-youtube-id', 'dQw4w9WgXcQ')
+          else {
+            const video = page.locator('.link-preview[data-type="embed"] [data-youtube-id]')
+            await expect(video).toHaveAttribute('data-youtube-id', 'dQw4w9WgXcQ')
+            const poster = video.locator('button > img')
+            await expect(poster).toHaveCSS('margin-top', '0px')
+            await expect(poster).toHaveCSS('margin-bottom', '0px')
+            const gap = await poster.evaluate((image) => {
+              const frame = image.parentElement!
+              return (
+                image.getBoundingClientRect().top -
+                frame.getBoundingClientRect().top -
+                parseFloat(getComputedStyle(frame).borderTopWidth)
+              )
+            })
+            expect(gap).toBeCloseTo(0)
+          }
           await expect(page.getByRole('alertdialog')).toHaveCount(0)
         })
       }
@@ -1791,7 +1851,8 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await expect.poll(() => readFile(saved, 'utf8')).toContain('> [!NOTE] Note')
       // Act
       await page.getByLabel('Notice title').fill('Important detail')
-      await page.getByLabel('Notice type').selectOption('warning')
+      await page.getByRole('combobox', { name: 'Notice type' }).click()
+      await page.getByRole('option', { name: 'Warning', exact: true }).click()
       await page.getByLabel('Notice title').press('Enter')
       await editorSettled(page)
       await page.keyboard.type('Notice body edited')
@@ -1802,7 +1863,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await reopen(page, path)
       // Assert
       await expect(page.getByLabel('Notice title')).toHaveValue('Important detail')
-      await expect(page.getByLabel('Notice type')).toHaveValue('warning')
+      await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
       await expect(block).toContainText('Notice body edited')
       // Act
       await removeBlock(page, block)

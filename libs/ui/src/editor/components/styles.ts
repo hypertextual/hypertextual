@@ -18,6 +18,7 @@ export const editorSurface = cva(
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
+export const youtubeSurface = '[&>button>img]:my-0'
 export const imageSurface =
   'image-node-view relative my-6 group [.image-node-pending-delete_&]:bg-accent'
 export const captionInput =

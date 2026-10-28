@@ -2,6 +2,7 @@
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
   import { NodeViewWrapper } from 'svelte-tiptap'
+  import { X } from 'lucide-svelte'
 
   // Props ---------------------------------------------------------------------
   let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
@@ -91,13 +92,6 @@
     onclick={deleteNode}
     aria-label="Remove image"
   >
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M6 18L18 6M6 6l12 12"
-      />
-    </svg>
+    <X class="size-3.5" aria-hidden="true" />
   </button>
 </NodeViewWrapper>
