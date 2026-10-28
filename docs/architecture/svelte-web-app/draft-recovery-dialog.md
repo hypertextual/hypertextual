@@ -62,6 +62,8 @@ stateDiagram-v2
     Retrying --> SaveFailed: save fails again
     SaveFailed --> SaveFailed: Copy draft updates copy feedback
     UnsupportedEdit --> UnsupportedEdit: Copy draft updates copy feedback
+    UnsupportedEdit --> UnsupportedEdit: editor toolbar requests layer dismissal
+    SaveFailed --> SaveFailed: editor toolbar requests layer dismissal
     SaveFailed --> Closed: Keep editing or Escape
     UnsupportedEdit --> Closed: Keep editing or Escape
     SaveFailed --> Closed: Discard draft and reload
@@ -73,4 +75,5 @@ stateDiagram-v2
 ## Implementation
 
 - Keep `EditorService.reload()` waiting for active writes before reopening the file. A late write can otherwise replace the reloaded content.
+- Prevent parent-layer dismissal requests from closing this independent recovery alert. Its own actions and normal dismissal still belong to the dialog.
 - Strip duplicate recovery instructions before adding the shared draft-retention explanation.

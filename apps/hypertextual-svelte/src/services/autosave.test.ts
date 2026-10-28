@@ -11,6 +11,8 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+// unit ------------------------------------------------------------------------
+
 describe('autosave lifecycle', () => {
   test('initial content and unchanged edits never write', async () => {
     let writes = 0

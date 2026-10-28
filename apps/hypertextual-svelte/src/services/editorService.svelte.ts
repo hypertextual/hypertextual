@@ -1,9 +1,8 @@
-import {
-  EditorDocument,
-  documentTitle,
-  type EditorChange,
-  type EditorFailure,
-} from '@hypertextual/ui'
+import { parse, type JSONContent } from 'htmd-ts'
+import { editorSchema } from '@hypertextual/ui/editor-schema'
+import type { EditorImageUploadResult } from '@hypertextual/ui'
+import { ArticleViewModel } from '../models/articleViewModel'
+import { MediaService } from './mediaService'
 import {
   errorMessage,
   type WorkspaceClient,
@@ -20,7 +19,7 @@ export interface EditorObserver {
 /** One selection and autosave lifecycle per workspace window. */
 export class EditorService {
   selected = $state<WorkspaceNode | null>(null)
-  document = $state.raw<EditorDocument | null>(null)
+  document = $state.raw<ArticleViewModel | null>(null)
   image = $state<string | null>(null)
   loading = $state(false)
   openingError = $state<string | null>(null)
@@ -33,13 +32,16 @@ export class EditorService {
   version = $state(0)
   focusRequest = $state(0)
   private saver: Autosave | undefined
+  private readonly media: MediaService
   private requestId = 0
   private active = true
 
   constructor(
     private client: WorkspaceClient,
     private observer: EditorObserver,
-  ) {}
+  ) {
+    this.media = new MediaService(client)
+  }
 
   get dirty() {
     return Boolean(this.saver?.dirty || this.codecError)
@@ -102,22 +104,14 @@ export class EditorService {
       if (entry.kind === 'unavailable')
         throw new Error('This file is unavailable or links outside the workspace.')
       if (/\.(png|jpe?g|gif|webp)$/i.test(entry.name)) {
-        const asset = await this.client.readImage('', entry.path)
+        const asset = await this.media.get('', entry.path)
         if (this.isCurrent(id)) this.image = asset.url
         return
       }
       const read = await this.client.read(entry.path)
       if (!this.isCurrent(id)) return
-      const document = await EditorDocument.open(read.content, {
-        resolve: async (source) => (await this.client.readImage(entry.path, source)).url,
-        upload: async (file) => {
-          const asset = await this.client.importImage(
-            entry.path,
-            Array.from(new Uint8Array(await file.arrayBuffer())),
-          )
-          return { source: asset.source, src: asset.url }
-        },
-      })
+      const document = this.parseDocument(read.content)
+      await this.resolveImages(entry.path, document)
       if (!this.isCurrent(id)) return
       this.document = document
       this.version++
@@ -134,7 +128,7 @@ export class EditorService {
         read.content,
         read.revision,
         async (source, revision) => {
-          const title = documentTitle(source) || document.title
+          const title = this.parseDocument(source).title || document.title
           const saved = await this.client.saveArticle(
             currentPath,
             source,
@@ -144,6 +138,7 @@ export class EditorService {
           persistedTitle = title
           const oldPath = currentPath
           currentPath = saved.path
+          this.media.relocateArticle(oldPath, saved.path)
           if (this.isCurrent(id) && this.selected) {
             this.selected = { ...this.selected, path: saved.path, name: saved.name }
             this.observer.saved(oldPath, saved, title)
@@ -165,19 +160,41 @@ export class EditorService {
     }
   }
 
-  change(change: EditorChange) {
+  change(content: JSONContent) {
     this.copyStatus = ''
     if (!this.document?.editable || this.busy || this.closing) return
-    if (this.selected) this.observer.titleChanged(this.selected.path, change.title)
-    this.codecError = null
-    this.saver?.update(change.source)
+    try {
+      const portable = this.document.transformImages(content, (url) =>
+        this.media.portableSource(this.selected?.path ?? '', url),
+      )
+      const change = this.document.update(portable)
+      EditorService.validateDocument(portable)
+      if (this.selected) this.observer.titleChanged(this.selected.path, change.title)
+      this.codecError = null
+      this.saver?.update(change.source)
+    } catch (error) {
+      if (this.selected) this.observer.titleChanged(this.selected.path, this.document.title)
+      const message = errorMessage(error)
+      if (this.codecError !== message) this.recoveryOpen = true
+      this.codecError = message
+    }
   }
 
-  fail(failure: EditorFailure) {
-    this.copyStatus = ''
-    if (this.selected) this.observer.titleChanged(this.selected.path, failure.title)
-    if (this.codecError !== failure.message) this.recoveryOpen = true
-    this.codecError = failure.message
+  async upload(file: File): Promise<EditorImageUploadResult> {
+    if (!this.selected || !this.document)
+      throw new Error('Open an article before uploading images.')
+    const document = this.document
+    const articlePath = this.selected.path
+    const asset = await this.media.upload(articlePath, file)
+    if (this.document === document && this.selected && this.selected.path !== articlePath)
+      this.media.relocateArticle(articlePath, this.selected.path)
+    return { src: asset.url }
+  }
+
+  static validateDocument(content: JSONContent): JSONContent {
+    const document = editorSchema.nodeFromJSON(content)
+    document.check()
+    return document.toJSON()
   }
 
   async copyDraft() {
@@ -227,7 +244,29 @@ export class EditorService {
   dispose() {
     this.active = false
     this.clear()
+    this.media.dispose()
   }
+  private parseDocument(source: string): ArticleViewModel {
+    try {
+      const parsed = parse(source)
+      EditorService.validateDocument(parsed.content)
+      return new ArticleViewModel(source, parsed.content, parsed.issues)
+    } catch {
+      return new ArticleViewModel(
+        source,
+        null,
+        [],
+        'This article could not be opened. The original source is shown read-only.',
+      )
+    }
+  }
+
+  private async resolveImages(articlePath: string, document: ArticleViewModel) {
+    const assets = await this.media.batchGet(articlePath, document.imageSources)
+    const displayUrls = new Map(assets.map((asset) => [asset.source, asset.url]))
+    document.displayImages((source) => displayUrls.get(source) ?? source)
+  }
+
   private isCurrent(id: number) {
     return this.active && id === this.requestId
   }

@@ -3,7 +3,7 @@ name = "htmd-rs"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "A minimal Rust library template that exports a hello greeting."
+description = "Private placeholder for a future Rust implementation of the HTMD format SDK."
 publish = false
 license = "Apache-2.0"
 

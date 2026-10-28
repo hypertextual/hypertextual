@@ -1,21 +1,28 @@
-# htmd-ts
+# HTMD TypeScript
 
-A private, typed ESM library starter built with Bun and TypeScript.
+Private SDK for the HTMD Markdown format and synchronous conversion between file contents and native ProseMirror JSON.
 
-## Use
+## Features
 
-```ts
-import { greet } from 'htmd-ts'
+- CommonMark and GFM with custom component syntax.
+- Complete parsing and save/reopen conversion for supported editor elements.
+- Per-fragment recovery with preserved source and issue metadata.
 
-console.log(greet('Premise'))
+## Quick start
+
+From the repository root, run:
+
+```sh
+mise run //libs/htmd-ts:build
+mise run //libs/htmd-ts:test
 ```
 
-## Develop
+## Docs
 
-```bash
-mise run install
-mise run test
-mise run build
-```
+- [Architecture and public API](../../docs/architecture/htmd-ts.md): package boundaries, Markdown syntax, conversion, and recovery.
+- [Development](../../docs/development.md): setup, commands, and test suites.
+- [System architecture](../../docs/architecture/index.md): app orchestration and package relationships.
 
-The package requires Bun 1.4.2 or later. This package is internal and is not published.
+## License
+
+License determination pending.

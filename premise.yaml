@@ -47,3 +47,8 @@ workspace:
       path: libs/htmd-ts
       answers:
         name: htmd-ts
+    - name: hyped-fs
+      template: cloudvoyant/premise-cargo:premise-rust-lib
+      path: libs/hyped-fs
+      answers:
+        name: hyped-fs

@@ -34,6 +34,10 @@
 
 <Dialog
   role="alertdialog"
+  onRequestDismiss={(event) => {
+    // Recovery belongs to the document, not to an editor popover that just closed.
+    event.preventDefault()
+  }}
   {open}
   onOpenChange={({ open }) => {
     if (!open) onclose()

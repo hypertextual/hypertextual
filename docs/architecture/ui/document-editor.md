@@ -2,41 +2,43 @@
 
 ## Overview
 
-DocumentEditor wraps the published Helical editor with a portable document API. Hosts exchange source text and title metadata without traversing editor JSON.
+DocumentEditor hosts the local Svelte editor with a native ProseMirror JSON API. The app supplies parsed content and receives document changes. Every supported node, mark, and attribute must survive the app's full save/reopen workflow, including formatting on whitespace.
 
 ## Design
 
 ### Public API
 
-`EditorDocument.open(source, assets?)` prepares a document. The session exposes title, editability, source, serialization, and draft-copy operations. `DocumentEditorProps` accepts the session, editability, and change/error callbacks. The component handle exposes `focus()`.
-
-`EditorAssets` supplies `resolve(source)` and `upload(file)`. Upload results include a persisted source reference and a display URL. The host decides how storage works.
+`DocumentEditorProps` accepts `document: JSONContent`, optional `editable`, and `onchange(document: JSONContent)`. The optional `onUpload(file)` callback returns an image display `src` and optional `srcset`. The component handle exposes `focus()`.
 
 ```svelte
-<DocumentEditor document={session} onchange={saveChange} onerror={showRecovery} />
+<DocumentEditor
+  document={article.content}
+  editable={!workspace.blocked}
+  onchange={(document) => editor.change(document)}
+  onUpload={uploadImage}
+/>
 ```
+
+The app's `ArticleViewModel` owns source, draft, display JSON, title extraction, and pure document transformations. `EditorService` coordinates format validation, files, media, and autosave. The workspace-aware `MediaService` fetches and uploads local and remote assets. Unsupported nodes remain editable as raw-source wrappers; `ContentPane` shows the whole source only after an unrecoverable parser failure. These services and views are outside the reusable component.
 
 ### Component Diagram
 
 ```mermaid
 flowchart TD
-    host["Host component"]
-    wrapper["DocumentEditor"]
-    editor["Published Helical Editor"]
-    fallback["Read-only source preview<br/>Reason and original source"]
-    session["EditorDocument"]
-    assets["Host EditorAssets callbacks"]
-
-    host -->|"document, editable, callbacks"| wrapper
-    wrapper -->|"onchange, onerror"| host
-    wrapper -->|"editable document"| editor
-    wrapper -->|"unsupported source"| fallback
-    editor -->|"JSON changes, image uploads"| wrapper
-    wrapper -->|"update, upload"| session
-    session -->|"resolve, upload"| assets
+    app[App ArticleViewModel and editor service] -->|PM JSON| host[App ContentPane]
+    host -->|document, editable, onUpload| wrapper[DocumentEditor]
+    wrapper -->|PM JSON changes| app
+    wrapper --> view[Local Svelte Editor]
+    view -->|upload callback| app
+    app --> SDK[htmd-ts]
+    app --> FS[App filesystem client]
+    host -->|unrecoverable parser failure| preview[App-owned source preview]
+    view --> surfaces[Insertion forms, slash menu, bubble toolbar]
+    surfaces -->|rendered surface and anchor| overlays[EditorOverlays]
+    overlays -->|position, scroll lock, cleanup| surfaces
 ```
 
-DocumentEditor renders either the Helical editor or the source preview. The host supplies the document session and asset callbacks. The wrapper forwards `focus()` to the mounted Helical editor.
+DocumentEditor renders the local editor and forwards its focus handle. It does not import the format SDK, parse Markdown, or perform filesystem operations.
 
 ### Layout
 
@@ -59,50 +61,50 @@ Editable document, including an inserted notice:
 +------------------------------------------------------------------+
 ```
 
-Unsupported source:
-
-```text
-+------------------------------------------------------------------+
-|                                                                  |
-|  This article contains syntax the editor cannot preserve.        |
-|  The original source is shown read-only.                         |
-|                                                                  |
-|  :::chart                                                        |
-|  {"series": [1, 2, 3]}                                           |
-|  :::                                                             |
-|                                                                  |
-|                                                                  |
-|                                                                  |
-|                                                                  |
-+------------------------------------------------------------------+
-```
-
-The wrapper occupies the host content area without a toolbar or footer of its own. Helical renders the editable blocks. The source fallback places its reason above the original text.
+The wrapper fills the host content area without a toolbar or footer of its own. The local editor renders blocks with Helical and Ark controls. The app owns loading, save status, source previews, and recovery dialogs.
 
 ### State and Data Flow
 
 ```mermaid
 stateDiagram-v2
-    state "Original source shown read-only" as ReadOnly
-    state "Editable document" as Editable
-    state "Unsupported edit retained" as Retained
-
-    [*] --> ReadOnly: source cannot be preserved by the editor
-    [*] --> Editable: source opens safely
-    Editable --> Editable: supported edits produce source and title
-    Editable --> Retained: edit cannot be saved as Markdown
-    Retained --> Editable: undo or correct the unsupported edit
-    Retained --> Retained: copyDraft returns the draft as JSON
-    ReadOnly --> [*]: host replaces the document session
-    Editable --> [*]: host replaces the document session
-    Retained --> [*]: host replaces the document session
+    state "Editable PM document" as Editable
+    state "Editing disabled by host" as Disabled
+    [*] --> Editable: host supplies document
+    Editable --> Editable: emit JSON change to app
+    Editable --> Disabled: editable becomes false
+    Disabled --> Editable: editable becomes true
+    Editable --> [*]: host replaces or unmounts document
+    Disabled --> [*]: host replaces or unmounts document
 ```
 
-- In an editable document, `/` opens the block menu. Arrow keys choose an item, Enter inserts it, and Escape closes the menu.
+The editor keeps selection, transactions, node views, and interaction state. The app processes emitted JSON synchronously through `htmd-ts` before scheduling a save. Format or storage errors retain the app draft and open app recovery. Replacing the article destroys the previous editor and overlay bindings.
+
+### Behavior
+
+```mermaid
+stateDiagram-v2
+    [*] --> Editing
+    Editing --> BlockMenu: type slash in a text block
+    BlockMenu --> BlockMenu: filter or move with arrow keys
+    BlockMenu --> Editing: Enter inserts a direct block
+    BlockMenu --> InsertionForm: choose image, bookmark, or YouTube
+    InsertionForm --> InsertionForm: map anchor through document edits
+    InsertionForm --> Editing: submit or cancel
+    InsertionForm --> Editing: anchor deleted or article replaced
+    BlockMenu --> Editing: Escape cancels
+    Editing --> Formatting: select text
+    Formatting --> Editing: apply formatting or dismiss
+```
+
+The component disables forced-title enforcement. The app extracts the first H1 from document JSON for display titles and saved filenames. `EditorOverlays` owns insertion requests, surface positioning, and scroll locks. Forms follow mapped document anchors, slash suggestions follow their range, and the toolbar follows selection. Svelte and Ark own the controls and keyboard interaction. Text formatting includes highlight and font color; text alignment is unavailable for both headings and paragraphs.
 
 ## Implementation
 
-- Restore saved image paths before serialization. Display URLs must never enter saved Markdown.
-- Return unchanged source exactly, including its line endings. Reject conversions that lose content and retain the latest draft.
-- Cover document sessions in `document.test.ts` and Markdown preservation in `markdown.test.ts`.
-- Editor ownership work is tracked in [HYPE-160](https://linear.app/cloudvoyant/issue/HYPE-160/vendor-the-helical-editor-for-development-inside-hypertextual) and [CLO-197](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and).
+- Compose published Helical prose variants for editor typography. Keep app CSS to layout so heading sizes and spacing have one owner. Avoid Tailwind Typography inside the editor; its generated quote characters and code margins are for rendered prose.
+- Render editable code without whitespace around its node-view content. Place the language selector at the left of the shared code-block header.
+
+- Keep component props and change events as native JSON, without encoded JSON strings or source sessions.
+- Supply framework node views through configured Tiptap extensions. Keep format and filesystem dependencies outside the UI package.
+- Use `@hypertextual/ui/editor-schema` for app schema agreement tests. Cover format syntax in SDK BDD integration examples.
+- Cover interaction and overlays in `e2e/hypertextual-desktop/editor.spec.ts`. Do not add tests inside UI extensions.
+- See [editor source ownership](editor-source.md) for provenance, dependencies, coverage, and the upstream transplant procedure.

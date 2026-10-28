@@ -2,14 +2,16 @@
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
-use crate::{
-    error::{Result, error},
-    models::{ArticleContent, ArticleMetadata, ImageAsset, WorkspaceListing, WorkspaceNode},
-    services::{ArticleService, MediaService, WorkspaceService},
+use hyped_fs::{
+    ArticleContent, ArticleMetadata, ArticleService, ImageAsset, MediaService, Result,
+    WorkspaceListing, WorkspaceNode, WorkspaceService, error,
 };
 
 /// Shared workspace access for Tauri command handlers.
-pub struct WorkspaceState(pub Arc<Mutex<WorkspaceService>>);
+pub struct WorkspaceState(
+    /// The shared Hypertextual service guarded across all Tauri file commands.
+    pub Arc<Mutex<WorkspaceService>>,
+);
 
 async fn run<T: Send + 'static>(
     state: State<'_, WorkspaceState>,
