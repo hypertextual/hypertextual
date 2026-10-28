@@ -1,6 +1,6 @@
 import type { Page, Locator } from '@playwright/test'
 import { test, expect, edit, createArticle, delay, png } from './fixtures'
-import { readFile, writeFile, readdir } from 'node:fs/promises'
+import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 // Tests -----------------------------------------------------------------------
@@ -108,7 +108,7 @@ test.describe(
       await expect(page.locator('.ProseMirror h1')).toHaveText('HTMD')
     })
 
-    test('User can inspect rich source and images without rewriting files', async ({
+    test('User can inspect unparsed source and images without rewriting files', async ({
       page,
       workspace,
     }) => {
@@ -116,8 +116,10 @@ test.describe(
       // Act
       await page.locator('[role="treeitem"][data-value$="rich.htmd"]').click()
       // Assert
-      await expect(page.getByLabel('Original article source')).toContainText('"series":[1,2]')
-      await expect(page.locator('.ProseMirror')).toHaveCount(0)
+      await expect(page.locator('.ProseMirror [data-unparsed="block"]')).toContainText(
+        '"series":[1,2]',
+      )
+      await expect(page.getByLabel('Original article source')).toHaveCount(0)
       await page.locator('[role="treeitem"][data-value$="titled-link.md"]').click()
       await expect(page.locator('.ProseMirror a')).toHaveAttribute('title', 'Preserve this title')
       await page.locator('[role="treeitem"][data-value$="image.png"]').click()
@@ -156,7 +158,7 @@ test.describe(
       await expect(page.locator('.document-status > span').first()).toHaveText('Renamed title')
       await expect
         .poll(() => readFile(join(workspace.root, 'Drafts/Renamed title.md'), 'utf8'))
-        .toContain('Renamed title&#32;')
+        .toContain('# Renamed title&#32;')
       const paragraph = page.locator('.ProseMirror p').first()
       await paragraph.click()
       await page.keyboard.press('End')
@@ -170,7 +172,7 @@ test.describe(
       await expect(page.locator('.ProseMirror h2')).toHaveText('')
       await expect
         .poll(() => readFile(join(workspace.root, 'Drafts/Renamed title.md'), 'utf8'))
-        .toContain('## ')
+        .toMatch(/^##(?: |\n|$)/m)
       await expect(page.getByRole('alert')).toHaveCount(0)
       await page.locator('[role="treeitem"][data-value$="two.htmd"]').click()
       await page.locator('[role="treeitem"][data-value="Drafts/Renamed title.md"]').click()
@@ -291,7 +293,7 @@ test.describe(
       await page.keyboard.press('End')
       await page.keyboard.press('Enter')
       await page.keyboard.type('/image')
-      await page.getByRole('button', { name: 'Image', exact: true }).click()
+      await page.getByRole('option', { name: 'Image', exact: true }).click()
       await page
         .locator('input[type="file"]')
         .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png })
@@ -316,7 +318,7 @@ test.describe(
       await expect(page.getByRole('treeitem', { name: '.images', exact: true })).toHaveCount(0)
     })
 
-    test('User can recover unsupported formatting through the alert dialog', async ({
+    test('User can recover a failed formatted save through the alert dialog', async ({
       page,
       workspace,
     }) => {
@@ -326,26 +328,21 @@ test.describe(
         throw new Error('Browser dialogs must not be used for recovery')
       })
       await page.locator('[role="treeitem"][data-value="same.md"]').click()
-      await page.locator('.ProseMirror h1').click()
-      await page.evaluate(
-        () =>
-          new Promise<void>((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-          ),
-      )
-      await page.keyboard.press('End')
-      for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+ArrowLeft')
-      // Assert
+      await enterBody(page, 'Recoverable body')
       await expect
-        .poll(() => page.evaluate(() => window.getSelection()?.toString()))
-        .toBe('Markdown')
-      await page.getByRole('button', { name: 'Underline', exact: true }).click()
-      await expect(page.getByRole('alertdialog')).toContainText('draft is retained')
+        .poll(() => readFile(join(workspace.root, 'same.md'), 'utf8'))
+        .toContain('Recoverable body')
+      workspace.failWrites = true
+      await page.keyboard.press('ControlOrMeta+u')
+      await page.keyboard.type(' draft')
+      // Assert
+      await expect(page.getByRole('alertdialog')).toContainText('Disk unavailable')
       await page.screenshot({ path: test.info().outputPath('recovery.png') })
       await page.getByRole('button', { name: 'Discard draft and reload', exact: true }).click()
       await expect(page.getByRole('alertdialog')).toHaveCount(0)
       await expect(page.locator('.ProseMirror h1')).toHaveText('Markdown')
       await expect(page.locator('.ProseMirror u')).toHaveCount(0)
+      workspace.failWrites = false
       await edit(page, ' Recovered.')
       await expect
         .poll(() => readFile(join(workspace.root, 'same.md'), 'utf8'))
@@ -377,20 +374,1342 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         // Act
         await page.keyboard.type('/')
         // Assert
-        await expect(page.getByRole('button', { name: 'Notice', exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible()
+        await expect(page.getByRole('option', { name: 'Notice', exact: true })).toBeVisible()
+        await expect(page.getByRole('option', { name: 'Image', exact: true })).toBeVisible()
         // Act
         await page.keyboard.type('code')
         // Assert
-        await expect(page.getByRole('button', { name: 'Code Block', exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Notice', exact: true })).toHaveCount(0)
+        await expect(page.getByRole('option', { name: 'Code Block', exact: true })).toBeVisible()
+        await expect(page.getByRole('option', { name: 'Notice', exact: true })).toHaveCount(0)
         // Act
         await page.keyboard.press('Escape')
         // Assert
-        await expect(page.getByRole('button', { name: 'Code Block', exact: true })).toHaveCount(0)
+        await expect(page.getByRole('option', { name: 'Code Block', exact: true })).toHaveCount(0)
         await expect(page.locator('.ProseMirror')).toContainText('/code')
       },
     )
+
+    test.describe('When moving between empty body blocks', () => {
+      test('it shows command guidance only for the focused paragraph', async ({ page }) => {
+        // Arrange
+        await edit(page, '')
+        await page.keyboard.press('Enter')
+        await page.keyboard.press('Enter')
+        const empty = page.locator('.ProseMirror p.is-empty[data-placeholder]')
+
+        // Act
+        await empty.first().click()
+
+        // Assert
+        await expect
+          .poll(() =>
+            empty.evaluateAll(
+              (elements) =>
+                elements.filter((element) =>
+                  getComputedStyle(element, '::before').content.includes("Type '/'"),
+                ).length,
+            ),
+          )
+          .toBe(1)
+        await expect
+          .poll(() =>
+            empty.first().evaluate((element) => getComputedStyle(element, '::before').content),
+          )
+          .toContain("Type '/'")
+
+        // Act
+        await empty.last().click()
+
+        // Assert
+        await expect
+          .poll(() =>
+            empty.first().evaluate((element) => getComputedStyle(element, '::before').content),
+          )
+          .toBe('none')
+        await expect
+          .poll(() =>
+            empty.last().evaluate((element) => getComputedStyle(element, '::before').content),
+          )
+          .toContain("Type '/'")
+      })
+    })
+
+    test.describe('When typing a Markdown heading shortcut', () => {
+      test('it converts a double-hash input into a second-level heading and saves it', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await enterBody(page, '')
+
+        // Act
+        await page.keyboard.type('## ', { delay: 30 })
+        await expect(page.locator('.ProseMirror h2')).toBeVisible()
+        await editorSettled(page)
+        await page.keyboard.type('Section title')
+
+        // Assert
+        await expect(page.locator('.ProseMirror h2')).toHaveText('Section title')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('## Section title')
+
+        // Act
+        await reopen(page, path)
+
+        // Assert
+        await expect(page.locator('.ProseMirror h2')).toHaveText('Section title')
+      })
+    })
+
+    test.describe('When saving every editor element', () => {
+      test('it keeps unparsed blocks and inline syntax editable beside supported content', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const html = '<figure>Raw HTML</figure>'
+        const source =
+          '# Partial article\n\nKnown **bold**.\n\n' + html + '\n\nAfter :future[raw] text.\n'
+        await writeFile(join(workspace.root, 'Partial article.md'), source)
+
+        // Act
+        await page.reload()
+        await page.locator('[role="treeitem"][data-value="Partial article.md"]').click()
+
+        // Assert
+        const block = page.locator('.ProseMirror [data-unparsed="block"]')
+        const inline = page.locator('.ProseMirror [data-unparsed="inline"]')
+        await expect(block).toHaveText(html)
+        await expect(block).toHaveAttribute('data-source-kind', 'html')
+        await expect(block).toHaveAttribute('data-reason', 'Unsupported Markdown html.')
+        await expect(block).toHaveCSS('white-space', 'pre-wrap')
+        await expect(inline).toHaveText(':future[raw]')
+        await expect(page.locator('.ProseMirror strong')).toHaveText('bold')
+        await expect(page.locator('.ProseMirror figure')).toHaveCount(0)
+        await expect(page.getByLabel('Original article source')).toHaveCount(0)
+
+        // Act: ordinary text and the raw source remain editable.
+        await page.locator('.ProseMirror > p').filter({ hasText: 'After ' }).click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type(' edited')
+        await block.click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type(' raw edit')
+
+        // Assert
+        await expect
+          .poll(() => readFile(join(workspace.root, 'Partial article.md'), 'utf8'))
+          .toContain(html + ' raw edit')
+        await expect
+          .poll(() => readFile(join(workspace.root, 'Partial article.md'), 'utf8'))
+          .toContain('After :future[raw] text. edited')
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+        // Act
+        await reopen(page, 'Partial article.md')
+
+        // Assert
+        await expect(block).toHaveText(html + ' raw edit')
+        await expect(inline).toHaveText(':future[raw]')
+        await expect(page.locator('.ProseMirror strong')).toHaveText('bold')
+        await expect(page.locator('.ProseMirror > p').filter({ hasText: 'After ' })).toContainText(
+          'text. edited',
+        )
+      })
+
+      test('it preserves unparsed frontmatter before the title while editing and reopening', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const header = '---\ntitle: Metadata\n---'
+        const source = header + '\n\n# Frontmatter\n\nEditable body.\n'
+        await writeFile(join(workspace.root, 'Frontmatter.md'), source)
+        // Act
+        await page.reload()
+        await page.locator('[role="treeitem"][data-value="Frontmatter.md"]').click()
+        // Assert
+        const raw = page.locator('.ProseMirror [data-unparsed="block"]')
+        await expect(raw).toHaveText(header)
+        await expect(page.locator('.ProseMirror h1')).toHaveText('Frontmatter')
+        // Act
+        await page.locator('.ProseMirror > p').filter({ hasText: 'Editable body.' }).click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type(' edited')
+        // Assert
+        await expect
+          .poll(() => readFile(join(workspace.root, 'Frontmatter.md'), 'utf8'))
+          .toBe(header + '\n\n# Frontmatter\n\nEditable body. edited\n')
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+        // Act
+        await reopen(page, 'Frontmatter.md')
+        // Assert
+        await expect(raw).toHaveText(header)
+        await expect(page.locator('.ProseMirror h1')).toHaveText('Frontmatter')
+        await expect(
+          page.locator('.ProseMirror > p').filter({ hasText: 'Editable body.' }),
+        ).toContainText('edited')
+      })
+
+      test('it preserves every schema node, mark, and attribute across editing and reopening', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange: these checked-in source and JSON fixtures cover the full mounted schema.
+        const source = await readFile(
+          new URL('../../libs/htmd-ts/fixtures/editor-roundtrip.md', import.meta.url),
+          'utf8',
+        )
+        await mkdir(join(workspace.root, '.images'), { recursive: true })
+        await writeFile(join(workspace.root, '.images/roundtrip.png'), png)
+        await writeFile(join(workspace.root, 'roundtrip.md'), source)
+        await page.route('https://images.example.com/**', (route) =>
+          route.fulfill({ body: png, contentType: 'image/png' }),
+        )
+        await page.reload()
+        await page.locator('[role="treeitem"][data-value="roundtrip.md"]').click()
+
+        // Assert
+        await expect(page.locator('.ProseMirror h1')).toHaveText('Roundtrip fixture')
+        for (const level of [2, 3, 4, 5, 6])
+          await expect(page.locator(`.ProseMirror > h${level}`)).toHaveText(`Heading ${level}`)
+        const headings = await page
+          .locator('.ProseMirror > :is(h1,h2,h3,h4,h5,h6)')
+          .evaluateAll((elements) =>
+            elements.map((element) => {
+              const style = getComputedStyle(element)
+              return {
+                size: parseFloat(style.fontSize),
+                top: parseFloat(style.marginTop),
+                bottom: parseFloat(style.marginBottom),
+              }
+            }),
+          )
+        expect(headings).toHaveLength(6)
+        expect(headings[0]!.top).toBe(0)
+        for (let index = 1; index < headings.length; index++) {
+          expect(headings[index - 1]!.size).toBeGreaterThan(headings[index]!.size)
+          expect(headings[index]!.bottom).toBeLessThanOrEqual(headings[index]!.top)
+        }
+        const quote = page.locator('.ProseMirror blockquote p')
+        expect(
+          await quote.evaluate((element) => getComputedStyle(element, '::before').content),
+        ).toMatch(/^(none|normal|"")$/)
+        expect(
+          await quote.evaluate((element) => getComputedStyle(element, '::after').content),
+        ).toMatch(/^(none|normal|"")$/)
+        const inline = page.locator('.ProseMirror > p').filter({ hasText: 'Normal. ' })
+        for (const tag of ['strong', 'em', 's', 'u', 'code', 'a', 'mark', 'span[style*="color"]'])
+          await expect(inline.locator(tag).first()).toBeVisible()
+        await expect(inline.locator('mark').first()).toHaveCSS(
+          'background-color',
+          'rgb(59, 130, 246)',
+        )
+        await expect(inline.locator('span[style*="color"]').first()).toHaveCSS(
+          'color',
+          'rgb(59, 130, 246)',
+        )
+        await expect(page.locator('.ProseMirror blockquote')).toContainText('Quoted text')
+        await expect(page.locator('.ProseMirror ol')).toHaveAttribute('start', '3')
+        await expect(page.locator('.ProseMirror').getByRole('checkbox')).toBeChecked()
+        await expect(page.locator('.ProseMirror hr')).toHaveCount(1)
+        await expect(page.locator('.ProseMirror .node-codeBlock code')).toContainText(
+          'const example',
+        )
+        await expect(page.locator('.editor-notice-node')).toHaveCount(4)
+        await expect(page.locator('.ProseMirror img[alt="Roundtrip image"]')).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Linked article', exact: true })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'URL mention', exact: true })).toBeVisible()
+        await expect(page.locator('.link-preview[data-type="bookmark"]')).toContainText(
+          'Bookmark title',
+        )
+        await expect(page.locator('.link-preview[data-type="embed"]')).toHaveCount(1)
+        await expect(page.locator('.ProseMirror [data-unparsed="block"]')).toBeVisible()
+        await expect(page.locator('.ProseMirror [data-unparsed="inline"]')).toBeVisible()
+
+        // Act
+        await page.locator('.ProseMirror h1').click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type(' updated')
+        const path = 'Roundtrip fixture updated.md'
+
+        // Assert: app-visible output is saved; SDK inventory/equality lives in package integration tests.
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8').catch(() => ''))
+          .toContain('# Roundtrip fixture updated')
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+        // Act
+        await reopen(page, path)
+
+        // Assert
+        await expect(page.locator('.ProseMirror h1')).toHaveText('Roundtrip fixture updated')
+        await expect(page.locator('.link-preview[data-type="embed"]')).toHaveCount(1)
+        await expect(page.locator('.ProseMirror [data-unparsed="block"]')).toBeVisible()
+        await expect(page.locator('.ProseMirror [data-unparsed="inline"]')).toBeVisible()
+        await expect(page.locator('.editor-notice-node')).toHaveCount(4)
+        await expect(page.getByRole('link', { name: 'URL mention', exact: true })).toBeVisible()
+        await expect(page.locator('.ProseMirror img[alt="Roundtrip image"]')).toBeVisible()
+        await expect(page.locator('.ProseMirror ol')).toHaveAttribute('start', '3')
+        await expect(inline.locator('mark').first()).toHaveCSS(
+          'background-color',
+          'rgb(59, 130, 246)',
+        )
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+        // Assert: every supported block and inline family remains rendered after reopening.
+        for (const level of [2, 3, 4, 5, 6])
+          await expect(page.locator(`.ProseMirror > h${level}`)).toHaveText(`Heading ${level}`)
+        for (const tag of ['strong', 'em', 's', 'u', 'code', 'a', 'mark', 'span[style*="color"]'])
+          await expect(inline.locator(tag).first()).toBeVisible()
+        await expect(page.locator('.ProseMirror blockquote')).toContainText('Quoted text')
+        await expect(page.locator('.ProseMirror').getByRole('checkbox')).toBeChecked()
+        await expect(page.locator('.ProseMirror hr')).toHaveCount(1)
+        await expect(page.locator('.ProseMirror .node-codeBlock code')).toContainText(
+          'const example',
+        )
+        await expect(page.getByRole('link', { name: 'Linked article', exact: true })).toBeVisible()
+        await expect(page.locator('.link-preview[data-type="bookmark"]')).toContainText(
+          'Bookmark title',
+        )
+        const sourceAfterEdit = await readFile(join(workspace.root, path), 'utf8')
+        expect(sourceAfterEdit).not.toMatch(
+          /:{1,}\s*(?:paragraph|heading|text|task-item|task-list|list-item|ordered-list|bullet-list|image|notice)\b/,
+        )
+
+        // Act: the persisted YouTube URL retains its timestamp and the published control seeks it.
+        await page.route('https://www.youtube-nocookie.com/**', (route) =>
+          route.fulfill({ body: '<html></html>', contentType: 'text/html' }),
+        )
+        const timestamp = page.getByRole('button', { name: '01:30 Start here', exact: true })
+        await expect(timestamp).toBeVisible()
+        await timestamp.click()
+
+        // Assert
+        await expect(page.locator('.link-preview[data-type="embed"] iframe')).toHaveAttribute(
+          'src',
+          /[?&]start=90(?:&|$)/,
+        )
+      })
+
+      for (const block of ['paragraph', 'heading']) {
+        test(`it omits ${block} alignment while retaining color controls`, async ({ page }) => {
+          // Arrange
+          if (block === 'paragraph') {
+            await enterBody(page, 'Formatting without alignment')
+          } else {
+            await page.locator('.ProseMirror h1').click()
+            await editorSettled(page)
+          }
+
+          // Act
+          if (block === 'paragraph') {
+            await selectLastText(page, 'Formatting without alignment')
+          } else {
+            await page.keyboard.press('Home')
+            await page.keyboard.press('Shift+End')
+          }
+
+          // Assert
+          await expect(page.getByRole('toolbar', { name: 'Text formatting' })).toBeVisible()
+          for (const name of ['Align left', 'Align center', 'Align right', 'Justify'])
+            await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+          await expect(page.getByRole('button', { name: 'Highlight', exact: true })).toBeVisible()
+          await expect(page.getByRole('button', { name: 'Text Color', exact: true })).toBeVisible()
+        })
+      }
+
+      for (const media of [
+        {
+          command: 'Bookmark',
+          dialog: 'Insert bookmark',
+          submit: 'Insert',
+          url: 'https://example.com/bookmark',
+          type: 'bookmark',
+        },
+        {
+          command: 'YouTube',
+          dialog: 'Embed YouTube video',
+          submit: 'Embed',
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          type: 'embed',
+        },
+      ]) {
+        test(`it inserts ${media.command}, saves it, and reopens the same card`, async ({
+          page,
+          workspace,
+        }) => {
+          // Arrange
+          const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+          await insertBlock(page, media.command)
+          const dialog = page.getByRole('dialog', { name: media.dialog, exact: true })
+
+          // Act
+          await dialog.locator('input').fill(media.url)
+          await dialog.getByRole('button', { name: media.submit, exact: true }).click()
+
+          // Assert
+          await expect(page.locator(`.link-preview[data-type="${media.type}"]`)).toHaveCount(1)
+          await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain(media.url)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+          // Act
+          await reopen(page, path)
+
+          // Assert
+          await expect(page.locator(`.link-preview[data-type="${media.type}"]`)).toHaveCount(1)
+          if (media.type === 'bookmark')
+            await expect(
+              page.locator('.link-preview[data-type="bookmark"] a').first(),
+            ).toHaveAttribute('href', media.url)
+          else
+            await expect(
+              page.locator('.link-preview[data-type="embed"] [data-youtube-id]'),
+            ).toHaveAttribute('data-youtube-id', 'dQw4w9WgXcQ')
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+        })
+      }
+    })
+
+    test.describe('When saving inline formatting around whitespace', () => {
+      for (const mark of [
+        {
+          name: 'Italic',
+          stored: '<em>Italic </em>',
+          selected: '<em> Italic  </em>',
+          shortcut: 'ControlOrMeta+i',
+          tag: 'em',
+        },
+        {
+          name: 'Bold',
+          stored: '<strong>Bold </strong>',
+          selected: '<strong> Bold  </strong>',
+          shortcut: 'ControlOrMeta+b',
+          tag: 'strong',
+        },
+        {
+          name: 'Strikethrough',
+          stored: '<s>Strikethrough </s>',
+          selected: '<s> Strikethrough  </s>',
+          shortcut: 'ControlOrMeta+Shift+s',
+          tag: 's',
+        },
+        {
+          name: 'Code',
+          stored: '<code>Code </code>',
+          selected: '<code> Code  </code>',
+          shortcut: 'ControlOrMeta+e',
+          tag: 'code',
+        },
+        {
+          name: 'Underline',
+          stored: '<u>Underline </u>',
+          selected: '<u> Underline  </u>',
+          shortcut: 'ControlOrMeta+u',
+          tag: 'u',
+        },
+      ]) {
+        test(`it saves ${mark.name} typing with a trailing space and resumes after reopening`, async ({
+          page,
+          workspace,
+        }) => {
+          // Arrange
+          const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+          await enterBody(page, 'Normal text. ')
+
+          // Act
+          await page.keyboard.press(mark.shortcut)
+          await page.keyboard.type(`${mark.name} `)
+
+          // Assert
+          await expect(page.locator(`.ProseMirror ${mark.tag}`)).toHaveText(`${mark.name} `)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+          await expect
+            .poll(() => readFile(join(workspace.root, path), 'utf8'))
+            .toContain(mark.stored)
+
+          // Act
+          await reopen(page, path)
+
+          // Assert
+          await expect
+            .poll(() => page.locator(`.ProseMirror ${mark.tag}`).textContent())
+            .toBe(`${mark.name} `)
+          await expect(page.locator('.ProseMirror > p').last()).toHaveText(
+            `Normal text. ${mark.name} `,
+          )
+
+          // Act
+          await page.locator('.ProseMirror > p').last().click()
+          await editorSettled(page)
+          await page.keyboard.press('End')
+          await page.keyboard.press(mark.shortcut)
+          await page.keyboard.type('continued')
+
+          // Assert
+          await expect
+            .poll(() => page.locator(`.ProseMirror ${mark.tag}`).textContent())
+            .toBe(`${mark.name} `)
+          await expect
+            .poll(() => readFile(join(workspace.root, path), 'utf8'))
+            .toContain(`${mark.stored}continued`)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+        })
+
+        test(`it preserves spaces around selected ${mark.name} text when saved and reopened`, async ({
+          page,
+          workspace,
+        }) => {
+          // Arrange
+          const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+          await enterBody(page, `Before  ${mark.name}  `)
+          await selectLastText(page, ` ${mark.name}  `)
+
+          // Act
+          await page.keyboard.press(mark.shortcut)
+
+          // Assert
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+          await expect
+            .poll(() => readFile(join(workspace.root, path), 'utf8'))
+            .toContain(mark.selected)
+
+          // Act
+          await reopen(page, path)
+
+          // Assert
+          await expect
+            .poll(() => page.locator(`.ProseMirror ${mark.tag}`).textContent())
+            .toBe(` ${mark.name}  `)
+          await expect(page.locator('.ProseMirror > p').last()).toHaveText(`Before  ${mark.name}  `)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+        })
+      }
+    })
+
+    test.describe('When selecting and formatting article text', () => {
+      test('it keeps the formatting toolbar beside its selection after scrolling and resizing', async ({
+        page,
+      }) => {
+        // Arrange
+        await enterBody(
+          page,
+          `${Array.from({ length: 20 }, (_, index) => `Paragraph ${index}`).join('\n')}\nToolbar anchor`,
+        )
+        await selectLastText(page, 'Toolbar anchor')
+        const toolbar = page.getByRole('toolbar', { name: 'Text formatting' })
+
+        for (const width of [1120, 900]) {
+          // Act
+          await page.setViewportSize({ width, height: 640 })
+          await page.locator('.ProseMirror > p').last().scrollIntoViewIfNeeded()
+
+          // Assert
+          await expect(toolbar).toBeVisible()
+          await expect
+            .poll(async () => {
+              const anchor = await page.evaluate(() => {
+                const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+                return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+              })
+              const box = (await toolbar.boundingBox())!
+              const left = Math.min(
+                Math.max((anchor.left + anchor.right - box.width) / 2, 8),
+                Math.max(width - box.width - 8, 8),
+              )
+              return Math.max(
+                Math.abs(box.x - left),
+                Math.min(
+                  Math.abs(anchor.top - box.y - box.height - 8),
+                  Math.abs(box.y - anchor.bottom - 8),
+                ),
+              )
+            })
+            .toBeLessThan(2)
+          const box = (await toolbar.boundingBox())!
+          expect(box.x).toBeGreaterThanOrEqual(8)
+          expect(box.x + box.width).toBeLessThanOrEqual(width - 8)
+          expect(box.y).toBeGreaterThanOrEqual(8)
+          expect(box.y + box.height).toBeLessThanOrEqual(632)
+        }
+
+        // Act
+        await page.keyboard.press('Escape')
+
+        // Assert
+        await expect(toolbar).toBeHidden()
+      })
+
+      test('it saves bold text and preserves the formatting after reopening', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await enterBody(page, 'Selected text')
+        await selectLastText(page, 'Selected text')
+        const toolbar = page.getByRole('toolbar', { name: 'Text formatting' })
+
+        // Act
+        await toolbar.getByRole('button', { name: 'Bold', exact: true }).click()
+
+        // Assert
+        await expect(page.locator('.ProseMirror strong')).toHaveText('Selected text')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('**Selected text**')
+
+        // Act
+        await page.keyboard.press('Escape')
+        await reopen(page, path)
+
+        // Assert
+        await expect(page.locator('.ProseMirror strong')).toHaveText('Selected text')
+      })
+
+      test('it undoes and redoes bold formatting through the keyboard', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await enterBody(page, 'History text')
+        await selectLastText(page, 'History text')
+        await page.getByRole('button', { name: 'Bold', exact: true }).click()
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('**History text**')
+
+        // Act
+        await page.keyboard.press('ControlOrMeta+z')
+
+        // Assert
+        await expect(page.locator('.ProseMirror strong')).toHaveCount(0)
+        await expect(page.locator('.ProseMirror')).toContainText('History text')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .not.toContain('**History text**')
+
+        // Act
+        await page.keyboard.press('ControlOrMeta+Shift+z')
+
+        // Assert
+        await expect(page.locator('.ProseMirror strong')).toHaveText('History text')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('**History text**')
+      })
+
+      for (const format of [
+        {
+          name: 'Highlight',
+          color: 'Blue',
+          selector: 'mark',
+          property: 'background-color',
+          value: 'var(--chart-3)',
+          stored: '<mark style="background-color:var(--chart-3)">Colored text </mark>',
+        },
+        {
+          name: 'Text Color',
+          color: 'Red',
+          selector: 'span[style*="color"]',
+          property: 'color',
+          value: 'var(--danger)',
+          stored: '<span style="color:var(--danger)">Colored text </span>',
+        },
+      ]) {
+        test(`it saves ${format.name} and preserves its actual color after reopening`, async ({
+          page,
+          workspace,
+        }) => {
+          // Arrange
+          const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+          await enterBody(page, 'Colored text ')
+          await selectLastText(page, 'Colored text ')
+
+          // Act
+          await page.getByRole('button', { name: format.name, exact: true }).click()
+          const palette = page.getByRole('button', { name: format.color, exact: true })
+          const color = await palette
+            .locator('div')
+            .first()
+            .evaluate((element) => getComputedStyle(element).backgroundColor)
+          expect(
+            await palette
+              .locator('div')
+              .first()
+              .evaluate((element) => (element as HTMLElement).style.backgroundColor),
+          ).toBe(format.value)
+          await palette.click()
+
+          // Assert
+          const formatted = page.locator(`.ProseMirror ${format.selector}`)
+          await expect(formatted).toHaveCSS(format.property, color)
+          await expect
+            .poll(() => readFile(join(workspace.root, path), 'utf8'))
+            .toContain(format.stored)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+          // Act
+          await reopen(page, path)
+
+          // Assert
+          await expect(formatted).toHaveCSS(format.property, color)
+          await expect.poll(() => formatted.textContent()).toBe('Colored text ')
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+          // Act
+          await page.locator('.ProseMirror > p').last().click()
+          await editorSettled(page)
+          await page.keyboard.press('End')
+          await selectLastText(page, 'Colored text ')
+
+          // Assert
+          const control = page.getByRole('button', { name: format.name, exact: true })
+          await expect(control).toHaveAttribute('data-state', 'on')
+          await expect(control.locator('span[style]')).toHaveCSS('background-color', color)
+        })
+      }
+    })
+
+    test.describe('When navigating a long slash menu', () => {
+      test('it scrolls the selected command into view and inserts it with Enter', async ({
+        page,
+      }) => {
+        // Arrange
+        await enterBody(page, '/')
+        const menu = page.locator('[data-slash-menu-scroll]')
+
+        // Act
+        for (let index = 0; index < 30; index++) await page.keyboard.press('ArrowDown')
+
+        // Assert
+        const selected = page.locator('[data-slash-selected]')
+        await expect(selected).toContainText('Bookmark')
+        await expect(selected).toBeInViewport()
+        await expect.poll(() => menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+
+        // Act
+        await page.keyboard.press('Enter')
+
+        // Assert
+        await expect(page.getByRole('dialog', { name: 'Insert bookmark' })).toBeVisible()
+        await expect(menu).toHaveCount(0)
+      })
+
+      test('it keeps filtered commands reachable near the viewport edge and dismisses them', async ({
+        page,
+      }) => {
+        // Arrange
+        await page.setViewportSize({ width: 1000, height: 480 })
+        await enterBody(
+          page,
+          Array.from({ length: 18 }, (_, index) => `Paragraph ${index}`).join('\n'),
+        )
+        await page.keyboard.press('Enter')
+
+        // Act
+        await page.keyboard.type('/')
+        await page.keyboard.type('you')
+
+        // Assert
+        const menu = page.locator('[data-slash-menu-surface]')
+        await expect(page.getByRole('option', { name: /YouTube/ })).toBeVisible()
+        const box = await menu.boundingBox()
+        expect(box).not.toBeNull()
+        expect(box!.y).toBeGreaterThanOrEqual(0)
+        expect(box!.y + box!.height).toBeLessThanOrEqual(480)
+
+        // Act
+        await page.keyboard.press('Escape')
+        await page.keyboard.type(' continued')
+
+        // Assert
+        await expect(menu).toHaveCount(0)
+        await expect(page.locator('.ProseMirror')).toContainText('/you continued')
+      })
+    })
+
+    test.describe('When an insertion overlay locks the article scroll', () => {
+      test('it locks only the article container and restores scrolling after cancellation', async ({
+        page,
+      }) => {
+        // Arrange
+        await enterBody(
+          page,
+          Array.from({ length: 24 }, (_, index) => `Long article paragraph ${index}`).join('\n'),
+        )
+        await page.keyboard.press('Enter')
+        await page.keyboard.type('/bookmark')
+        await page.getByRole('option', { name: 'Bookmark', exact: true }).click()
+        const scroll = page.locator('.article-scroll')
+        const dialog = page.getByRole('dialog', { name: 'Insert bookmark' })
+        const before = await scroll.evaluate((element) => element.scrollTop)
+        const bodyOverflow = await page
+          .locator('body')
+          .evaluate((element) => element.style.overflow)
+
+        // Act
+        await scroll.hover({ position: { x: 8, y: 8 } })
+        await page.mouse.wheel(0, -240)
+
+        // Assert
+        await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBe(before)
+        await expect(dialog).toBeInViewport()
+        expect(await page.locator('body').evaluate((element) => element.style.overflow)).toBe(
+          bodyOverflow,
+        )
+
+        // Act
+        await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+        await scroll.hover({ position: { x: 8, y: 8 } })
+        await page.mouse.wheel(0, -240)
+
+        // Assert
+        await expect(dialog).toHaveCount(0)
+        await expect
+          .poll(() => scroll.evaluate((element) => element.scrollTop))
+          .toBeLessThan(before)
+      })
+    })
+
+    test.describe('When editing with a registered insertion overlay open', () => {
+      for (const edge of ['top', 'bottom'] as const) {
+        test(`it keeps a resized and reopened image form beside the cursor near the ${edge}`, async ({
+          page,
+        }) => {
+          // Arrange
+          await page.setViewportSize({ width: 1000, height: 640 })
+          await enterBody(
+            page,
+            edge === 'top'
+              ? 'Cursor anchor '
+              : `${Array.from({ length: 20 }, (_, index) => `Paragraph ${index}`).join('\n')}\nCursor anchor `,
+          )
+          const dialog = page.getByRole('dialog', { name: 'Insert image' })
+
+          for (let attempt = 0; attempt < 2; attempt++) {
+            // Act
+            await page.keyboard.type('/image')
+            await page.getByRole('option', { name: 'Image', exact: true }).click()
+
+            for (const tab of ['Upload', 'URL']) {
+              await dialog.getByRole('tab', { name: tab, exact: true }).click()
+
+              // Assert: compare visible DOM geometry without invoking editor commands.
+              await expect
+                .poll(async () => {
+                  const anchor = await page
+                    .locator('.ProseMirror > p')
+                    .last()
+                    .evaluate((paragraph) => {
+                      const range = document.createRange()
+                      range.selectNodeContents(paragraph.firstChild!)
+                      range.collapse(false)
+                      const rect = range.getBoundingClientRect()
+                      return { left: rect.left, top: rect.top, bottom: rect.bottom }
+                    })
+                  const box = await dialog.boundingBox()
+                  if (!box) return Infinity
+                  return Math.max(
+                    Math.abs(box.x - anchor.left),
+                    Math.min(
+                      Math.abs(box.y - anchor.bottom - 4),
+                      Math.abs(anchor.top - box.y - box.height - 4),
+                    ),
+                  )
+                })
+                .toBeLessThan(2)
+              const box = (await dialog.boundingBox())!
+              expect(box.y).toBeGreaterThanOrEqual(16)
+              expect(box.y + box.height).toBeLessThanOrEqual(624)
+            }
+
+            // Act
+            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+            await page.locator('.ProseMirror > p').last().click()
+            await editorSettled(page)
+            await page.keyboard.press('End')
+
+            // Assert
+            await expect(dialog).toHaveCount(0)
+          }
+        })
+      }
+
+      test('it keeps the upload draft and inserts at the mapped anchor after earlier text changes', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const title = initialWorkspace === 'empty' ? 'Untitled' : 'Markdown'
+        await enterBody(page, 'Anchor marker')
+        await insertBlock(page, 'Image')
+        const dialog = page.getByRole('dialog', { name: 'Insert image' })
+        await dialog.locator('input[type="file"]').setInputFiles({
+          name: 'mapped.png',
+          mimeType: 'image/png',
+          buffer: png,
+        })
+        await expect(dialog.getByText('mapped.png', { exact: true })).toBeVisible()
+
+        // Act
+        await page.locator('.ProseMirror h1').click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type(' mapped')
+
+        // Assert
+        await expect(page.locator('.ProseMirror h1')).toHaveText(`${title} mapped`)
+        await expect(dialog).toBeVisible()
+        await expect(dialog.getByText('mapped.png', { exact: true })).toBeVisible()
+        await expect(page.locator('.document-status')).toContainText('Saved')
+
+        // Act
+        await dialog.getByRole('button', { name: 'Upload', exact: true }).click()
+
+        // Assert
+        const path = `${title} mapped.md`
+        await expect(page.locator('.ProseMirror img')).toBeVisible()
+        await expect(dialog).toHaveCount(0)
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.images/')
+        const source = await readFile(join(workspace.root, path), 'utf8')
+        expect(source).toContain('Anchor marker')
+        const imageOffset = source.search(/!\[/)
+        expect(imageOffset).toBeGreaterThan(-1)
+        expect(source.indexOf('Anchor marker')).toBeLessThan(imageOffset)
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+      })
+
+      test('it dismisses the overlay when its document anchor is removed', async ({ page }) => {
+        // Arrange
+        await insertBlock(page, 'Image')
+        const dialog = page.getByRole('dialog', { name: 'Insert image' })
+        await expect(dialog).toBeVisible()
+
+        // Act
+        await page.locator('.ProseMirror').focus()
+        await editorSettled(page)
+        await page.keyboard.press('ControlOrMeta+a')
+        await page.keyboard.press('Backspace')
+
+        // Assert
+        await expect(dialog).toHaveCount(0)
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+        // Act
+        await page.keyboard.type('After removal')
+
+        // Assert
+        await expect(page.locator('.ProseMirror')).toContainText('After removal')
+      })
+    })
+
+    test.describe('When validating insertion forms', () => {
+      for (const form of [
+        { command: 'Bookmark', dialog: 'Insert bookmark', input: 'input[type="url"]' },
+        { command: 'Image', dialog: 'Insert image', input: 'input[type="url"]' },
+        { command: 'YouTube', dialog: 'Embed YouTube video', input: 'input' },
+      ]) {
+        test(`it keeps ${form.command} validation beside its input and cancels without inserting a block`, async ({
+          page,
+        }) => {
+          // Arrange
+          await enterBody(page, `/${form.command.toLowerCase()}`)
+          // This short command occupies one text line. Measure that rendered line;
+          // WebKit reports a zero rectangle for its collapsed browser selection.
+          const caret = await page
+            .locator('.ProseMirror p')
+            .last()
+            .evaluate((paragraph) => {
+              const range = document.createRange()
+              range.selectNodeContents(paragraph)
+              const rect = range.getBoundingClientRect()
+              return { top: rect.top, bottom: rect.bottom }
+            })
+          await page.getByRole('option', { name: form.command, exact: true }).click()
+          await editorSettled(page)
+          const dialog = page.getByRole('dialog', { name: form.dialog, exact: true })
+          if (form.command === 'Image')
+            await dialog.getByRole('tab', { name: 'URL', exact: true }).click()
+          const input = dialog.locator(form.input)
+
+          // Act
+          await input.fill('not-a-url')
+          await input.press('Enter')
+
+          // Assert
+          const error = dialog.getByRole('alert')
+          await expect(error).toBeVisible()
+          const [inputBox, errorBox, dialogBox] = await Promise.all([
+            input.boundingBox(),
+            error.boundingBox(),
+            dialog.boundingBox(),
+          ])
+          expect(inputBox).not.toBeNull()
+          expect(errorBox).not.toBeNull()
+          expect(dialogBox).not.toBeNull()
+          expect(errorBox!.y - (inputBox!.y + inputBox!.height)).toBeGreaterThanOrEqual(0)
+          expect(errorBox!.y - (inputBox!.y + inputBox!.height)).toBeLessThanOrEqual(8)
+          expect(dialogBox!.y).toBeGreaterThanOrEqual(0)
+          expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(640)
+          expect(caret).not.toBeNull()
+          const aboveGap = caret!.top - (dialogBox!.y + dialogBox!.height)
+          const belowGap = dialogBox!.y - caret!.bottom
+          expect(Math.min(Math.abs(aboveGap), Math.abs(belowGap))).toBeLessThanOrEqual(8)
+          await expect(
+            page.locator(
+              '.ProseMirror img, .ProseMirror iframe, .ProseMirror [data-type="linkPreview"]',
+            ),
+          ).toHaveCount(0)
+
+          // Act
+          await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+          // Assert
+          await expect(dialog).toHaveCount(0)
+          await expect(page.getByRole('alertdialog')).toHaveCount(0)
+          await expect(
+            page.locator(
+              '.ProseMirror img, .ProseMirror iframe, .ProseMirror [data-type="linkPreview"]',
+            ),
+          ).toHaveCount(0)
+        })
+      }
+
+      test('it removes an open insertion overlay when another article is selected', async ({
+        page,
+      }) => {
+        // Arrange
+        await createArticle(page)
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await insertBlock(page, 'Image')
+        await expect(page.getByRole('dialog', { name: 'Insert image' })).toBeVisible()
+
+        // Act
+        await page
+          .locator(
+            `[role="treeitem"][data-value="${initialWorkspace === 'empty' ? 'Untitled 2.md' : 'Untitled.md'}"]`,
+          )
+          .click()
+
+        // Assert
+        await expect(page.getByRole('dialog', { name: 'Insert image' })).toHaveCount(0)
+        await expect(page.locator('.ProseMirror')).toBeVisible()
+      })
+    })
+
+    test.describe('When editing separate numbered lists', () => {
+      test('it saves and reopens a separate empty list without merging its neighbors', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await writeFile(
+          join(workspace.root, 'lists.md'),
+          '# Lists\n\n1. First\n\n1) <p></p>\n\n3. Third\n',
+        )
+        await page.reload()
+        await page.locator('[role="treeitem"][data-value="lists.md"]').click()
+        const lists = page.locator('.ProseMirror > ol')
+        await expect(lists).toHaveCount(3)
+
+        // Act
+        await edit(page, ' updated')
+
+        // Assert
+        await expect(page.getByRole('status')).toContainText('Saved')
+        await expect
+          .poll(() => readFile(join(workspace.root, 'lists.md'), 'utf8'))
+          .toContain('1) <p></p>')
+        await reopen(page, 'lists.md')
+        await expect(lists).toHaveCount(3)
+        await expect(lists.nth(0)).toHaveText('First')
+        await expect(lists.nth(2)).toHaveText('Third updated')
+        await expect(lists.nth(1).locator('p')).toBeEmpty()
+        await expect(lists.nth(2)).toHaveAttribute('start', '3')
+      })
+    })
+
+    test.describe('When changing a code block language', () => {
+      test('it renders syntax without a nested box or command placeholder and preserves the language', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await insertBlock(page, 'Code Block')
+        const block = page.locator('.ProseMirror [data-code-block]')
+        const code = block.locator('pre.editor-code-content')
+
+        // Act
+        await block.getByRole('combobox').click()
+        await page.getByRole('option', { name: 'Python', exact: true }).click()
+        await code.locator('code').click()
+        await editorSettled(page)
+        await page.keyboard.type('def answer(): return "yes"')
+
+        // Assert
+        await expect(block.getByRole('combobox')).toContainText('Python')
+        await expect(block.locator('[data-placeholder]')).toHaveCount(0)
+        const selector = await block.getByRole('combobox').boundingBox()
+        const copy = await block
+          .getByRole('button', { name: 'Copy code', exact: true })
+          .boundingBox()
+        expect(selector).not.toBeNull()
+        expect(copy).not.toBeNull()
+        expect(selector!.x + selector!.width).toBeLessThan(copy!.x)
+        expect(await code.evaluate((element) => element.textContent)).toBe(
+          'def answer(): return "yes"',
+        )
+        await expect(code).toHaveCSS('margin-bottom', '0px')
+        await expect(code).toHaveCSS('margin-top', '0px')
+        await expect(code).toHaveCSS('border-top-width', '0px')
+        await expect(code.locator('.hljs-keyword').first()).toBeVisible()
+        await expect(code.locator('.hljs-string').first()).toBeVisible()
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('```python')
+
+        // Act
+        await reopen(page, path)
+
+        // Assert
+        await expect(block.getByRole('combobox')).toContainText('Python')
+        await expect(code).toContainText('def answer(): return "yes"')
+      })
+    })
+
+    test.describe('When editing a selected link', () => {
+      test('it preserves boundary spaces and the link destination when saved and reopened', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await enterBody(page, 'Before  linked  ')
+        await selectLastText(page, ' linked  ')
+
+        // Act
+        await page.getByRole('button', { name: 'Link', exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: 'Edit link' })
+        await dialog.getByPlaceholder('Enter URL').fill('https://example.com/article')
+        await dialog.getByPlaceholder('Enter URL').press('Enter')
+
+        // Assert
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain(
+            '<a href="https://example.com/article" target="_blank" rel="noopener noreferrer" class="text-primary underline"> linked  </a>',
+          )
+
+        // Act
+        await reopen(page, path)
+
+        // Assert
+        await expect.poll(() => page.locator('.ProseMirror a').textContent()).toBe(' linked  ')
+        await expect(page.locator('.ProseMirror a')).toHaveAttribute(
+          'href',
+          'https://example.com/article',
+        )
+        await expect(page.locator('.ProseMirror > p').last()).toHaveText('Before  linked  ')
+
+        // Act
+        await page.locator('.ProseMirror > p').last().click()
+        await editorSettled(page)
+        await page.keyboard.press('End')
+        await page.keyboard.type('after')
+
+        // Assert
+        await expect.poll(() => page.locator('.ProseMirror a').textContent()).toBe(' linked  after')
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('after')
+        await expect(page.getByRole('alertdialog')).toHaveCount(0)
+      })
+
+      test('it saves the link target and removes it through the link editor', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await enterBody(page, 'Linked text')
+        await selectLastText(page, 'Linked text')
+
+        // Act
+        await page.getByRole('button', { name: 'Link', exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: 'Edit link' })
+        await dialog.getByPlaceholder('Enter URL').fill('https://example.com/article')
+        await dialog.getByPlaceholder('Enter URL').press('Enter')
+
+        // Assert
+        await expect(page.locator('.ProseMirror a')).toHaveAttribute(
+          'href',
+          'https://example.com/article',
+        )
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('[Linked text](https://example.com/article)')
+
+        // Act
+        await reopen(page, path)
+        await edit(page, '')
+        await selectLastText(page, 'Linked text')
+        await page.getByRole('button', { name: 'Link', exact: true }).click()
+        await expect(
+          page.getByRole('dialog', { name: 'Edit link' }).getByPlaceholder('Enter URL'),
+        ).toHaveValue('https://example.com/article')
+        await page
+          .getByRole('dialog', { name: 'Edit link' })
+          .getByRole('button', { name: 'Remove link' })
+          .click()
+
+        // Assert
+        await expect(page.locator('.ProseMirror a')).toHaveCount(0)
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .not.toContain('https://example.com/article')
+        await expect(page.locator('.ProseMirror')).toContainText('Linked text')
+      })
+    })
+
+    test.describe('When opening the link editor in a long article', () => {
+      test('it anchors the link input below the formatting toolbar and restores article scrolling when closed', async ({
+        page,
+      }) => {
+        // Arrange
+        await enterBody(
+          page,
+          Array.from({ length: 24 }, (_, index) => `Paragraph ${index}`).join('\n'),
+        )
+        await page.keyboard.press('Enter')
+        await page.keyboard.type('Link selection')
+        await selectLastText(page, 'Link selection')
+        const scroll = page.locator('.article-scroll')
+
+        // Act
+        await page.getByRole('button', { name: 'Link', exact: true }).click()
+
+        // Assert
+        const toolbar = page.getByRole('toolbar', { name: 'Text formatting' })
+        const dialog = page.getByRole('dialog', { name: 'Edit link' })
+        await expect(dialog).toBeVisible()
+        const [toolbarBox, dialogBox] = await Promise.all([
+          toolbar.boundingBox(),
+          dialog.boundingBox(),
+        ])
+        expect(toolbarBox).not.toBeNull()
+        expect(dialogBox).not.toBeNull()
+        expect(dialogBox!.y).toBeGreaterThanOrEqual(toolbarBox!.y + toolbarBox!.height - 1)
+        expect(dialogBox!.y).toBeLessThanOrEqual(toolbarBox!.y + toolbarBox!.height + 24)
+        const before = await scroll.evaluate((element) => element.scrollTop)
+
+        // Act
+        await scroll.hover({ position: { x: 8, y: 8 } })
+        await page.mouse.wheel(0, -200)
+
+        // Assert
+        await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBe(before)
+
+        // Act
+        await dialog.getByPlaceholder('Enter URL').press('Enter')
+        await scroll.hover({ position: { x: 8, y: 8 } })
+        await page.mouse.wheel(0, -200)
+
+        // Assert
+        await expect(dialog).toHaveCount(0)
+        await expect
+          .poll(() => scroll.evaluate((element) => element.scrollTop))
+          .toBeLessThan(before)
+      })
+    })
+
+    test.describe('When pasting a bare URL', () => {
+      for (const replaceSelection of [false, true]) {
+        test(
+          replaceSelection
+            ? 'it replaces selected text with the pasted URL and preserves the link after reopening'
+            : 'it inserts a normal link without a choice menu and preserves it after reopening',
+          async ({ page, workspace }) => {
+            // Arrange: the browser clipboard is populated through a rendered URL input.
+            const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+            const url = 'https://example.com/pasted-link'
+            await insertBlock(page, 'Image')
+            const dialog = page.getByRole('dialog', { name: 'Insert image' })
+            await dialog.getByRole('tab', { name: 'URL', exact: true }).click()
+            const input = dialog.locator('input[type="url"]')
+            await input.fill(url)
+            await input.press('ControlOrMeta+a')
+            await input.press('ControlOrMeta+c')
+            await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+            await page.locator('.ProseMirror p').last().click()
+            await editorSettled(page)
+            if (replaceSelection) {
+              await page.keyboard.type('Replace this')
+              await selectLastText(page, 'Replace this')
+            }
+
+            // Act
+            await page.keyboard.press('ControlOrMeta+v')
+
+            // Assert
+            await expect(page.locator('.ProseMirror a')).toHaveAttribute('href', url)
+            await expect(page.locator('.ProseMirror a')).toHaveText(url)
+            await expect(page.locator('.ProseMirror')).not.toContainText('Replace this')
+            await expect(page.getByRole('menu')).toHaveCount(0)
+            await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain(url)
+
+            // Act
+            await reopen(page, path)
+
+            // Assert
+            await expect(page.locator('.ProseMirror a')).toHaveAttribute('href', url)
+            await expect(page.locator('.ProseMirror a')).toHaveText(url)
+          },
+        )
+      }
+    })
+
+    test.describe('When an image upload fails', () => {
+      test('it preserves the article and allows the selected image to be retried', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
+        await insertBlock(page, 'Image')
+        await expect(page.locator('.document-status')).toContainText('Saved')
+        const original = await readFile(join(workspace.root, path), 'utf8')
+        workspace.failImageUploads = true
+        await page
+          .locator('input[type="file"]')
+          .setInputFiles({ name: 'retry.png', mimeType: 'image/png', buffer: png })
+        const dialog = page.getByRole('dialog', { name: 'Insert image' })
+
+        // Act
+        await dialog.getByRole('button', { name: 'Upload', exact: true }).last().click()
+
+        // Assert
+        await expect(dialog.getByRole('alert')).toContainText('Upload failed. Please try again.')
+        await expect(page.locator('.ProseMirror img')).toHaveCount(0)
+        expect(await readFile(join(workspace.root, path), 'utf8')).toBe(original)
+
+        // Act
+        workspace.failImageUploads = false
+        await dialog.getByRole('button', { name: 'Upload', exact: true }).last().click()
+
+        // Assert
+        await expect(page.locator('.ProseMirror img')).toBeVisible()
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.images/')
+        await expect(dialog).toHaveCount(0)
+        expect(await readdir(join(workspace.root, '.images'))).toHaveLength(1)
+      })
+    })
 
     for (const widget of [
       { name: 'Heading 1', selector: 'h2', markdown: '## Widget text' },
@@ -529,10 +1848,16 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await expect.poll(() => readFile(saved, 'utf8')).toContain('.images/')
       expect(await readdir(join(workspace.root, '.images'))).toHaveLength(1)
       // Act
-      const caption = page.getByPlaceholder('Add a caption…')
+      const caption = page.locator('.ProseMirror .caption-input')
       await caption.fill('An edited caption')
-      await page.locator('.ProseMirror h1').click()
+      await caption.press('Enter')
+      await expect
+        .poll(() => page.evaluate(() => document.activeElement?.classList.contains('ProseMirror')))
+        .toBe(true)
+      await editorSettled(page)
+      await page.keyboard.type('After caption')
       // Assert
+      await expect(page.locator('.ProseMirror p')).toContainText(['After caption'])
       await expect.poll(() => readFile(saved, 'utf8')).toContain('"An edited caption"')
       expect(await readFile(saved, 'utf8')).not.toContain('data:')
       // Act
@@ -560,11 +1885,27 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
 }
 
 // Fixtures --------------------------------------------------------------------
-async function insertBlock(page: Page, name: string) {
+async function enterBody(page: Page, text: string) {
   await edit(page, '')
   await page.keyboard.press('Enter')
+  const paragraph = page.locator('.ProseMirror > p').last()
+  await paragraph.click()
+  await editorSettled(page)
+  await page.keyboard.press('End')
+  await page.keyboard.type(text)
+}
+
+async function selectLastText(page: Page, text: string) {
+  await editorSettled(page)
+  for (let index = 0; index < text.length; index++) await page.keyboard.press('Shift+ArrowLeft')
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(text)
+  await editorSettled(page)
+}
+
+async function insertBlock(page: Page, name: string) {
+  await enterBody(page, '')
   await page.keyboard.type(`/${name.split(' ')[0]!.toLowerCase()}`)
-  await page.getByRole('button', { name, exact: true }).click()
+  await page.getByRole('option', { name, exact: true }).click()
   await editorSettled(page)
 }
 

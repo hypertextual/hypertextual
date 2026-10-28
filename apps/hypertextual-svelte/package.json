@@ -30,6 +30,8 @@
     "@cloudvoyant/helical-ui": "0.19.0",
     "manim-web": "0.3.24",
     "@hypertextual/ui": "workspace:*",
+    "@tiptap/core": "3.31.4",
+    "htmd-ts": "workspace:*",
     "lucide-svelte": "0.577.0"
   }
 }

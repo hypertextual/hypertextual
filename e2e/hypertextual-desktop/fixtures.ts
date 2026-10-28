@@ -8,6 +8,7 @@ export { expect }
 export interface Workspace {
   root: string
   failWrites: boolean
+  failImageUploads: boolean
   failLists: boolean
   slowReads: boolean
   destroyed: boolean
@@ -76,6 +77,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           root,
           failLists: false,
           failWrites: false,
+          failImageUploads: false,
           slowReads: false,
           destroyed: false,
           quit: false,
@@ -172,6 +174,8 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
               throw new Error('No available name')
             }
             if (command === 'workspace_import_image') {
+              if (workspace.failImageUploads)
+                throw new Error('Image storage unavailable. Retry the upload.')
               const bytes = Buffer.from(args.bytes!)
               const parent = args.articlePath!.includes('/')
                 ? args.articlePath!.slice(0, args.articlePath!.lastIndexOf('/'))
@@ -276,6 +280,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
 })
 
 export async function edit(page: Page, text: string) {
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
   await page.locator('.ProseMirror').click()
   // Let Helical finish scheduled autofocus before positioning the caret for typing.
   await page.evaluate(
@@ -289,5 +294,9 @@ export async function edit(page: Page, text: string) {
 }
 
 export async function createArticle(page: Page) {
+  const selected = page.locator('[role="treeitem"][aria-selected="true"]')
+  const previous = (await selected.count()) ? await selected.getAttribute('data-value') : null
   await page.getByRole('button', { name: 'New article', exact: true }).click()
+  await expect.poll(() => selected.getAttribute('data-value')).not.toBe(previous)
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
 }

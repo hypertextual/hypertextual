@@ -24,59 +24,66 @@ Hypertextual is a desktop workspace for local articles. Writers browse files, ed
 ### Components and Responsibilities
 
 ```mermaid
-flowchart LR
+flowchart TD
   Writer --> Shell[Workspace shell]
-  Shell --> Workspace[Workspace service]
-  Shell --> Editor[Editor service]
-  Shell --> UI[Reusable UI]
+  Shell --> Workspace[App workspace service]
+  Shell --> Editor[App editor service]
+  Editor --> Document[App ArticleViewModel]
+  Document --> SDK[htmd-ts: synchronous format SDK]
+  SDK -->|PM JSON| Document
+  Shell --> UI[Reusable JSON editor, tree, menus]
+  UI -->|PM JSON changes| Editor
+  Document -->|PM JSON for display| UI
   Workspace --> Client[Tauri clients]
   Editor --> Client
-  Editor --> UI
-  Client --> Rust[Tauri workspace commands]
-  Rust --> WorkspaceService[Native workspace service]
-  Rust --> ArticleService[Native article service]
-  Rust --> MediaService[Native media service]
-  ArticleService --> WorkspaceService
-  MediaService --> WorkspaceService
-  WorkspaceService --> Files[Local files]
-  ArticleService --> Files
-  MediaService --> Files
+  Client --> Native[Desktop Tauri adapters]
+  Native --> Filesystem[hyped-fs: Hypertextual workspace models and services]
+  Filesystem --> Files[Workspace files]
 ```
 
 - The shell composes navigation, the article pane, and recovery controls.
-- Application services own workspace operations, article selection, and autosave policy.
-- The private UI library supplies portable editor, tree, and menu interfaces using published Helical packages and Ark UI.
-- Tauri clients connect application services to Rust. Rust owns filesystem access and workspace safety.
-- The HTMD libraries remain reserved for format SDK design. The CLI is a separate Rust consumer.
+- App services own selection, autosave, source previews, drafts, and portable image references.
+- `htmd-ts` owns Markdown syntax, validation, and synchronous conversion to and from ProseMirror JSON.
+- The private UI library supplies the local editor, tree, and menus through published Helical and Ark controls.
+- Tauri clients exchange raw source and revisions through thin desktop command adapters.
+- Private `hyped-fs` owns the Hypertextual workspace models and services, including article, image, naming, revision, and file policy.
 
 ### Data and Control Flow
 
-Opening a workspace supplies the tree with its entries. Selecting an article opens an editor document through the editor service. The reusable editor emits serialized content and title changes. Autosave writes those changes through the Tauri client, and the workspace service reflects the saved filename.
+Opening the workspace supplies entries for the tree. Selecting an article reads raw Markdown and its revision through the Tauri client. `EditorService` calls `htmd-ts` synchronously and asks its workspace-aware `MediaService` to resolve local and remote images for an `ArticleViewModel`. `ContentPane` supplies the resulting JSON to the editor. Unsupported nodes become editable raw-source wrappers alongside recognized content. Only an unrecoverable parser failure shows the whole source in an app-owned read-only preview.
 
-A failed save retains the draft. Switching articles or closing the window requires pending writes to finish. Application state belongs to one window and resets on startup.
+Editor changes return native JSON. The app retains the draft, restores portable image references, and calls the synchronous writer. Autosave sends raw source to the native article service. The article service in `hyped-fs` checks the revision, stages replacement bytes, rechecks the revision and destination, and commits the replacement. The app reflects any title-based filename change.
+
+A failed conversion or save retains the draft for recovery. Switching articles or closing the window requires pending writes to finish. Application state belongs to one window and resets on startup.
 
 ### Interfaces and Contracts
 
-The workspace client exposes file operations, image reads and imports, and revision-aware writes. A revision identifies the content version that the caller expects to replace. The editor service supplies image callbacks to the reusable editor without exposing workspace paths or storage conventions.
+The format SDK exposes `parse`, `serialize`, and `validateDocument` with SDK-owned ProseMirror JSON types. Parsing returns JSON plus plain issues and preserves failed nodes as raw-source wrappers. Tiptap Markdown, Marked, extension objects, and the engine schema stay private. Invalid editor JSON and unsafe writes return purpose-specific errors. App integration tests validate actual parsed JSON in the mounted editor schema.
+
+`DocumentEditor` receives document JSON and emits JSON changes. It has no format SDK or filesystem dependency. The app supplies image uploads. Source text, revisions, asset mappings, and recovery belong to app services.
+
+The workspace client retains its raw source-text read/write API. A revision identifies the content version that the caller expects to replace. `hyped-fs` exposes Hypertextual workspace, article, and media services with the existing models and error codes. Tauri adapts these APIs without duplicating their policy.
 
 ## Implementation
 
 ### Ownership boundaries
 
-Application-specific components and services live in the Svelte app. Generic components and editor conversion live in the private UI library. The desktop backend retains native filesystem and window integration.
+`libs/htmd-ts` owns the current format implementation. It uses Tiptap Markdown and Marked with CommonMark and GFM. Custom syntax is limited to component data those formats cannot represent. Consolidated `nodes.ts` and `marks.ts` reuse upstream extension machinery and define custom parsing/rendering hooks. Public BDD parsing examples document the syntax and complete save/reopen contract. Svelte renders parsed nodes without defining the saved format.
 
-Rust models live under `apps/hypertextual-desktop/src/models`. Related types share a file. `workspace.rs` defines the workspace location, its nodes, and its listing. `article.rs` defines article content and metadata. Models validate values and construct data without accessing the filesystem.
+`libs/ui` owns reusable UI and the local editor core. App compositions, `ArticleViewModel`, and autosave live under `apps/hypertextual-svelte/src`. Native models and services live under `libs/hyped-fs/src/models` and `src/services`. Models validate and map data without filesystem access.
 
-Native services live under `src/services`. WorkspaceService owns browsing, folder creation, renaming, deletion, and containment checks. ArticleService owns article creation, reads, and saves. MediaService owns image imports and reads. Article and media services share the workspace boundary. Their behavior tests live inside their source files and use isolated temporary directories.
-
-`error.rs` defines the shared workspace error contract. The top-level `workspace.rs` contains Tauri commands and serializes filesystem operations across all three services.
+`libs/hyped-fs` owns the existing Hypertextual file operations and policy together: confinement, article validation, limits, image types and names, revisions, title-derived filenames, replacement, and Trash. The desktop owns Tauri command and lifecycle adapters and serializes service mutations.
 
 ### Extension points
 
-Storage and asset adapters allow the editor to serve other applications. The planned Helical editor service and shared Rust filesystem library can replace these boundaries without moving workspace policy into UI components.
+`htmd-rs` remains a private placeholder under its original name. Rust conversion, source-position APIs, and an LSP remain future work. Charts will use format-owned structured data and separate Svelte rendering. `hyped-fs` provides the boundary for future remote file sync, but no remote provider exists now.
+
+Package integration suites exercise the format and filesystem APIs. App integration tests cover document sessions and schema agreement. The existing Chromium/WebKit suite covers editor and workspace behavior through a filesystem-backed Tauri substitute. Lifted package integration tests cover native workspace policy.
 
 ## References
 
+- [hyped-fs workspace persistence](hyped-fs.md)
+- [htmd-ts format SDK](htmd-ts.md)
 - [UI library components](ui/index.md)
 - [Svelte web app components](svelte-web-app/index.md)
 - [Development commands](../development.md)

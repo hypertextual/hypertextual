@@ -43,7 +43,7 @@ test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-t
     // Assert
     await expect(page.locator('.ProseMirror h1')).toHaveText('Markdown')
     workspace.failWrites = true
-    await createArticle(page)
+    await page.getByRole('button', { name: 'New article', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText('Cannot create an article')
     await expect(page.locator('.ProseMirror h1')).toHaveText('Markdown')
     workspace.failWrites = false
@@ -376,7 +376,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       // Act
       await renameEntry(page, 'Research', 'Reference')
       // Assert
-      expect(await exists(original)).toBe(false)
+      await expect.poll(() => exists(original)).toBe(false)
       expect((await stat(renamed)).isDirectory()).toBe(true)
       await page.reload()
       await expect(entry(page, 'Reference')).toBeVisible()

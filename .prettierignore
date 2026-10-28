@@ -24,3 +24,6 @@ RELEASE_NOTES.md
 **/playwright-report/
 
 **/dist-e2e/
+
+# Exact Markdown parser vectors contain format-significant directive boundaries.
+libs/htmd-ts/fixtures/*.md

@@ -1,32 +1,15 @@
-import type { ImageUploadResult } from '@cloudvoyant/helical-ui'
-import type { EditorDocument } from './document'
+import type { JSONContent } from '@tiptap/core'
+import type { ImageUploadResult } from './core'
 
-export interface EditorAsset extends ImageUploadResult {
-  source: string
-}
-
-export interface EditorAssets {
-  resolve: (source: string) => Promise<string>
-  upload: (file: File) => Promise<EditorAsset>
-}
-
-export interface EditorChange {
-  source: string
-  title: string
-}
-
-export interface EditorFailure {
-  message: string
-  title: string
-}
+export type EditorImageUploadResult = ImageUploadResult
 
 export interface EditorHandle {
   focus: () => void
 }
 
 export interface DocumentEditorProps {
-  document: EditorDocument
+  document: JSONContent
   editable?: boolean
-  onchange: (change: EditorChange) => void
-  onerror: (failure: EditorFailure) => void
+  onchange: (document: JSONContent) => void
+  onUpload?: (file: File) => Promise<EditorImageUploadResult>
 }

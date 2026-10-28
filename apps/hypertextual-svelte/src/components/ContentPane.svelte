@@ -46,15 +46,26 @@
     <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
   {:else if editor.document && editor.selected}
     <div class="article-scroll">
-      <div class:article-editor={editor.document.editable}>
+      <div class={{ 'article-editor': editor.document.editable }}>
         {#key editor.version}
-          <DocumentEditor
-            bind:this={view}
-            document={editor.document}
-            editable={!workspace.blocked}
-            onchange={(change) => editor.change(change)}
-            onerror={(failure) => editor.fail(failure)}
-          />
+          {#if editor.document.content}
+            <DocumentEditor
+              bind:this={view}
+              document={editor.document.content}
+              editable={!workspace.blocked}
+              onchange={(document) => editor.change(document)}
+              onUpload={(file) => editor.upload(file)}
+            />
+          {:else}
+            <div class="source-preview p-6">
+              <p class="readonly-notice mb-5 text-xs text-muted-foreground">
+                {editor.document.reason}
+              </p>
+              <pre
+                aria-label="Original article source"
+                class="whitespace-pre-wrap break-words text-xs">{editor.document.source}</pre>
+            </div>
+          {/if}
         {/key}
       </div>
     </div>
@@ -67,6 +78,6 @@
   {/if}
   <footer class="document-status" role="status" aria-live="polite">
     <span title={editor.selected?.path}>{workspace.selectedTitle}</span>
-    <span class:error={Boolean(editor.codecError || editor.save.error)}>{editor.status}</span>
+    <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span>
   </footer>
 </main>

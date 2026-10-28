@@ -135,25 +135,7 @@ button:focus-visible {
   padding: 36px 48px 80px;
 }
 .article-editor .ProseMirror {
-  outline: none;
-  color: #334155;
-  font-size: 15px;
-  line-height: 1.8;
   min-height: 300px;
-  --tw-prose-headings: #334155;
-}
-.article-editor .ProseMirror h1 {
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  margin-bottom: 20px;
-}
-.article-editor .ProseMirror h2 {
-  font-size: 20px;
-  font-weight: 550;
-}
-.article-editor .ProseMirror p {
-  margin: 12px 0;
 }
 .empty-pane {
   flex: 1;

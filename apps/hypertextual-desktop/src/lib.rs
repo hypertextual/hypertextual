@@ -1,6 +1,3 @@
-mod error;
-mod models;
-mod services;
 mod workspace;
 
 use std::sync::{
@@ -9,8 +6,12 @@ use std::sync::{
 };
 use tauri::{Emitter, Manager};
 
+/// Tracks whether the frontend can flush pending saves during quit.
 #[derive(Default)]
-struct FrontendReady(AtomicBool);
+struct FrontendReady(
+    /// True after the frontend registers its quit handler.
+    AtomicBool,
+);
 
 #[tauri::command]
 fn workspace_frontend_ready(state: tauri::State<'_, FrontendReady>) {
@@ -32,7 +33,7 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
                 None => app.path().home_dir()?,
             };
             app.manage(workspace::WorkspaceState(Arc::new(Mutex::new(
-                services::WorkspaceService::from_home(home),
+                hyped_fs::WorkspaceService::from_home(home),
             ))));
             Ok(())
         })

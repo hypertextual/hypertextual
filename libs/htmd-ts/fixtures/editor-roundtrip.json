@@ -1,0 +1,549 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 1
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Roundtrip fixture"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 2
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading 2"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 3
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading 3"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 4
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading 4"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 5
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading 5"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {
+        "level": 6
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "Heading 6"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Normal. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "link",
+              "attrs": {
+                "href": "https://example.com/full",
+                "title": "Full link",
+                "target": "_self",
+                "rel": "author",
+                "class": "custom-link"
+              }
+            }
+          ],
+          "text": "link "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "textStyle",
+              "attrs": {
+                "color": "#3b82f6"
+              }
+            }
+          ],
+          "text": "textStyle "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "bold"
+            }
+          ],
+          "text": "bold "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "code"
+            }
+          ],
+          "text": "code "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "italic"
+            }
+          ],
+          "text": "italic "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "strike"
+            }
+          ],
+          "text": "strike "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "highlight",
+              "attrs": {
+                "color": "#3b82f6"
+              }
+            }
+          ],
+          "text": "highlight "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "underline"
+            }
+          ],
+          "text": "underline "
+        },
+        {
+          "type": "text",
+          "text": "next. "
+        },
+        {
+          "type": "text",
+          "marks": [
+            {
+              "type": "textStyle",
+              "attrs": {
+                "color": "#ef4444"
+              }
+            },
+            {
+              "type": "bold"
+            },
+            {
+              "type": "italic"
+            },
+            {
+              "type": "highlight",
+              "attrs": {
+                "color": "#22c55e"
+              }
+            },
+            {
+              "type": "underline"
+            }
+          ],
+          "text": "Mixed "
+        },
+        {
+          "type": "hardBreak"
+        },
+        {
+          "type": "text",
+          "text": "After hard break."
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Aligned left"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Aligned center"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Aligned right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Aligned justify"
+        }
+      ]
+    },
+    {
+      "type": "blockquote",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Quoted text"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Bullet item"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "orderedList",
+      "attrs": {
+        "start": 3,
+        "type": null
+      },
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ordered item"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "taskList",
+      "content": [
+        {
+          "type": "taskItem",
+          "attrs": {
+            "checked": true
+          },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Completed task"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "horizontalRule"
+    },
+    {
+      "type": "codeBlock",
+      "attrs": {
+        "language": "typescript"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "const example = \"<em>literal</em>\";\n// :::chart stays code"
+        }
+      ]
+    },
+    {
+      "type": "notice",
+      "attrs": {
+        "title": "info notice",
+        "variant": "info"
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Notice body info"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "notice",
+      "attrs": {
+        "title": "success notice",
+        "variant": "success"
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Notice body success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "notice",
+      "attrs": {
+        "title": "warning notice",
+        "variant": "warning"
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Notice body warning"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "notice",
+      "attrs": {
+        "title": "error notice",
+        "variant": "error"
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Notice body error"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "imageNode",
+      "attrs": {
+        "src": ".images/roundtrip.png",
+        "srcset": null,
+        "alt": "Roundtrip image",
+        "caption": "Caption with trailing space "
+      }
+    },
+    {
+      "type": "linkPreview",
+      "attrs": {
+        "url": "https://example.com/bookmark",
+        "title": "Bookmark title",
+        "description": "Bookmark description",
+        "image": "https://images.example.com/bookmark.png",
+        "favicon": "https://images.example.com/favicon.png",
+        "provider": "Example",
+        "type": "bookmark"
+      }
+    },
+    {
+      "type": "linkPreview",
+      "attrs": {
+        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=90",
+        "title": "Embedded video",
+        "description": "Embed description",
+        "image": null,
+        "favicon": null,
+        "provider": "YouTube",
+        "type": "embed"
+      }
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Mentions: "
+        },
+        {
+          "type": "internalMention",
+          "attrs": {
+            "id": "post-123",
+            "label": "Linked article",
+            "type": "post",
+            "seriesId": "series-456"
+          }
+        },
+        {
+          "type": "text",
+          "text": " and "
+        },
+        {
+          "type": "urlMention",
+          "attrs": {
+            "url": "https://example.com/mention",
+            "title": "URL mention",
+            "favicon": "https://images.example.com/favicon.png"
+          }
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "End of full fixture."
+        }
+      ]
+    },
+    {
+      "type": "unparsedBlock",
+      "attrs": {
+        "kind": "containerDirective",
+        "reason": "Unsupported chart directive."
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": ":::chart\n{\"series\":[1,2]}\n:::"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "text",
+          "text": "Inline "
+        },
+        {
+          "type": "unparsedInline",
+          "attrs": {
+            "kind": "textDirective",
+            "reason": "Unsupported future directive."
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": ":future[raw]"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "text": " text."
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,8 @@
 ## Hard Rules
 
 - Use the published npm packages `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`.
-- Reference `~/Projects/helical-ui` for composition and style. Never copy its components or replace npm dependencies with local paths.
+- Develop the copied Svelte editor and framework-neutral core in `libs/ui/src/editor`. Record upstream provenance in [the editor source guide](docs/architecture/ui/editor-source.md).
+- Reference `~/Projects/helical-ui` for composition and style. Do not copy unrelated components or replace npm dependencies with local paths.
 - Prefer existing [Mise tasks](mise.toml). See [development commands](docs/development.md).
 - Commit or publish only when requested.
 - Fill every section of `~/.difflab/templates/pull-request-description.md` with actual changes and verified evidence.
@@ -17,10 +18,11 @@
 
 - Keep reusable UI in private, non-publishable `libs/ui`.
 - Keep application compositions, messages, and recovery flows in `apps/hypertextual-svelte/src/components`.
-- Keep Svelte view models in `src/services` and Tauri adapters in `src/clients`.
+- Keep application view models in `src/models`, stateful services in `src/services`, and Tauri adapters in `src/clients`.
 - Group related Rust models in one domain module, including workspace nodes, workspace listings, and workspace data.
-- Keep native persistence services under `apps/hypertextual-desktop/src/services`, divided into workspace, article, and media operations.
-- Reserve the HTMD libraries for format SDK work.
+- Keep Hypertextual workspace, article, and media models and services in private `libs/hyped-fs`. Keep desktop Rust code limited to Tauri setup, commands, and lifecycle adapters.
+- Make `libs/htmd-ts` own Markdown syntax, extensions, validation, and synchronous conversion to ProseMirror JSON. Keep `libs/htmd-rs` deferred under its original name.
+- Make `hyped-fs` specific to Hypertextual workspaces. Move existing native models, file policy, revision checks, and persistence services together instead of adding a generic filesystem layer. Keep frontend autosave scheduling in the app.
 - Put reusable UI docs under `docs/architecture/ui` and app component docs under `docs/architecture/svelte-web-app`.
 - Keep setup and commands in [the development guide](docs/development.md). Omit algorithms and source walkthroughs there.
 
@@ -42,7 +44,7 @@
 - Explain each field's meaning, path base, units, or constraints where relevant.
 - Limit model methods to validation, factories, mapping, derived values, and in-memory business rules.
 - Keep filesystem access and persistence out of models.
-- Share workspace containment checks across native services.
+- Use the Hypertextual services in `hyped-fs` for workspace containment, article and image operations, revision checks, and save rechecks.
 - Keep Tauri commands as transport adapters and serialize filesystem operations across services.
 
 ### Svelte and Helical
@@ -56,8 +58,21 @@
 - Use semantic tokens for colors, borders, focus, disabled, invalid, and Ark states. Extend tokens when needed.
 - Avoid component-specific global CSS and hard-coded palette colors.
 - Scan the library source for Tailwind utilities in the consuming app.
-- Reuse published Helical editor contracts, node factories, and upstream Tiptap document types.
-- Keep portable document conversion behind the reusable editor wrapper. Keep storage and autosave policy in app services.
+- Reuse local editor contracts and node definitions in `libs/ui/src/editor/core`, and upstream Tiptap document types. Pass extension dependencies through `.configure()`.
+- Use `EditorOverlays` for insertion requests and shared surface positioning and scroll control. Keep its geometry helpers private; render controls in Svelte.
+- Make the app editor service orchestrate filesystem access, `htmd-ts`, portable image references, drafts, and autosave.
+- Use a workspace-aware media service for local and remote image get, upload, and batch-get operations. Keep URL substitution maps local to the transformation method and document the substitution in architecture implementation notes.
+- Keep article transformations in an article or document view model under `models`, with instance methods.
+- Colocate schema compatibility tests with the service that owns validation.
+- Exchange native Tiptap `JSONContent` with the reusable editor. Keep Markdown conversion, source previews, and format SDK dependencies outside `libs/ui`.
+- Prefer CommonMark and established GFM syntax. Add bespoke syntax only for editor features that those formats cannot represent.
+- Disable all text alignment. Keep text color and highlights. Keep responsive image source sets in frontend presentation state.
+- Keep HTMD node definitions in `nodes.ts` and mark definitions in `marks.ts`. Colocate `nodes.test.ts` and `marks.test.ts`, with nested BDD groups for each element and variant.
+- Use Tiptap Markdown machinery internally in HTMD. Keep its public exchange boundary to opaque file contents, native ProseMirror JSON, and plain issue metadata. Keep engine instances and extension APIs out of that public contract.
+- Keep HTMD types in `types.ts` and named, purpose-specific errors in `errors.ts`. Document exactly when each error occurs.
+- Keep the HTMD core API in `lib.ts`. Split conversion and validation into small functions with explicit responsibilities.
+- Recover Markdown parsing failures per node with editable raw-source wrappers carrying syntax kind and diagnostic details. Keep supported content editable and let editor renderers style or hide wrappers without dropping saved source.
+- Require full save/reopen round trips for supported persisted nodes, marks, and attributes, including formatting on whitespace. Cover all supported elements in an editable demo fixture.
 - Implement services as stateful classes.
 - Register desktop close and quit handlers in the shell lifecycle.
 - Keep pending-save flushing and overlapping-close guards in the editor service.
@@ -79,6 +94,7 @@
 ### Documentation
 
 - Use the installed Difflab software architecture and UI component templates.
+- Keep library READMEs thin and follow the root README structure. Put detailed architecture and API documentation under `docs`, using the relevant installed Difflab templates.
 - Keep diagrams inline in Markdown. Do not add separate diagram sources or rendered assets.
 - Draw aligned UI skeletons with spacing and proportions grounded in actual styles. Show separate states when useful.
 - Show trees as indented text and context menus beside their clicked element.
@@ -91,6 +107,7 @@
 
 - Keep TypeScript end-to-end tests under root `e2e/`, outside Rust applications and their test directories.
 - Use one Playwright suite at `e2e/hypertextual-desktop`, with only `workspace-file-tree.spec.ts` and `editor.spec.ts` as feature specs.
+- Cover editor extension behavior in `editor.spec.ts`. Do not add tests in the extensions directory.
 - Colocate browser configuration, entry points, fixtures, and Mise tasks with that suite.
 - Do not add a root `e2e/mise.toml` or duplicate app-local browser runners.
 - Use native `test.describe('When …')` groups and individual tests for observable behavior.
@@ -103,7 +120,12 @@
 - Keep fixture helpers separate from cases and export only helpers used by another module.
 - Keep the browser suite's filesystem-backed Tauri substitute explicit. It does not test native windows, Rust filesystem safety, or system Trash.
 - Cover native filesystem guarantees with Rust service behavior tests against real temporary files.
-- Colocate Rust tests inside their source file in `#[cfg(test)] mod tests`. Do not create a separate entity test directory.
+- Move existing native service behavior tests with their owning `hyped-fs` services. Colocate private Rust unit tests in `#[cfg(test)] mod tests`.
+- Colocate TypeScript integration and unit tests beside their source as `*.test.ts`. Do not use `.integration.test.ts` names or separate directories for these tests.
+- Put integration tests first under `// integration ---` and unit tests last under `// unit ---`. Extend divider dashes through column 80 and omit empty sections.
+- Keep public Rust package integration suites in `libs/hyped-fs/tests`. Exercise package APIs with real temporary files or the actual parser.
+- Cover every supported HTMD node, mark, attribute, and variant with parsing and full round-trip integration examples; preserve raw-source error recovery. Organize examples by node and mark family. Show literal Markdown input, explicit expected JSON, and full write/reopen behavior.
+- Keep package coverage in integration suites. Do not add package E2E runners or private-helper coverage workstreams.
 - Use optional `given_*` modules, `when_*` operation modules, and `it_*` outcome tests with Given, When, and Then comments.
 - Share fixture setup code, but create one fixture per test and let it own its temporary directory.
 - Avoid tests of private helpers, shared mutable fixtures, and custom BDD runners.

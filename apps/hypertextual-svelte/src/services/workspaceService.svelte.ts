@@ -1,4 +1,7 @@
-import { documentTitle, type TreeNode, type ContextMenuItem } from '@hypertextual/ui'
+import type { TreeNode, ContextMenuItem } from '@hypertextual/ui'
+import { parse } from 'htmd-ts'
+import { ArticleViewModel } from '../models/articleViewModel'
+import { WorkspaceNodeViewModel } from '../models/workspaceNodeViewModel'
 import {
   errorMessage,
   type WorkspaceClient,
@@ -59,12 +62,16 @@ export class WorkspaceService {
   }
   get nodes() {
     return [
-      ...(this.pendingEntry && !this.pendingParent ? [this.toNode(this.pendingEntry)] : []),
-      ...this.entries.map((entry) => this.toNode(entry)),
+      ...(this.pendingEntry && !this.pendingParent
+        ? [new WorkspaceNodeViewModel(this.pendingEntry).toTreeNode()]
+        : []),
+      ...this.entries.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode()),
     ]
   }
   get pendingNode() {
-    return this.pendingEntry ? this.toNode(this.pendingEntry) : undefined
+    return this.pendingEntry
+      ? new WorkspaceNodeViewModel(this.pendingEntry).toTreeNode()
+      : undefined
   }
 
   async open() {
@@ -89,7 +96,7 @@ export class WorkspaceService {
     if (!this.active) return []
     for (const entry of items) this.listed[entry.path] = entry
     await this.loadTitles(items)
-    return items.map((entry) => this.toNode(entry))
+    return items.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode())
   }
 
   async select(path: string) {
@@ -255,19 +262,14 @@ export class WorkspaceService {
           try {
             const read = await this.client.read(entry.path)
             if (this.active && this.editor.selected?.path !== entry.path)
-              this.updateTitle(entry.path, documentTitle(read.content))
+              this.updateTitle(
+                entry.path,
+                new ArticleViewModel(read.content, parse(read.content).content).title,
+              )
           } catch {
             /* Keep unreadable entries visible under their filenames. */
           }
         }),
     )
-  }
-  private toNode(entry: WorkspaceNode): TreeNode {
-    return {
-      value: entry.path,
-      label: entry.name,
-      description: entry.kind === 'directory' ? undefined : entry.name,
-      branch: entry.kind === 'directory',
-    }
   }
 }
