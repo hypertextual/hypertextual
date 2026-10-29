@@ -8,7 +8,7 @@ DocumentEditor hosts the local Svelte editor with a native ProseMirror JSON API.
 
 ### Public API
 
-`DocumentEditorProps` accepts `document: JSONContent`, optional `editable`, and `onchange(document: JSONContent)`. The optional `onUpload(file)` callback returns an image display `src` and optional `srcset`. The optional `onmodechange(mode)` callback reports `view` or `edit`. The component handle exposes `focus()`, which enters edit mode.
+`DocumentEditorProps` accepts `document: JSONContent`, optional `editable`, and `onchange(document: JSONContent)`. The optional `onUpload(file)` callback returns an image display `src` and optional `srcset`. The optional `oneditablechange(editable)` callback requests an editability change and returns the accepted boolean. The app owns that boolean. The component handle exposes `focus()`, which requests editing before focusing the document. `class` styles the scroll region, and `contentClass` styles the inner document.
 
 ```svelte
 <DocumentEditor
@@ -38,7 +38,7 @@ flowchart TD
     overlays -->|position, scroll lock, cleanup| surfaces
 ```
 
-DocumentEditor owns view and edit modes and forwards its focus handle. It does not import the format SDK, parse Markdown, or perform filesystem operations.
+DocumentEditor uses the supplied `editable` flag and forwards its focus handle. EditorService owns that flag. There is no separate `editing` state or modal state context. It does not import the format SDK, parse Markdown, or perform filesystem operations.
 
 ### Layout
 
@@ -61,7 +61,7 @@ Editable document, including an inserted notice:
 +------------------------------------------------------------------+
 ```
 
-The wrapper fills the host content area without a toolbar or footer of its own. View mode hides editing controls and the formatting toolbar. Video playback and code copying remain available. The app focuses its scroll region in view mode so arrow keys scroll the article. The local editor renders blocks with Helical and Ark controls. The app owns loading, save status, source previews, and recovery dialogs.
+The wrapper fills the host content area without a toolbar or footer of its own. View mode hides editing controls and the formatting toolbar. Video playback and code copying remain available. DocumentEditor owns the focusable scroll region. It focuses that region while editing is disabled so arrow keys scroll the article. The local editor renders blocks with Helical and Ark controls. The app owns loading, save status, source previews, and recovery dialogs.
 
 ### State and Data Flow
 
@@ -75,7 +75,7 @@ stateDiagram-v2
     Edit --> [*]: host replaces document
 ```
 
-The editor keeps selection, transactions, node views, and interaction state. If the host disables editing, the component hides edit controls and preserves the chosen mode. The app processes emitted JSON synchronously through `htmd-ts` before scheduling a save. Format or storage errors retain the app draft and open app recovery. Replacing the article destroys the previous editor and overlay bindings.
+The editor keeps selection, transactions, and node views. EditorService owns the current `editable` flag and resets it when the selected article changes. If the host disables editing, the component hides edit controls and preserves the chosen mode. The app processes emitted JSON synchronously through `htmd-ts` before scheduling a save. Format or storage errors retain the app draft and open app recovery. Replacing the article destroys the previous editor and overlay bindings.
 
 ### Behavior
 
@@ -101,7 +101,7 @@ The component disables forced-title enforcement. The app extracts the first H1 f
 
 ## Implementation
 
-- Share reactive mode state with mounted node views through Svelte context. Change editability without emitting document updates.
+- Let node views read Tiptap editability through update subscriptions. Forward document updates only when the transaction changes document content.
 
 - Compose published Helical prose variants for editor typography. Keep app CSS to layout so heading sizes and spacing have one owner. Avoid Tailwind Typography inside the editor; its generated quote characters and code margins are for rendered prose.
 - Render editable code without whitespace around its node-view content. Place the language selector at the left of the shared code-block header.
@@ -109,5 +109,5 @@ The component disables forced-title enforcement. The app extracts the first H1 f
 - Keep component props and change events as native JSON, without encoded JSON strings or source sessions.
 - Supply framework node views through configured Tiptap extensions. Keep format and filesystem dependencies outside the UI package.
 - Use `@hypertextual/ui/editor-schema` for app schema agreement tests. Cover format syntax in SDK BDD integration examples.
-- Cover interaction and overlays in `e2e/hypertextual-desktop/editor.spec.ts`. Do not add tests inside UI extensions.
+- Cover editability and scrolling in `e2e/hypertextual-desktop/modal-editing.spec.ts`. Cover document interaction and overlays in `editor.spec.ts`. Do not add tests inside UI extensions.
 - See [editor source ownership](editor-source.md) for provenance, dependencies, coverage, and the upstream transplant procedure.

@@ -56,11 +56,12 @@ mise run //e2e/hypertextual-desktop:install
 mise run //e2e/hypertextual-desktop:smoke
 mise run //e2e/hypertextual-desktop:test -- workspace-file-tree.spec.ts --project chromium
 mise run //e2e/hypertextual-desktop:test -- editor.spec.ts --grep notice
+mise run //e2e/hypertextual-desktop:test -- modal-editing.spec.ts
 mise run //e2e/hypertextual-desktop:test
 mise run //e2e/hypertextual-desktop:lint
 ```
 
-Run relevant cases during development and the full suite before completing shared UI changes. Each test owns a temporary workspace. The suite tests the production UI through a filesystem-backed Tauri substitute. The filesystem package integration suite and native app service tests cover native filesystem guarantees. The browser substitute does not test native windows or system Trash.
+Run relevant cases during development and the full suite before completing shared UI changes. Editor editability and scroll journeys live in `modal-editing.spec.ts`, grouped by the starting view or edit state and the user action. Each test owns a temporary workspace. The suite tests the production UI through a filesystem-backed Tauri substitute. The filesystem package integration suite and native app service tests cover native filesystem guarantees. The browser substitute does not test native windows or system Trash.
 
 Open traces with `bunx playwright show-trace <trace.zip>`. Reports and traces remain under `e2e/hypertextual-desktop` and are ignored by Git.
 

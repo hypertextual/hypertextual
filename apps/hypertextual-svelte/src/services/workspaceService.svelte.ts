@@ -126,7 +126,6 @@ export class WorkspaceService {
     }
     if (created) {
       await this.editor.open(created)
-      this.editor.focusRequest++
     }
   }
 

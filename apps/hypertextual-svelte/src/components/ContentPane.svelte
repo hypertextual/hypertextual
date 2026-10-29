@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { tick } from 'svelte'
   import { Button } from '@cloudvoyant/helical-svelte'
   import { Breadcrumb, DocumentEditor } from '@hypertextual/ui'
   import { FileText } from 'lucide-svelte'
@@ -10,10 +9,6 @@
     workspace: WorkspaceService
   }
   let { workspace }: ContentPaneProps = $props()
-
-  // State ---------------------------------------------------------------------
-  let articleScroll = $state<HTMLDivElement>()
-  let mode = $state<'view' | 'edit'>('view')
 
   // Derived -------------------------------------------------------------------
   const editor = $derived(workspace.editor)
@@ -26,34 +21,6 @@
         ]
       : ['Local workspace'],
   )
-
-  // Lifecycle -----------------------------------------------------------------
-  $effect(() => {
-    const request = editor.focusRequest
-    if (request)
-      void tick().then(() => {
-        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
-      })
-  })
-
-  $effect(() => {
-    const version = editor.version
-    if (version) {
-      mode = 'view'
-      void tick().then(() => {
-        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
-      })
-    }
-  })
-
-  // Methods -------------------------------------------------------------------
-  function changeMode(next: 'view' | 'edit') {
-    mode = next
-    if (next === 'view')
-      void tick().then(() => {
-        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
-      })
-  }
 </script>
 
 <main class="document-pane" aria-label="Article">
@@ -71,38 +38,26 @@
   {:else if editor.image && editor.selected}
     <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
   {:else if editor.document && editor.selected}
-    <!-- A focusable scroll region enables native arrow and page-key scrolling. -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div
-      class="article-scroll"
-      bind:this={articleScroll}
-      tabindex="0"
-      role="region"
-      aria-label="Article content"
-    >
-      <div class={{ 'article-editor': editor.document.editable }}>
-        {#key editor.version}
-          {#if editor.document.content}
-            <DocumentEditor
-              document={editor.document.content}
-              editable={!workspace.blocked}
-              onmodechange={changeMode}
-              onchange={(document) => editor.change(document)}
-              onUpload={(file) => editor.upload(file)}
-            />
-          {:else}
-            <div class="source-preview p-6">
-              <p class="readonly-notice mb-5 text-xs text-muted-foreground">
-                {editor.document.reason}
-              </p>
-              <pre
-                aria-label="Original article source"
-                class="whitespace-pre-wrap break-words text-xs">{editor.document.source}</pre>
-            </div>
-          {/if}
-        {/key}
-      </div>
-    </div>
+    {#key editor.version}
+      {#if editor.document.content}
+        <DocumentEditor
+          document={editor.document.content}
+          editable={editor.editable && !workspace.blocked}
+          oneditablechange={(editable) => editor.setEditable(editable && !workspace.blocked)}
+          class="article-scroll"
+          contentClass="article-editor"
+          onchange={(document) => editor.change(document)}
+          onUpload={(file) => editor.upload(file)}
+        />
+      {:else}
+        <div class="source-preview min-h-0 flex-1 overflow-auto p-6">
+          <p class="readonly-notice mb-5 text-xs text-muted-foreground">{editor.document.reason}</p>
+          <pre
+            aria-label="Original article source"
+            class="whitespace-pre-wrap break-words text-xs">{editor.document.source}</pre>
+        </div>
+      {/if}
+    {/key}
   {:else}
     <div class="empty-pane">
       <FileText size={32} strokeWidth={1.5} />
@@ -116,7 +71,7 @@
     {:else}<span>No article selected</span>{/if}
     <div class="document-state">
       {#if editor.document?.content}<span aria-label="Editor mode"
-          >{mode === 'edit' ? 'Edit' : 'View'}</span
+          >{editor.editable ? 'Edit' : 'View'}</span
         >{/if}
       <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span
       >

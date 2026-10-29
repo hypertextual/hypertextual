@@ -1,21 +1,24 @@
 <script lang="ts">
   import LocalEditor from './components/Editor.svelte'
   import { tick, onMount } from 'svelte'
+  import { cn } from '@cloudvoyant/helical-ui'
+  import { editorViewport } from './styles'
   import type { DocumentEditorProps, EditorHandle } from './types'
 
   // Props ---------------------------------------------------------------------
   let {
     document,
-    editable = true,
+    editable = false,
     onchange,
     onUpload,
-    onmodechange,
+    oneditablechange,
+    class: className,
+    contentClass,
   }: DocumentEditorProps = $props()
 
   // State ---------------------------------------------------------------------
   let view = $state<EditorHandle>()
-  let editing = $state(false)
-  let surface: HTMLDivElement
+  let surface = $state<HTMLDivElement>()
 
   // Lifecycle -----------------------------------------------------------------
   onMount(() => {
@@ -23,42 +26,55 @@
     return () => window.removeEventListener('keydown', exitEdit, true)
   })
 
+  $effect(() => {
+    if (!editable)
+      void tick().then(() => {
+        if (!editable) surface?.focus({ preventScroll: true })
+      })
+  })
+
   // Methods -------------------------------------------------------------------
   export function focus() {
-    enterEdit()
-    void tick().then(() => view?.focus())
+    if (enterEdit()) void tick().then(() => view?.focus())
   }
 
-  function enterEdit() {
-    if (!editable || editing) return
-    editing = true
-    onmodechange?.('edit')
+  function enterEdit(): boolean {
+    return oneditablechange?.(true) ?? false
   }
 
   function exitEdit(event: KeyboardEvent) {
     if (
       event.key !== 'Escape' ||
       event.isComposing ||
-      !editing ||
+      !editable ||
       !(event.target instanceof Element) ||
-      (!surface.contains(event.target) && !event.target.closest('[data-editor-controls]'))
+      (!surface?.contains(event.target) && !event.target.closest('[data-editor-controls]'))
     )
       return
     event.preventDefault()
     event.stopPropagation()
-    editing = false
-    onmodechange?.('view')
+    oneditablechange?.(false)
   }
 </script>
 
-<div bind:this={surface} data-editor-mode={editing && editable ? 'edit' : 'view'}>
-  <LocalEditor
-    bind:this={view}
-    content={document}
-    editable={editable && editing}
-    onedit={editable ? enterEdit : undefined}
-    enforceTitle={false}
-    {onUpload}
-    {onchange}
-  />
+<!-- Native scroll-region focus lets arrow and page keys scroll in view state. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+  bind:this={surface}
+  class={cn(editorViewport, className)}
+  tabindex="0"
+  role="region"
+  aria-label="Article content"
+>
+  <div class={contentClass}>
+    <LocalEditor
+      bind:this={view}
+      content={document}
+      {editable}
+      onedit={enterEdit}
+      enforceTitle={false}
+      {onUpload}
+      {onchange}
+    />
+  </div>
 </div>

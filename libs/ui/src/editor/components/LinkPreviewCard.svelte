@@ -4,19 +4,27 @@
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
   import { Link, X } from 'lucide-svelte'
-  import { getContext } from 'svelte'
-  import { editorModeKey, type EditorMode } from './mode'
+  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, deleteNode }: LinkPreviewCardProps = $props()
-  const mode = getContext<EditorMode>(editorModeKey)
+  let { node, editor, deleteNode }: LinkPreviewCardProps = $props()
 
   // State ---------------------------------------------------------------------
+  const subscribe = createSubscriber((update) => {
+    editor.on('update', update)
+    return () => {
+      editor.off('update', update)
+    }
+  })
   let imageError = $state(false)
 
   let faviconError = $state(false)
 
   // Derived -------------------------------------------------------------------
+  const editable = $derived.by(() => {
+    subscribe()
+    return editor.isEditable
+  })
   const { url, title, description, image, favicon, type } = $derived(node.attrs)
   const chapters = $derived.by(() => {
     try {
@@ -88,7 +96,7 @@
     </YouTube>
   {/if}
 
-  {#if mode.editable}<button
+  {#if editable}<button
       type="button"
       aria-label="Remove preview"
       class="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-muted border-none cursor-pointer opacity-0 transition-opacity hover:opacity-100"

@@ -81,7 +81,7 @@ Unsupported source, rendered by this app pane:
 +------------------------------------------------------------------------+
 ```
 
-The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. The pane focuses the scroll region after opening an article or leaving edit mode. Arrow keys then use native browser scrolling. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
+The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. DocumentEditor owns scroll-region focus and keyboard reactions. ContentPane passes the editor service’s `editable` flag and accepts editability requests through that service. Arrow keys use native browser scrolling while editing is disabled. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
 
 ### State and Data Flow
 

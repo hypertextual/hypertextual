@@ -2,8 +2,7 @@
   import { editorSurface, editorTypography } from './styles'
   import { cn } from '@cloudvoyant/helical-ui'
   import type { EditorProps, EditorOverlayViewProps } from './types'
-  import { onMount, onDestroy, setContext, getAllContexts, type Component } from 'svelte'
-  import { editorModeKey } from './mode'
+  import { onMount, onDestroy, type Component } from 'svelte'
   import { Editor, type EditorOptions } from '@tiptap/core'
   import { SvelteNodeViewRenderer } from 'svelte-tiptap'
   import {
@@ -45,9 +44,6 @@
 
   // State ---------------------------------------------------------------------
   let editor = $state<Editor | null>(null)
-  const mode = $state({ editable: false })
-  setContext(editorModeKey, mode)
-  const nodeViewContext = getAllContexts()
 
   let element: HTMLDivElement
 
@@ -105,14 +101,11 @@
     }
 
     const nodeViews = {
-      image: () => SvelteNodeViewRenderer(ImageNodeView, { context: new Map(nodeViewContext) }),
-      urlMention: () =>
-        SvelteNodeViewRenderer(UrlMentionPill, { context: new Map(nodeViewContext) }),
-      linkPreview: () =>
-        SvelteNodeViewRenderer(LinkPreviewCard, { context: new Map(nodeViewContext) }),
-      codeBlock: () =>
-        SvelteNodeViewRenderer(CodeBlockComponent, { context: new Map(nodeViewContext) }),
-      notice: () => SvelteNodeViewRenderer(NoticeNodeView, { context: new Map(nodeViewContext) }),
+      image: () => SvelteNodeViewRenderer(ImageNodeView),
+      urlMention: () => SvelteNodeViewRenderer(UrlMentionPill),
+      linkPreview: () => SvelteNodeViewRenderer(LinkPreviewCard),
+      codeBlock: () => SvelteNodeViewRenderer(CodeBlockComponent),
+      notice: () => SvelteNodeViewRenderer(NoticeNodeView),
     }
 
     editor = new Editor({
@@ -187,8 +180,8 @@
             ],
       },
       editable,
-      onUpdate: ({ editor }) => {
-        onchange?.(editor.getJSON())
+      onUpdate: ({ editor, transaction }) => {
+        if (transaction.docChanged) onchange?.(editor.getJSON())
       },
       editorProps: {
         handleClick(view, position, event) {
@@ -201,9 +194,9 @@
             )
           )
             return false
-          onedit()
+          if (!onedit()) return false
           // Enable before ProseMirror places the caret for this click.
-          editor?.setEditable(true, false)
+          editor?.setEditable(true)
           editor?.commands.setTextSelection(position)
           view.focus()
           return true
@@ -223,9 +216,8 @@
 
   // Update editable state
   $effect(() => {
-    mode.editable = editable
     if (editor) {
-      editor.setEditable(editable, false)
+      editor.setEditable(editable)
       if (!editable) {
         if (activeOverlay) editor.commands.closeOverlay(activeOverlay.name)
         slashMenuProps = null

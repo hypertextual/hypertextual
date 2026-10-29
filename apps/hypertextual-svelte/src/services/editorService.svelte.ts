@@ -20,6 +20,7 @@ export interface EditorObserver {
 export class EditorService {
   selected = $state<WorkspaceNode | null>(null)
   document = $state.raw<ArticleViewModel | null>(null)
+  editable = $state(false)
   image = $state<string | null>(null)
   loading = $state(false)
   openingError = $state<string | null>(null)
@@ -30,7 +31,6 @@ export class EditorService {
   recoveryOpen = $state(false)
   copyStatus = $state('')
   version = $state(0)
-  focusRequest = $state(0)
   private saver: Autosave | undefined
   private readonly media: MediaService
   private requestId = 0
@@ -56,6 +56,11 @@ export class EditorService {
           : 'Changes pending…'
     }
     return this.image ? 'Image' : this.document ? 'Read-only' : 'Local files'
+  }
+
+  setEditable(editable: boolean): boolean {
+    this.editable = editable && Boolean(this.document?.editable) && !this.busy && !this.closing
+    return this.editable
   }
 
   async flush(): Promise<boolean> {
@@ -93,6 +98,7 @@ export class EditorService {
     this.saver?.dispose()
     this.saver = undefined
     this.selected = entry
+    this.editable = false
     this.document = null
     this.image = null
     this.codecError = null
@@ -228,6 +234,7 @@ export class EditorService {
     this.saver?.dispose()
     this.saver = undefined
     this.selected = null
+    this.editable = false
     this.document = null
     this.image = null
     this.codecError = null

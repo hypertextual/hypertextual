@@ -76,6 +76,8 @@
 - Implement services as stateful classes.
 - Register desktop close and quit handlers in the shell lifecycle.
 - Keep pending-save flushing and overlapping-close guards in the editor service.
+- [Proposed] Keep the current editor interaction state in one `editable` flag on `EditorService`. Defer a separate modal-editing state model until its own design ticket.
+- [Proposed] Keep article scrolling and keyboard reactions in the reusable editor component. Keep the application content pane focused on composition.
 
 ### Workspace UI
 
@@ -106,11 +108,12 @@
 ## Testing
 
 - Keep TypeScript end-to-end tests under root `e2e/`, outside Rust applications and their test directories.
-- Use one Playwright suite at `e2e/hypertextual-desktop`, with only `workspace-file-tree.spec.ts` and `editor.spec.ts` as feature specs.
+- Use one Playwright suite at `e2e/hypertextual-desktop`, with `workspace-file-tree.spec.ts`, `editor.spec.ts`, and `modal-editing.spec.ts` as feature specs.
 - Cover editor extension behavior in `editor.spec.ts`. Do not add tests in the extensions directory.
 - Colocate browser configuration, entry points, fixtures, and Mise tasks with that suite.
 - Do not add a root `e2e/mise.toml` or duplicate app-local browser runners.
-- Use native `test.describe('When …')` groups and individual tests for observable behavior.
+- Use native `test.describe` groups and individual tests for observable behavior.
+- [Proposed] Group modal-editing journeys by the user's starting view or edit state, then by the action, using native Given and When describe groups.
 - Cover empty and existing workspaces separately, with suite and feature tags and representative `@smoke` journeys.
 - Separate Arrange, Act, and Assert blocks with comments. Keep assertions explicit and avoid custom step runners or test aliases.
 - Give each case its own temporary workspace and browser context through fixtures. Avoid mutable module state.

@@ -5,8 +5,7 @@
   import { NodeViewContent, NodeViewWrapper } from 'svelte-tiptap'
   import { Selection } from '@tiptap/pm/state'
   import { noticeBody } from './styles'
-  import { getContext } from 'svelte'
-  import { editorModeKey, type EditorMode } from './mode'
+  import { createSubscriber } from 'svelte/reactivity'
   import {
     Notice,
     Select,
@@ -23,9 +22,14 @@
 
   // Props ---------------------------------------------------------------------
   let { node, editor, getPos, updateAttributes }: NoticeNodeViewProps = $props()
-  const mode = getContext<EditorMode>(editorModeKey)
 
   // State ---------------------------------------------------------------------
+  const subscribe = createSubscriber((update) => {
+    editor.on('update', update)
+    return () => {
+      editor.off('update', update)
+    }
+  })
   const variants = [
     { value: 'info', label: 'Info', icon: Info },
     { value: 'success', label: 'Success', icon: CircleCheck },
@@ -34,6 +38,10 @@
   ]
 
   // Derived -------------------------------------------------------------------
+  const editable = $derived.by(() => {
+    subscribe()
+    return editor.isEditable
+  })
   const variant = $derived((node.attrs.variant as NoticeType | undefined) ?? 'info')
 
   const title = $derived((node.attrs.title as string | undefined) ?? 'Note')
@@ -86,7 +94,7 @@
 <NodeViewWrapper>
   <Notice {variant} class="editor-notice-node relative my-1 px-2 py-1">
     <div class="flex items-center gap-2" contenteditable={false}>
-      {#if mode.editable}
+      {#if editable}
         <input
           aria-label="Notice title"
           value={title}
@@ -125,6 +133,6 @@
         <span class="font-semibold tracking-tight">{title}</span>
       {/if}
     </div>
-    <NodeViewContent data-empty={empty && mode.editable} class={noticeBody} />
+    <NodeViewContent data-empty={empty && editable} class={noticeBody} />
   </Notice>
 </NodeViewWrapper>

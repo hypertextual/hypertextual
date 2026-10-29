@@ -3,17 +3,25 @@
   import type { ImageNodeViewProps } from './types'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { X } from 'lucide-svelte'
-  import { getContext } from 'svelte'
-  import { editorModeKey, type EditorMode } from './mode'
+  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
   let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
-  const mode = getContext<EditorMode>(editorModeKey)
 
   // State ---------------------------------------------------------------------
+  const subscribe = createSubscriber((update) => {
+    editor.on('update', update)
+    return () => {
+      editor.off('update', update)
+    }
+  })
   let captionFocused = $state(false)
 
   // Derived -------------------------------------------------------------------
+  const editable = $derived.by(() => {
+    subscribe()
+    return editor.isEditable
+  })
   const { src, srcset, alt } = $derived(node.attrs)
 
   let caption = $derived(node.attrs.caption || '')
@@ -73,9 +81,9 @@
       class="w-full object-cover"
       draggable="false"
     />
-    {#if mode.editable || caption}
+    {#if editable || caption}
       <figcaption class="mt-2">
-        {#if mode.editable}
+        {#if editable}
           <input
             type="text"
             bind:value={caption}
@@ -95,7 +103,7 @@
     {/if}
   </figure>
 
-  {#if mode.editable}<button
+  {#if editable}<button
       type="button"
       class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
       onclick={deleteNode}
