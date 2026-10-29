@@ -52,7 +52,7 @@ const example = "<em>literal</em>";
 
 :::bookmark {url="https://example.com/bookmark" title="Bookmark title" description="Bookmark description" image="https://images.example.com/bookmark.png" favicon="https://images.example.com/favicon.png" provider="Example" type="bookmark"} :::
 
-:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ&amp;t=90" title="Embedded video" description="Embed description" provider="YouTube"} :::
+:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ&amp;t=90" description="Embed description" provider="YouTube"} :::
 
 Mentions: [mention id="post-123" label="Linked article" type="post" seriesId="series-456"] and [url-mention url="https://example.com/mention" title="URL mention" favicon="https://images.example.com/favicon.png"]
 

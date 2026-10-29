@@ -83,7 +83,7 @@
       {/if}
     </a>
   {:else if type === 'embed'}
-    <YouTube {url} {title} class={youtubeSurface}>
+    <YouTube {url} class={youtubeSurface}>
       {#if chapters.length}<YoutubeTimestamps {chapters} />{/if}
     </YouTube>
   {/if}

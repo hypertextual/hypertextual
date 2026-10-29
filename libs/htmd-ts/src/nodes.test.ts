@@ -602,7 +602,7 @@ describe('When handling link-preview', () => {
         ':::youtube {url="https://youtu.be/example?t=90" title="Video"} :::',
         {
           url: 'https://youtu.be/example?t=90',
-          title: 'Video',
+          title: null,
           description: null,
           image: null,
           favicon: null,
@@ -614,7 +614,7 @@ describe('When handling link-preview', () => {
         ':::youtube {url="https://www.youtube.com/watch?v=example&amp;start=90" title="Video"} :::',
         {
           url: 'https://www.youtube.com/watch?v=example&start=90',
-          title: 'Video',
+          title: null,
           description: null,
           image: null,
           favicon: null,

@@ -32,7 +32,7 @@
       .focus()
       .insertContentAt(position, {
         type: 'linkPreview',
-        attrs: { url: value, title: 'YouTube video', description: '', image: '', type: 'embed' },
+        attrs: { url: value, description: '', image: '', type: 'embed' },
       })
       .run()
     onClose()

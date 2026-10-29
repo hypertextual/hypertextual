@@ -12,6 +12,29 @@ import complete from '../fixtures/editor-roundtrip.json' with { type: 'json' }
 
 // integration -----------------------------------------------------------------
 
+describe('When saving YouTube embeds without titles', () => {
+  it('drops legacy video titles after an edit while keeping bookmark titles', () => {
+    // Given
+    const source =
+      '# Imported\n\n:::youtube {url="https://youtu.be/example?t=90" title="YouTube video"} :::\n\n:::bookmark {url="https://example.com" title="Bookmark title"} :::\n'
+    const document = parse(source).content
+
+    // Then: opening alone preserves the original file.
+    expect(serialize(document, { originalSource: source })).toBe(source)
+    expect(document.content![1]!.attrs!.title).toBeNull()
+
+    // When
+    document.content![0]!.content![0]!.text = 'Edited'
+    const saved = serialize(document, { originalSource: source })
+
+    // Then
+    expect(saved).toContain(':::youtube {url="https://youtu.be/example?t=90"} :::')
+    expect(saved).not.toContain('title="YouTube video"')
+    expect(saved).toContain('title="Bookmark title"')
+    expect(parse(saved).content).toEqual(document)
+  })
+})
+
 describe('When opening and saving the complete format contract', () => {
   it('preserves every other node and attribute when the heading changes', () => {
     // Given

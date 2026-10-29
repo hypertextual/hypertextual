@@ -120,7 +120,9 @@ test.describe(
       await expect(page.getByRole('button', { name: 'Remove preview' })).toHaveCount(0)
 
       // Act
-      await page.getByRole('button', { name: 'Play video: Demo video' }).click()
+      const video = prose.locator('[data-youtube-id]')
+      await expect(video.getByRole('heading')).toHaveCount(0)
+      await video.getByRole('button', { name: 'Play video', exact: true }).click()
 
       // Assert
       await expect(prose.locator('iframe')).toHaveAttribute(
@@ -1073,8 +1075,13 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
               page.locator('.link-preview[data-type="bookmark"] a').first(),
             ).toHaveAttribute('href', media.url)
           else {
+            const source = await readFile(join(workspace.root, path), 'utf8')
+            const embed = source.split('\n').find((line) => line.startsWith(':::youtube'))
+            expect(embed).toBeDefined()
+            expect(embed).not.toContain('title=')
             const video = page.locator('.link-preview[data-type="embed"] [data-youtube-id]')
             await expect(video).toHaveAttribute('data-youtube-id', 'dQw4w9WgXcQ')
+            await expect(video.getByRole('heading')).toHaveCount(0)
             const poster = video.locator('button > img')
             await expect(poster).toHaveCSS('margin-top', '0px')
             await expect(poster).toHaveCSS('margin-bottom', '0px')
