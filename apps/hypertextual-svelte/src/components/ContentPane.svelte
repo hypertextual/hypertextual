@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { Button } from '@cloudvoyant/helical-svelte'
-  import { DocumentEditor, type EditorHandle } from '@hypertextual/ui'
+  import { Breadcrumb, DocumentEditor } from '@hypertextual/ui'
   import { FileText } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
 
@@ -12,25 +12,51 @@
   let { workspace }: ContentPaneProps = $props()
 
   // State ---------------------------------------------------------------------
-  let view = $state<EditorHandle>()
+  let articleScroll = $state<HTMLDivElement>()
+  let mode = $state<'view' | 'edit'>('view')
 
   // Derived -------------------------------------------------------------------
   const editor = $derived(workspace.editor)
+  const crumbs = $derived(
+    editor.selected
+      ? [
+          'Local workspace',
+          ...editor.selected.path.split('/').slice(0, -1),
+          workspace.selectedTitle,
+        ]
+      : ['Local workspace'],
+  )
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
     const request = editor.focusRequest
-    if (request) void tick().then(() => view?.focus())
+    if (request)
+      void tick().then(() => {
+        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
+      })
   })
+
+  $effect(() => {
+    const version = editor.version
+    if (version) {
+      mode = 'view'
+      void tick().then(() => {
+        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
+      })
+    }
+  })
+
+  // Methods -------------------------------------------------------------------
+  function changeMode(next: 'view' | 'edit') {
+    mode = next
+    if (next === 'view')
+      void tick().then(() => {
+        if (mode === 'view') articleScroll?.focus({ preventScroll: true })
+      })
+  }
 </script>
 
 <main class="document-pane" aria-label="Article">
-  {#if editor.selected}
-    <div class="document-heading">
-      <span class="document-path" title={editor.selected.path}>{workspace.selectedTitle}</span>
-      <span class="format-label">{editor.selected.name.split('.').at(-1)?.toUpperCase()}</span>
-    </div>
-  {/if}
   {#if editor.loading}
     <div class="empty-pane" role="status">Opening article…</div>
   {:else if editor.openingError}
@@ -45,14 +71,22 @@
   {:else if editor.image && editor.selected}
     <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
   {:else if editor.document && editor.selected}
-    <div class="article-scroll">
+    <!-- A focusable scroll region enables native arrow and page-key scrolling. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+      class="article-scroll"
+      bind:this={articleScroll}
+      tabindex="0"
+      role="region"
+      aria-label="Article content"
+    >
       <div class={{ 'article-editor': editor.document.editable }}>
         {#key editor.version}
           {#if editor.document.content}
             <DocumentEditor
-              bind:this={view}
               document={editor.document.content}
               editable={!workspace.blocked}
+              onmodechange={changeMode}
               onchange={(document) => editor.change(document)}
               onUpload={(file) => editor.upload(file)}
             />
@@ -77,7 +111,15 @@
     </div>
   {/if}
   <footer class="document-status" role="status" aria-live="polite">
-    <span title={editor.selected?.path}>{workspace.selectedTitle}</span>
-    <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span>
+    {#if editor.selected}
+      <Breadcrumb items={crumbs} label="Article path" title={editor.selected.path} />
+    {:else}<span>No article selected</span>{/if}
+    <div class="document-state">
+      {#if editor.document?.content}<span aria-label="Editor mode"
+          >{mode === 'edit' ? 'Edit' : 'View'}</span
+        >{/if}
+      <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span
+      >
+    </div>
   </footer>
 </main>

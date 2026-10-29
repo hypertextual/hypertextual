@@ -2,7 +2,8 @@
   import { editorSurface, editorTypography } from './styles'
   import { cn } from '@cloudvoyant/helical-ui'
   import type { EditorProps, EditorOverlayViewProps } from './types'
-  import { onMount, onDestroy, type Component } from 'svelte'
+  import { onMount, onDestroy, setContext, getAllContexts, type Component } from 'svelte'
+  import { editorModeKey } from './mode'
   import { Editor, type EditorOptions } from '@tiptap/core'
   import { SvelteNodeViewRenderer } from 'svelte-tiptap'
   import {
@@ -33,6 +34,7 @@
   let {
     content,
     editable = true,
+    onedit,
     enforceTitle = true,
     onchange,
     mentionSource,
@@ -43,6 +45,9 @@
 
   // State ---------------------------------------------------------------------
   let editor = $state<Editor | null>(null)
+  const mode = $state({ editable: false })
+  setContext(editorModeKey, mode)
+  const nodeViewContext = getAllContexts()
 
   let element: HTMLDivElement
 
@@ -100,11 +105,14 @@
     }
 
     const nodeViews = {
-      image: () => SvelteNodeViewRenderer(ImageNodeView),
-      urlMention: () => SvelteNodeViewRenderer(UrlMentionPill),
-      linkPreview: () => SvelteNodeViewRenderer(LinkPreviewCard),
-      codeBlock: () => SvelteNodeViewRenderer(CodeBlockComponent),
-      notice: () => SvelteNodeViewRenderer(NoticeNodeView),
+      image: () => SvelteNodeViewRenderer(ImageNodeView, { context: new Map(nodeViewContext) }),
+      urlMention: () =>
+        SvelteNodeViewRenderer(UrlMentionPill, { context: new Map(nodeViewContext) }),
+      linkPreview: () =>
+        SvelteNodeViewRenderer(LinkPreviewCard, { context: new Map(nodeViewContext) }),
+      codeBlock: () =>
+        SvelteNodeViewRenderer(CodeBlockComponent, { context: new Map(nodeViewContext) }),
+      notice: () => SvelteNodeViewRenderer(NoticeNodeView, { context: new Map(nodeViewContext) }),
     }
 
     editor = new Editor({
@@ -183,6 +191,23 @@
         onchange?.(editor.getJSON())
       },
       editorProps: {
+        handleClick(view, position, event) {
+          if (view.editable || !onedit) return false
+          const target = event.target
+          if (
+            target instanceof Element &&
+            target.closest(
+              'a, button, input, select, summary, iframe, [role="button"], [role="combobox"]',
+            )
+          )
+            return false
+          onedit()
+          // Enable before ProseMirror places the caret for this click.
+          editor?.setEditable(true, false)
+          editor?.commands.setTextSelection(position)
+          view.focus()
+          return true
+        },
         attributes: {
           class: editorTypography,
         },
@@ -198,8 +223,14 @@
 
   // Update editable state
   $effect(() => {
+    mode.editable = editable
     if (editor) {
-      editor.setEditable(editable)
+      editor.setEditable(editable, false)
+      if (!editable) {
+        if (activeOverlay) editor.commands.closeOverlay(activeOverlay.name)
+        slashMenuProps = null
+        mentionMenuProps = null
+      }
     }
   })
 
@@ -238,7 +269,7 @@
 
 <div class={cn(editorSurface())}>
   <div bind:this={element}></div>
-  {#if editor}
+  {#if editor && editable}
     <BubbleMenuContent {editor} />
     {#if slashMenuProps}
       <div bind:this={slashMenuSurface} data-slash-menu-surface class="fixed z-50">

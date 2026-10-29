@@ -8,6 +8,129 @@ test.describe(
   'When editing and recovering saved articles',
   { tag: ['@desktop', '@editor'] },
   () => {
+    test(
+      'User opens articles in view mode, clicks to edit, and presses Escape to view',
+      { tag: '@smoke' },
+      async ({ page, workspace }) => {
+        // Arrange
+        const source =
+          '# Modes\n\nA paragraph to edit.\n\n> [!NOTE] Remember\n> Body text.\n\n```javascript\nconst value = 1\n```\n'
+        await writeFile(join(workspace.root, 'Drafts/modes.md'), source)
+        await page.reload()
+        await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
+
+        // Act
+        await page.locator('[role="treeitem"][data-value="Drafts/modes.md"]').click()
+
+        // Assert
+        const article = page.getByRole('main', { name: 'Article' })
+        const prose = page.locator('.ProseMirror')
+        await expect(prose).toHaveAttribute('contenteditable', 'false')
+        await expect(article.getByRole('combobox')).toHaveCount(0)
+        await expect(page.getByLabel('Notice title')).toHaveCount(0)
+        await expect(page.locator('.editor-notice-node')).toContainText('Remember')
+        await expect(page.locator('.document-heading')).toHaveCount(0)
+        await expect(page.locator('.titlebar')).not.toContainText('hypertextual')
+        const breadcrumb = page.getByRole('navigation', { name: 'Article path' })
+        await expect(breadcrumb.getByRole('listitem')).toHaveText([
+          'Local workspace',
+          'Drafts',
+          'Modes',
+        ])
+        await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Modes')
+        expect(await readFile(join(workspace.root, 'Drafts/modes.md'), 'utf8')).toBe(source)
+
+        // Act
+        await prose.locator('h1').click()
+
+        // Assert
+        await expect(prose).toHaveAttribute('contenteditable', 'true')
+        await expect(page.getByLabel('Notice title')).toHaveValue('Remember')
+        await expect(article.getByRole('combobox')).toHaveCount(2)
+
+        // Act
+        await page.getByLabel('Notice title').fill('Updated')
+        await page.getByLabel('Notice title').press('Escape')
+
+        // Assert
+        await expect(prose).toHaveAttribute('contenteditable', 'false')
+        await expect(article.getByRole('combobox')).toHaveCount(0)
+        await expect(page.getByLabel('Notice title')).toHaveCount(0)
+        await expect(page.locator('.editor-notice-node')).toContainText('Updated')
+        await expect
+          .poll(() => readFile(join(workspace.root, 'Drafts/modes.md'), 'utf8'))
+          .toContain('[!NOTE] Updated')
+      },
+    )
+
+    test('User scrolls with arrow keys in view mode without editing the article', async ({
+      page,
+      workspace,
+    }) => {
+      // Arrange
+      const source =
+        '# Long article\n\n' +
+        Array.from({ length: 60 }, (_, index) => `Paragraph ${index}.`).join('\n\n') +
+        '\n'
+      await writeFile(join(workspace.root, 'Long article.md'), source)
+      await page.reload()
+
+      // Act
+      await page.locator('[role="treeitem"][data-value="Long article.md"]').click()
+      const scroll = page.getByRole('region', { name: 'Article content' })
+      await expect(scroll).toBeFocused()
+      for (let index = 0; index < 6; index++) await page.keyboard.press('ArrowDown', { delay: 80 })
+
+      // Assert
+      await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+      const down = await scroll.evaluate((element) => element.scrollTop)
+
+      // Act
+      for (let index = 0; index < 6; index++) await page.keyboard.press('ArrowUp', { delay: 80 })
+
+      // Assert
+      await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeLessThan(down)
+      await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
+      expect(await readFile(join(workspace.root, 'Long article.md'), 'utf8')).toBe(source)
+    })
+
+    test('User can play a video and read image captions without entering edit mode', async ({
+      page,
+      workspace,
+    }) => {
+      // Arrange
+      const source =
+        '# Media views\n\n![Photo](.images/photo.png "Photo caption")\n\n:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Demo video"} :::\n'
+      await mkdir(join(workspace.root, '.images'))
+      await writeFile(join(workspace.root, '.images/photo.png'), png)
+      await writeFile(join(workspace.root, 'Media views.md'), source)
+      await page.route('https://www.youtube-nocookie.com/**', (route) =>
+        route.fulfill({ body: '<html></html>', contentType: 'text/html' }),
+      )
+      await page.reload()
+
+      // Act
+      await page.locator('[role="treeitem"][data-value="Media views.md"]').click()
+
+      // Assert
+      const prose = page.locator('.ProseMirror')
+      await expect(prose.locator('figcaption')).toHaveText('Photo caption')
+      await expect(prose.locator('input')).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Remove image' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Remove preview' })).toHaveCount(0)
+
+      // Act
+      await page.getByRole('button', { name: 'Play video: Demo video' }).click()
+
+      // Assert
+      await expect(prose.locator('iframe')).toHaveAttribute(
+        'src',
+        /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/,
+      )
+      await expect(prose).toHaveAttribute('contenteditable', 'false')
+      expect(await readFile(join(workspace.root, 'Media views.md'), 'utf8')).toBe(source)
+    })
+
     test('User can autosave both article formats when switching and closing', async ({
       page,
       workspace,
@@ -150,12 +273,16 @@ test.describe(
       // Assert
       await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('One')
       await page.keyboard.type('Renamed title ')
-      await expect(page.locator('.document-path')).toHaveText('Renamed title')
-      await expect(page.locator('.document-path')).toHaveAttribute(
+      await expect(page.locator('.document-status [aria-current="page"]')).toHaveText(
+        'Renamed title',
+      )
+      await expect(page.locator('.document-status [aria-current="page"]')).toHaveAttribute(
         'title',
         'Drafts/Renamed title.md',
       )
-      await expect(page.locator('.document-status > span').first()).toHaveText('Renamed title')
+      await expect(page.locator('.document-status [aria-current="page"]').first()).toHaveText(
+        'Renamed title',
+      )
       await expect
         .poll(() => readFile(join(workspace.root, 'Drafts/Renamed title.md'), 'utf8'))
         .toContain('# Renamed title&#32;')
@@ -189,7 +316,7 @@ test.describe(
     })
 
     for (const extension of ['md', 'htmd']) {
-      test(`User sees the saved article title in both bars and its legacy ${extension} filename is synchronized on disk`, async ({
+      test(`User sees the saved article title in the breadcrumb and its legacy ${extension} filename is synchronized on disk`, async ({
         page,
         workspace,
       }) => {
@@ -210,13 +337,19 @@ test.describe(
         await oldEntry.click()
 
         // Assert: the bars agree with the tree, while hover exposes the actual path.
-        await expect(page.locator('.document-path')).toHaveText('A saved article')
-        await expect(page.locator('.document-status > span').first()).toHaveText('A saved article')
-        await expect(page.locator('.document-path')).toHaveAttribute('title', savedPath)
-        await expect(page.locator('.document-status > span').first()).toHaveAttribute(
+        await expect(page.locator('.document-status [aria-current="page"]')).toHaveText(
+          'A saved article',
+        )
+        await expect(page.locator('.document-status [aria-current="page"]').first()).toHaveText(
+          'A saved article',
+        )
+        await expect(page.locator('.document-status [aria-current="page"]')).toHaveAttribute(
           'title',
           savedPath,
         )
+        await expect(
+          page.locator('.document-status [aria-current="page"]').first(),
+        ).toHaveAttribute('title', savedPath)
         expect(await readFile(join(workspace.root, savedPath), 'utf8')).toBe(source)
         expect(await readdir(workspace.root)).not.toContain(oldPath)
         if (collision)
@@ -234,9 +367,16 @@ test.describe(
 
         // Assert
         await expect(page.locator('.ProseMirror')).toContainText('Still editable.')
-        await expect(page.locator('.document-path')).toHaveText('A saved article')
-        await expect(page.locator('.document-status > span').first()).toHaveText('A saved article')
-        await expect(page.locator('.document-path')).toHaveAttribute('title', savedPath)
+        await expect(page.locator('.document-status [aria-current="page"]')).toHaveText(
+          'A saved article',
+        )
+        await expect(page.locator('.document-status [aria-current="page"]').first()).toHaveText(
+          'A saved article',
+        )
+        await expect(page.locator('.document-status [aria-current="page"]')).toHaveAttribute(
+          'title',
+          savedPath,
+        )
       })
     }
 
@@ -259,6 +399,7 @@ test.describe(
       await page.getByLabel('Notice title').fill('Remember this')
       await page.getByRole('combobox', { name: 'Notice type' }).click()
       await page.getByRole('option', { name: 'Warning', exact: true }).click()
+      await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
       await page.getByLabel('Notice title').press('Enter')
       await expect
         .poll(() => page.evaluate(() => document.activeElement?.classList.contains('ProseMirror')))
@@ -278,8 +419,8 @@ test.describe(
         .toContain('Notice body&#32;')
       await page.locator('[role="treeitem"][data-value$="two.htmd"]').click()
       await page.locator('[role="treeitem"][data-value="Drafts/one.md"]').click()
-      await expect(page.getByLabel('Notice title')).toHaveValue('Remember this')
-      await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
+      await expect(page.getByLabel('Notice title')).toHaveCount(0)
+      await expect(page.locator('.editor-notice-node')).toContainText('Remember this')
       await expect(page.locator('.editor-notice-node')).toContainText('Notice body')
       await expect(page.getByRole('alert')).toHaveCount(0)
     })
@@ -457,7 +598,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           .toContain('## Section title')
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect(page.locator('.ProseMirror h2')).toHaveText('Section title')
@@ -465,6 +606,119 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
     })
 
     test.describe('When saving every editor element', () => {
+      test('it navigates up through a notice body and title to the preceding paragraph', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = 'Notice navigation.md'
+        await writeFile(
+          join(workspace.root, path),
+          '# Notice navigation\n\nBefore the notice.\n\n> [!NOTE] Reminder\n> Body text.\n\nAfter the notice.\n',
+        )
+        await page.reload()
+        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
+        const title = page.getByLabel('Notice title')
+        const body = page.locator('.editor-notice-node [data-node-view-content]')
+
+        // Act
+        await body.locator('p').click()
+        await page.keyboard.press('Home')
+        await page.keyboard.press('ArrowUp')
+
+        // Assert
+        await expect(title).toBeFocused()
+
+        // Act
+        await page.keyboard.press('ArrowUp')
+        await page.keyboard.type(' Updated.')
+
+        // Assert
+        await expect(page.locator('.ProseMirror > p').first()).toHaveText(
+          'Before the notice. Updated.',
+        )
+        await expect(title).toHaveValue('Reminder')
+        await expect(body).toHaveText('Body text.')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('Before the notice. Updated.')
+      })
+
+      test('it moves from a notice title into the body below it', async ({ page, workspace }) => {
+        // Arrange
+        const path = 'Notice focus.md'
+        await writeFile(
+          join(workspace.root, path),
+          '# Notice focus\n\nBefore the notice.\n\n> [!NOTE] Reminder\n> Original body.\n\nAfter the notice.\n',
+        )
+        await page.reload()
+        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
+        const notice = page.locator('.editor-notice-node')
+        const title = page.getByLabel('Notice title')
+        const body = notice.locator('[data-node-view-content]')
+
+        // Assert
+        await expect(body).toHaveText('Original body.')
+        const titleBox = await title.boundingBox()
+        const bodyBox = await body.boundingBox()
+        expect(bodyBox!.y).toBeGreaterThanOrEqual(titleBox!.y + titleBox!.height)
+
+        // Act
+        await title.fill('Updated reminder')
+        await title.press('Enter')
+        await page.keyboard.type('Added ')
+
+        // Assert
+        await expect(body).toHaveText('Added Original body.')
+        await expect(page.locator('.ProseMirror > p').first()).toHaveText('Before the notice.')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('> [!NOTE] Updated reminder\n> Added Original body.')
+
+        // Act
+        await reopenForEditing(page, path)
+
+        // Assert
+        await expect(title).toHaveValue('Updated reminder')
+        await expect(body).toHaveText('Added Original body.')
+      })
+
+      test('it shows an empty notice body and accepts typing immediately after its title', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const path = 'Empty notice.md'
+        await writeFile(join(workspace.root, path), '# Empty notice\n\n> [!NOTE] Reminder\n>\n')
+        await page.reload()
+        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
+        const title = page.getByLabel('Notice title')
+        const body = page.locator('.editor-notice-node [data-node-view-content]')
+
+        // Assert
+        await expect(body).toBeVisible()
+        await expect(body).toHaveAttribute('data-empty', 'true')
+        expect(
+          await body.evaluate((element) => getComputedStyle(element, '::before').content),
+        ).toBe('"Add the notice body here."')
+
+        // Act
+        await title.fill('Remember this')
+        await title.press('Enter')
+        await page.keyboard.type('Body text')
+
+        // Assert
+        await expect(title).toHaveValue('Remember this')
+        await expect(body).toHaveText('Body text')
+        await expect(body).toHaveAttribute('data-empty', 'false')
+        await expect
+          .poll(() => readFile(join(workspace.root, path), 'utf8'))
+          .toContain('> [!NOTE] Remember this\n> Body text')
+      })
+
       test('it opens legacy notice and empty paragraph directives as editable blocks', async ({
         page,
         workspace,
@@ -477,6 +731,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         // Act
         await page.reload()
         await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
 
         // Assert
         const notice = page.locator('.editor-notice-node')
@@ -490,6 +745,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await page.getByLabel('Notice title').fill('Remember this')
         await page.getByRole('combobox', { name: 'Notice type' }).click()
         await page.getByRole('option', { name: 'Warning', exact: true }).click()
+        await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
         await page.getByLabel('Notice title').press('Enter')
         await editorSettled(page)
         await page.keyboard.type('Updated. ')
@@ -503,7 +759,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           .toContain('Updated. And this should save!')
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect(page.getByLabel('Notice title')).toHaveValue('Remember this')
@@ -558,7 +814,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
         // Act
-        await reopen(page, 'Partial article.md')
+        await reopenForEditing(page, 'Partial article.md')
 
         // Assert
         await expect(block).toHaveText(html + ' raw edit')
@@ -595,7 +851,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           .toBe(header + '\n\n# Frontmatter\n\nEditable body. edited\n')
         await expect(page.getByRole('alertdialog')).toHaveCount(0)
         // Act
-        await reopen(page, 'Frontmatter.md')
+        await reopenForEditing(page, 'Frontmatter.md')
         // Assert
         await expect(raw).toHaveText(header)
         await expect(page.locator('.ProseMirror h1')).toHaveText('Frontmatter')
@@ -694,7 +950,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect(page.locator('.ProseMirror h1')).toHaveText('Roundtrip fixture updated')
@@ -808,7 +1064,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
           // Act
-          await reopen(page, path)
+          await reopenForEditing(page, path)
 
           // Assert
           await expect(page.locator(`.link-preview[data-type="${media.type}"]`)).toHaveCount(1)
@@ -895,7 +1151,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
             .toContain(mark.stored)
 
           // Act
-          await reopen(page, path)
+          await reopenForEditing(page, path)
 
           // Assert
           await expect
@@ -941,7 +1197,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
             .toContain(mark.selected)
 
           // Act
-          await reopen(page, path)
+          await reopenForEditing(page, path)
 
           // Assert
           await expect
@@ -1027,7 +1283,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
 
         // Act
         await page.keyboard.press('Escape')
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect(page.locator('.ProseMirror strong')).toHaveText('Selected text')
@@ -1117,7 +1373,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
           // Act
-          await reopen(page, path)
+          await reopenForEditing(page, path)
 
           // Assert
           await expect(formatted).toHaveCSS(format.property, color)
@@ -1188,7 +1444,8 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
 
         // Act
         await page.keyboard.press('Escape')
-        await page.keyboard.type(' continued')
+        await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
+        await edit(page, ' continued')
 
         // Assert
         await expect(menu).toHaveCount(0)
@@ -1450,6 +1707,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await createArticle(page)
         const path = initialWorkspace === 'empty' ? 'Untitled.md' : 'same.md'
         await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
+        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
         await insertBlock(page, 'Image')
         await expect(page.getByRole('dialog', { name: 'Insert image' })).toBeVisible()
 
@@ -1482,14 +1740,17 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await expect(lists).toHaveCount(3)
 
         // Act
-        await edit(page, ' updated')
+        await lists.nth(2).locator('p').click()
+        await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowRight' : 'End')
+        await page.keyboard.type(' updated')
 
         // Assert
         await expect(page.getByRole('status')).toContainText('Saved')
         await expect
           .poll(() => readFile(join(workspace.root, 'lists.md'), 'utf8'))
           .toContain('1) <p></p>')
-        await reopen(page, 'lists.md')
+        await reopenForEditing(page, 'lists.md')
         await expect(lists).toHaveCount(3)
         await expect(lists.nth(0)).toHaveText('First')
         await expect(lists.nth(2)).toHaveText('Third updated')
@@ -1537,7 +1798,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('```python')
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect(block.getByRole('combobox')).toContainText('Python')
@@ -1570,7 +1831,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           )
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
 
         // Assert
         await expect.poll(() => page.locator('.ProseMirror a').textContent()).toBe(' linked  ')
@@ -1617,7 +1878,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           .toContain('[Linked text](https://example.com/article)')
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
         await edit(page, '')
         await selectLastText(page, 'Linked text')
         await page.getByRole('button', { name: 'Link', exact: true }).click()
@@ -1725,7 +1986,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
             await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain(url)
 
             // Act
-            await reopen(page, path)
+            await reopenForEditing(page, path)
 
             // Assert
             await expect(page.locator('.ProseMirror a')).toHaveAttribute('href', url)
@@ -1819,7 +2080,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           await expect.poll(() => readFile(saved, 'utf8')).toContain('```typescript')
 
         // Act
-        await reopen(page, path)
+        await reopenForEditing(page, path)
         // Assert
         await expect(block).toContainText('Widget text edited')
         if (widget.name === 'Todo List') await expect(block.getByRole('checkbox')).toBeChecked()
@@ -1831,7 +2092,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         // Assert
         await expect(block).toHaveCount(0)
         await expect.poll(() => readFile(saved, 'utf8')).not.toContain('Widget text')
-        await reopen(page, path)
+        await reopenForEditing(page, path)
         await expect(block).toHaveCount(0)
         await expect(page.locator('.ProseMirror h1')).toHaveText(
           initialWorkspace === 'empty' ? 'Untitled' : 'Markdown',
@@ -1853,6 +2114,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await page.getByLabel('Notice title').fill('Important detail')
       await page.getByRole('combobox', { name: 'Notice type' }).click()
       await page.getByRole('option', { name: 'Warning', exact: true }).click()
+      await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
       await page.getByLabel('Notice title').press('Enter')
       await editorSettled(page)
       await page.keyboard.type('Notice body edited')
@@ -1860,7 +2122,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await expect.poll(() => readFile(saved, 'utf8')).toContain('> [!WARNING] Important detail')
       await expect.poll(() => readFile(saved, 'utf8')).toContain('Notice body edited')
       // Act
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       // Assert
       await expect(page.getByLabel('Notice title')).toHaveValue('Important detail')
       await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
@@ -1870,7 +2132,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       // Assert
       await expect(block).toHaveCount(0)
       await expect.poll(() => readFile(saved, 'utf8')).not.toContain('[!WARNING]')
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       await expect(block).toHaveCount(0)
     })
 
@@ -1885,12 +2147,12 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await expect(block).toHaveCount(1)
       await expect.poll(() => readFile(saved, 'utf8')).toContain('---')
       // Act
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       await removeBlock(page, block)
       // Assert
       await expect(block).toHaveCount(0)
       await expect.poll(() => readFile(saved, 'utf8')).not.toContain('---')
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       await expect(block).toHaveCount(0)
     })
 
@@ -1922,7 +2184,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await expect.poll(() => readFile(saved, 'utf8')).toContain('"An edited caption"')
       expect(await readFile(saved, 'utf8')).not.toContain('data:')
       // Act
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       // Assert
       await expect(page.getByPlaceholder('Add a caption…')).toHaveValue('An edited caption')
       await expect
@@ -1939,7 +2201,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       // Assert
       await expect(page.locator('.ProseMirror img')).toHaveCount(0)
       await expect.poll(() => readFile(saved, 'utf8')).not.toContain('![')
-      await reopen(page, path)
+      await reopenForEditing(page, path)
       await expect(page.locator('.ProseMirror img')).toHaveCount(0)
     })
   })
@@ -1970,11 +2232,13 @@ async function insertBlock(page: Page, name: string) {
   await editorSettled(page)
 }
 
-async function reopen(page: Page, path: string) {
+async function reopenForEditing(page: Page, path: string) {
   await expect(page.locator('.document-status')).toContainText('Saved')
   await page.reload()
   await page.locator(`[role="treeitem"][data-value=${JSON.stringify(path)}]`).click()
   await expect(page.locator('.ProseMirror')).toBeVisible()
+  await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
 }
 
 async function editorSettled(page: Page) {

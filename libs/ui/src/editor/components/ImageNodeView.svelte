@@ -3,9 +3,12 @@
   import type { ImageNodeViewProps } from './types'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { X } from 'lucide-svelte'
+  import { getContext } from 'svelte'
+  import { editorModeKey, type EditorMode } from './mode'
 
   // Props ---------------------------------------------------------------------
   let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
+  const mode = getContext<EditorMode>(editorModeKey)
 
   // State ---------------------------------------------------------------------
   let captionFocused = $state(false)
@@ -70,28 +73,34 @@
       class="w-full object-cover"
       draggable="false"
     />
-    <figcaption class="mt-2">
-      <input
-        type="text"
-        bind:value={caption}
-        onfocus={() => {
-          captionFocused = true
-        }}
-        onblur={handleCaptionBlur}
-        onkeydown={handleCaptionKeydown}
-        placeholder={captionFocused ? '' : 'Add a caption…'}
-        style="background: transparent; box-shadow: none; outline: none;"
-        class={captionInput}
-      />
-    </figcaption>
+    {#if mode.editable || caption}
+      <figcaption class="mt-2">
+        {#if mode.editable}
+          <input
+            type="text"
+            bind:value={caption}
+            onfocus={() => {
+              captionFocused = true
+            }}
+            onblur={handleCaptionBlur}
+            onkeydown={handleCaptionKeydown}
+            placeholder={captionFocused ? '' : 'Add a caption…'}
+            style="background: transparent; box-shadow: none; outline: none;"
+            class={captionInput}
+          />
+        {:else}
+          <span>{caption}</span>
+        {/if}
+      </figcaption>
+    {/if}
   </figure>
 
-  <button
-    type="button"
-    class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
-    onclick={deleteNode}
-    aria-label="Remove image"
-  >
-    <X class="size-3.5" aria-hidden="true" />
-  </button>
+  {#if mode.editable}<button
+      type="button"
+      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+      onclick={deleteNode}
+      aria-label="Remove image"
+    >
+      <X class="size-3.5" aria-hidden="true" />
+    </button>{/if}
 </NodeViewWrapper>

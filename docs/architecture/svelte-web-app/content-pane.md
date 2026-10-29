@@ -2,7 +2,7 @@
 
 ## Overview
 
-The content pane presents the selected document, image, or empty workspace preview. It shows the current article title and save status.
+The content pane presents the selected document, image, or empty workspace preview. Its footer shows the article breadcrumb, current mode, and save status.
 
 ## Design
 
@@ -44,8 +44,6 @@ Article selected:
 
 ```text
 +------------------------------------------------------------------------+
-|  A saved article                                                   MD  |
-+------------------------------------------------------------------------+
 |                                                                        |
 |                                                                        |
 |       A saved article                                                  |
@@ -62,15 +60,13 @@ Article selected:
 |                                                                        |
 |                                                                        |
 +------------------------------------------------------------------------+
-|  A saved article                                                Saved  |
+|  Local workspace > Drafts > A saved article               View  Saved  |
 +------------------------------------------------------------------------+
 ```
 
 Unsupported source, rendered by this app pane:
 
 ```text
-+------------------------------------------------------------------------+
-|  Imported article                                                  MD  |
 +------------------------------------------------------------------------+
 |                                                                        |
 |  This article contains syntax the editor cannot preserve.              |
@@ -81,11 +77,11 @@ Unsupported source, rendered by this app pane:
 |  :::                                                                   |
 |                                                                        |
 +------------------------------------------------------------------------+
-|  Imported article                                           Read-only  |
+|  Local workspace > Imported article                         Read-only  |
 +------------------------------------------------------------------------+
 ```
 
-The selected article has a 40 px heading bar. Only the document body scrolls. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
+The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. The pane focuses the scroll region after opening an article or leaving edit mode. Arrow keys then use native browser scrolling. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
 
 ### State and Data Flow
 

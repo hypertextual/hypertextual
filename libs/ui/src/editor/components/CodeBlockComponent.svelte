@@ -20,9 +20,12 @@
   } from '@cloudvoyant/helical-svelte'
   import { cn, codeBlockBodyBase, codeBlockContentBase } from '@cloudvoyant/helical-ui'
   import { ChevronsUpDown, Check } from 'lucide-svelte'
+  import { getContext } from 'svelte'
+  import { editorModeKey, type EditorMode } from './mode'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, updateAttributes }: CodeBlockComponentProps = $props()
+  let { node, updateAttributes }: CodeBlockComponentProps = $props()
+  const mode = getContext<EditorMode>(editorModeKey)
 
   // State ---------------------------------------------------------------------
   const languages = [
@@ -47,7 +50,7 @@
   // Derived -------------------------------------------------------------------
   const language = $derived(node.attrs.language || getDefaultLanguage())
 
-  const editable = $derived(editor.isEditable)
+  const editable = $derived(mode.editable)
 
   const currentLanguageLabel = $derived(
     languages.find((l) => l.value === language)?.label || 'JavaScript',
@@ -100,7 +103,7 @@
                 <ChevronsUpDown class="size-3 opacity-50" />
               </SelectIndicator>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent data-editor-controls>
               {#each languages as lang (lang.value)}
                 <SelectItem item={lang}>
                   <SelectItemText>{lang.label}</SelectItemText>

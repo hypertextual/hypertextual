@@ -4,9 +4,12 @@
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
   import { Link, X } from 'lucide-svelte'
+  import { getContext } from 'svelte'
+  import { editorModeKey, type EditorMode } from './mode'
 
   // Props ---------------------------------------------------------------------
   let { node, deleteNode }: LinkPreviewCardProps = $props()
+  const mode = getContext<EditorMode>(editorModeKey)
 
   // State ---------------------------------------------------------------------
   let imageError = $state(false)
@@ -85,12 +88,12 @@
     </YouTube>
   {/if}
 
-  <button
-    type="button"
-    aria-label="Remove preview"
-    class="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-muted border-none cursor-pointer opacity-0 transition-opacity hover:opacity-100"
-    onclick={deleteNode}
-  >
-    <X class="size-4" aria-hidden="true" />
-  </button>
+  {#if mode.editable}<button
+      type="button"
+      aria-label="Remove preview"
+      class="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-muted border-none cursor-pointer opacity-0 transition-opacity hover:opacity-100"
+      onclick={deleteNode}
+    >
+      <X class="size-4" aria-hidden="true" />
+    </button>{/if}
 </NodeViewWrapper>
