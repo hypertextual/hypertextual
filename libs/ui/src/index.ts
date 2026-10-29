@@ -5,3 +5,5 @@ export { default as DocumentEditor } from './editor/DocumentEditor.svelte'
 export type { EditorImageUploadResult, EditorHandle, DocumentEditorProps } from './editor/types'
 
 export type { ContextMenuItem, ContextMenuProps } from './context-menu/types'
+export { default as Breadcrumb } from './breadcrumb/Breadcrumb.svelte'
+export type { BreadcrumbProps } from './breadcrumb/types'

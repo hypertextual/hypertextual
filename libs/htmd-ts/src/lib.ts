@@ -10,6 +10,7 @@ import {
   UnknownInline,
   UnsupportedTable,
   HtmlBlock,
+  EmptyParagraph,
   LiteralSpan,
   ReferenceDefinition,
   rawNode,
@@ -41,6 +42,7 @@ function validateAttributes(
 }
 function portableNode(node: JSONContent): JSONContent {
   const attrs = node.attrs ? { ...node.attrs } : undefined
+  if (node.type === 'linkPreview' && attrs?.type === 'embed') attrs.title = null
   if (node.type === 'imageNode' && attrs) {
     attrs.srcset = null
     attrs.alt ??= ''
@@ -156,6 +158,7 @@ const engine = new MarkdownManager({
     UnknownInline,
     UnsupportedTable,
     HtmlBlock,
+    EmptyParagraph,
     HtmlSyntax,
     ...definitions,
   ].map(recoverable),

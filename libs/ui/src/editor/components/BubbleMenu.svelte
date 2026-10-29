@@ -152,6 +152,7 @@
   }}
 >
   <Popover.Content
+    data-editor-controls
     bind:ref={menu}
     onmousedown={(event) => {
       const target = event.target

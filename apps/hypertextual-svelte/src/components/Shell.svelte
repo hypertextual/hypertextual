@@ -81,7 +81,6 @@
     <SidebarTrigger title="Toggle sidebar" aria-controls="workspace-sidebar"
       ><PanelLeft size={14} strokeWidth={1.5} /></SidebarTrigger
     >
-    <span class="brand" data-tauri-drag-region>hypertextual</span>
     <div class="workspace-chooser">
       <Select items={workspace.items} value={[workspace.root]} size="sm">
         <SelectTrigger aria-label="Workspace selector" title={workspace.root} size="sm"

@@ -131,6 +131,21 @@ export const HtmlBlock = Extension.create({
   },
 })
 
+/** Read the empty paragraph directive written by earlier editor versions. */
+export const EmptyParagraph = Extension.create({
+  name: 'htmdEmptyParagraph',
+  markdownTokenizer: {
+    name: 'htmdEmptyParagraph',
+    level: 'block',
+    start: (src) => src.search(/^::paragraph[ \t]*(?:\n|$)/m),
+    tokenize(src) {
+      const match = /^::paragraph[ \t]*(?:\n|$)/.exec(src)
+      return match ? { type: 'htmdEmptyParagraph', raw: match[0] } : undefined
+    },
+  },
+  parseMarkdown: () => ({ type: 'paragraph' }),
+})
+
 /** Internal render-only node avoids Tiptap moving whitespace out of marks. */
 export const LiteralSpan = Extension.create({
   name: 'htmdLiteral',

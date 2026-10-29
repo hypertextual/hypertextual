@@ -57,11 +57,6 @@ button:focus-visible {
   border-bottom: 1px solid #e2e8f0;
   user-select: none;
 }
-.brand {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
 .workspace-caption {
   color: #94a3b8;
   font-size: 11px;
@@ -104,31 +99,6 @@ button:focus-visible {
   min-height: 0;
   background: white;
 }
-.document-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 24px;
-  flex-shrink: 0;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 11px;
-  color: #94a3b8;
-}
-.document-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.format-label {
-  margin-left: auto;
-  font-size: 9px;
-}
-.article-scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
 .article-editor {
   max-width: 820px;
   margin: 0 auto;
@@ -168,7 +138,7 @@ button:focus-visible {
   font-size: 10px;
   color: #94a3b8;
 }
-.document-status > span:first-child {
+.document-status > :first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -265,4 +235,11 @@ button:focus-visible {
 .sidebar-heading .new-article {
   width: 24px;
   height: 24px;
+}
+
+.document-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
 }

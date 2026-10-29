@@ -280,8 +280,8 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
 })
 
 export async function edit(page: Page, text: string) {
-  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
   await page.locator('.ProseMirror').click()
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
   // Let Helical finish scheduled autofocus before positioning the caret for typing.
   await page.evaluate(
     () =>
@@ -289,7 +289,8 @@ export async function edit(page: Page, text: string) {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   )
-  await page.keyboard.press('ControlOrMeta+End')
+  await expect(page.locator('.ProseMirror')).toBeFocused()
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')
   await page.keyboard.type(text)
 }
 
@@ -298,5 +299,7 @@ export async function createArticle(page: Page) {
   const previous = (await selected.count()) ? await selected.getAttribute('data-value') : null
   await page.getByRole('button', { name: 'New article', exact: true }).click()
   await expect.poll(() => selected.getAttribute('data-value')).not.toBe(previous)
+  await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
+  await page.locator('.ProseMirror').click()
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
 }

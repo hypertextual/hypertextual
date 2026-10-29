@@ -10,6 +10,9 @@ export interface EditorHandle {
 export interface DocumentEditorProps {
   document: JSONContent
   editable?: boolean
+  oneditablechange?: (editable: boolean) => boolean
+  class?: string
+  contentClass?: string
   onchange: (document: JSONContent) => void
   onUpload?: (file: File) => Promise<EditorImageUploadResult>
 }

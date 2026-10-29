@@ -18,6 +18,9 @@ export const editorSurface = cva(
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
+export const youtubeSurface = '[&>button>img]:my-0'
+export const noticeBody =
+  "min-h-6 [&_p]:m-0 data-[empty=true]:before:pointer-events-none data-[empty=true]:before:float-left data-[empty=true]:before:h-0 data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:content-['Add_the_notice_body_here.']"
 export const imageSurface =
   'image-node-view relative my-6 group [.image-node-pending-delete_&]:bg-accent'
 export const captionInput =

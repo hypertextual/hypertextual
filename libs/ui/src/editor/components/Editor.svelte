@@ -33,6 +33,7 @@
   let {
     content,
     editable = true,
+    onedit,
     enforceTitle = true,
     onchange,
     mentionSource,
@@ -179,10 +180,27 @@
             ],
       },
       editable,
-      onUpdate: ({ editor }) => {
-        onchange?.(editor.getJSON())
+      onUpdate: ({ editor, transaction }) => {
+        if (transaction.docChanged) onchange?.(editor.getJSON())
       },
       editorProps: {
+        handleClick(view, position, event) {
+          if (view.editable || !onedit) return false
+          const target = event.target
+          if (
+            target instanceof Element &&
+            target.closest(
+              'a, button, input, select, summary, iframe, [role="button"], [role="combobox"]',
+            )
+          )
+            return false
+          if (!onedit()) return false
+          // Enable before ProseMirror places the caret for this click.
+          editor?.setEditable(true)
+          editor?.commands.setTextSelection(position)
+          view.focus()
+          return true
+        },
         attributes: {
           class: editorTypography,
         },
@@ -200,6 +218,11 @@
   $effect(() => {
     if (editor) {
       editor.setEditable(editable)
+      if (!editable) {
+        if (activeOverlay) editor.commands.closeOverlay(activeOverlay.name)
+        slashMenuProps = null
+        mentionMenuProps = null
+      }
     }
   })
 
@@ -238,7 +261,7 @@
 
 <div class={cn(editorSurface())}>
   <div bind:this={element}></div>
-  {#if editor}
+  {#if editor && editable}
     <BubbleMenuContent {editor} />
     {#if slashMenuProps}
       <div bind:this={slashMenuSurface} data-slash-menu-surface class="fixed z-50">
