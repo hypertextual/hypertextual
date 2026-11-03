@@ -2,6 +2,7 @@
   import { Popover } from '@ark-ui/svelte/popover'
   import type { BubbleMenuProps } from './types'
   import { onMount } from 'svelte'
+  import { isEditorInInsertMode } from '../core'
   import FontColorPicker from './FontColorPicker.svelte'
   import LinkEditPopover from './LinkEditPopover.svelte'
   import { Link2 } from 'lucide-svelte'
@@ -78,7 +79,11 @@
   }
 
   function updateVisibility() {
-    if (!props.editor) return
+    if (!props.editor || !isEditorInInsertMode(props.editor)) {
+      isVisible = false
+      showLinkInput = false
+      return
+    }
 
     const { from, to, empty } = props.editor.state.selection
     const selectionKey = `${from}:${to}`

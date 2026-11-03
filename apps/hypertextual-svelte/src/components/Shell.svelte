@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
+  import {
+    getDocumentWhichKeyController,
+    subscribeDocumentWhichKeyController,
+  } from '@cloudvoyant/helical-ui'
   import {
     Button,
     Row,
@@ -15,6 +19,9 @@
     SelectContent,
     SelectItem,
     SelectItemText,
+    WhichKeyProvider,
+    WhichKey,
+    type WhichKeyNode,
   } from '@cloudvoyant/helical-svelte'
   import { FilePlus2, FolderPlus, PanelLeft, ChevronDown } from 'lucide-svelte'
   import { invoke, isTauri } from '@tauri-apps/api/core'
@@ -36,8 +43,99 @@
   // State ---------------------------------------------------------------------
   const workspace = untrack(() => new WorkspaceService(client))
   const editor = workspace.editor
+  let sidebarOpen = $state(true)
+
+  const appKeymap: Record<string, WhichKeyNode> = {
+    'Control+e': {
+      key: 'Control+e',
+      label: 'Toggle Explorer',
+      description: 'Toggle the Workspace Explorer sidebar open or closed',
+      category: 'Workspace',
+      mode: ['normal', 'select'],
+      commandId: 'workspace.toggleExplorer',
+    },
+    Space: {
+      key: 'Space',
+      label: '+leader',
+      group: 'Leader',
+      category: 'Leader',
+      mode: ['normal', 'select'],
+      children: {
+        e: {
+          key: 'e',
+          label: 'Toggle Explorer',
+          description: 'Toggle the Workspace Explorer sidebar open or closed',
+          category: 'Workspace',
+          commandId: 'workspace.toggleExplorer',
+        },
+        n: {
+          key: 'n',
+          label: 'New Article',
+          description: 'Create a new article in the workspace',
+          category: 'Workspace',
+          commandId: 'workspace.newArticle',
+        },
+        N: {
+          key: 'N',
+          label: 'New Folder',
+          description: 'Create a new folder in the workspace',
+          category: 'Workspace',
+          commandId: 'workspace.newFolder',
+        },
+      },
+    },
+  }
+
+  const appCommands = {
+    'workspace.toggleExplorer': () => toggleExplorer(),
+    'workspace.newArticle': () => {
+      void workspace.newArticle().then(() => {
+        if (editor.setEditable(true)) {
+          getDocumentWhichKeyController(document)?.setMode('insert')
+          void tick().then(() => {
+            document.querySelector<HTMLElement>('.ProseMirror')?.focus()
+          })
+        }
+      })
+      return true
+    },
+    'workspace.newFolder': () => {
+      if (!sidebarOpen) sidebarOpen = true
+      workspace.startCreate('directory')
+      return true
+    },
+  }
 
   // Lifecycle -----------------------------------------------------------------
+  $effect(() => {
+    let cleanupSub: (() => void) | undefined
+    const attachSub = () => {
+      cleanupSub?.()
+      const controller = getDocumentWhichKeyController(document)
+      if (!controller) return
+      let prevExplorerOpen = controller.getState().explorerOpen
+      cleanupSub = controller.subscribe((state) => {
+        if (prevExplorerOpen && !state.explorerOpen && !editor.editable) {
+          prevExplorerOpen = false
+          queueMicrotask(() => controller.setMode('normal'))
+          requestAnimationFrame(() => {
+            if (!editor.editable && controller.getState().mode === 'insert') {
+              controller.setMode('normal')
+            }
+          })
+          return
+        }
+        prevExplorerOpen = state.explorerOpen
+      })
+    }
+    attachSub()
+    const unsubRoot = subscribeDocumentWhichKeyController(document, attachSub)
+    return () => {
+      cleanupSub?.()
+      unsubRoot()
+    }
+  })
+
   onMount(() => {
     let active = true
     const unlisteners: (() => void)[] = []
@@ -71,88 +169,148 @@
       workspace.dispose()
     }
   })
+
+  // Methods -------------------------------------------------------------------
+  function toggleExplorer(): boolean {
+    const nextOpen = !sidebarOpen
+    sidebarOpen = nextOpen
+    const controller = getDocumentWhichKeyController(document)
+    if (nextOpen) {
+      void tick().then(() => {
+        requestAnimationFrame(() => {
+          controller?.focusPane('workspace')
+        })
+      })
+    } else {
+      void tick().then(() => {
+        requestAnimationFrame(() => {
+          if (controller?.focusPane('article')) return
+          const articleRegion = document.querySelector<HTMLElement>(
+            '[data-pane-id="article"] [data-pane-focus-target], [data-pane-id="article"]',
+          )
+          articleRegion?.focus({ preventScroll: true })
+        })
+      })
+    }
+    return true
+  }
 </script>
 
 <svelte:head><title>Hypertextual</title></svelte:head>
 <svelte:window onbeforeunload={(event) => editor.beforeUnload(event)} />
 
-<SidebarProvider class="workspace-shell" style="--sidebar-width: 236px">
-  <header class="titlebar" data-tauri-drag-region>
-    <SidebarTrigger title="Toggle sidebar" aria-controls="workspace-sidebar"
-      ><PanelLeft size={14} strokeWidth={1.5} /></SidebarTrigger
-    >
-    <div class="workspace-chooser">
-      <Select items={workspace.items} value={[workspace.root]} size="sm">
-        <SelectTrigger aria-label="Workspace selector" title={workspace.root} size="sm"
-          ><SelectValue /><SelectIndicator
-            ><ChevronDown size={12} strokeWidth={1.5} /></SelectIndicator
-          ></SelectTrigger
-        >
-        <SelectContent
-          >{#each workspace.items as item (item.value)}<SelectItem {item}
-              ><SelectItemText>{item.label}</SelectItemText></SelectItem
-            >{/each}</SelectContent
-        >
-      </Select>
-    </div>
-  </header>
-  <Row class="workspace-body">
-    <Sidebar
-      id="workspace-sidebar"
-      collapsible="offcanvas"
-      class="workspace-sidebar"
-      aria-label="Workspace"
-    >
-      <SidebarHeader class="sidebar-heading">
-        <Row class="workspace-heading-row">
-          <span>Workspace</span>
-          <Row class="workspace-actions">
-            <Button
-              variant="text"
-              size="sm"
-              class="new-article"
-              aria-label="New article"
-              title="New article"
-              disabled={workspace.cannotCreate}
-              onclick={() => workspace.startCreate('file')}
-              ><FilePlus2 size={14} strokeWidth={1.5} /></Button
-            >
-            <Button
-              variant="text"
-              size="sm"
-              class="new-article"
-              aria-label="New folder"
-              title="New folder"
-              disabled={workspace.cannotCreate}
-              onclick={() => workspace.startCreate('directory')}
-              ><FolderPlus size={14} strokeWidth={1.5} /></Button
-            >
+<WhichKeyProvider
+  preset="helix"
+  storageKey="hypertextual"
+  scoped={false}
+  keymap={appKeymap}
+  commands={appCommands}
+  onModeChange={(nextMode) => {
+    const controller = getDocumentWhichKeyController(document)
+    if (controller?.getState().explorerOpen) return
+    if (nextMode === 'insert') {
+      const active = typeof document !== 'undefined' ? document.activeElement : null
+      if (
+        !active?.closest('#workspace-sidebar') &&
+        !active?.closest('[data-which-key-explorer]') &&
+        !workspace.pendingEntry
+      ) {
+        editor.setEditable(true)
+      }
+    } else {
+      editor.setEditable(false)
+    }
+  }}
+>
+  <SidebarProvider
+    open={sidebarOpen}
+    onOpenChange={(next) => {
+      sidebarOpen = next
+    }}
+    class="workspace-shell"
+    style="--sidebar-width: 236px"
+  >
+    <header class="titlebar" data-tauri-drag-region>
+      <SidebarTrigger title="Toggle sidebar" aria-controls="workspace-sidebar"
+        ><PanelLeft size={14} strokeWidth={1.5} /></SidebarTrigger
+      >
+      <div class="workspace-chooser">
+        <Select items={workspace.items} value={[workspace.root]} size="sm">
+          <SelectTrigger aria-label="Workspace selector" title={workspace.root} size="sm"
+            ><SelectValue /><SelectIndicator
+              ><ChevronDown size={12} strokeWidth={1.5} /></SelectIndicator
+            ></SelectTrigger
+          >
+          <SelectContent
+            >{#each workspace.items as item (item.value)}<SelectItem {item}
+                ><SelectItemText>{item.label}</SelectItemText></SelectItem
+              >{/each}</SelectContent
+          >
+        </Select>
+      </div>
+    </header>
+    <Row class="workspace-body">
+      <Sidebar
+        id="workspace-sidebar"
+        paneId="workspace"
+        paneTitle="Workspace"
+        collapsible="offcanvas"
+        class="workspace-sidebar"
+        aria-label="Workspace"
+      >
+        <SidebarHeader class="sidebar-heading">
+          <Row class="workspace-heading-row">
+            <span>Workspace</span>
+            <Row class="workspace-actions">
+              <Button
+                variant="text"
+                size="sm"
+                class="new-article"
+                aria-label="New article"
+                title="New article"
+                disabled={workspace.cannotCreate}
+                onclick={() => workspace.startCreate('file')}
+                ><FilePlus2 size={14} strokeWidth={1.5} /></Button
+              >
+              <Button
+                variant="text"
+                size="sm"
+                class="new-article"
+                aria-label="New folder"
+                title="New folder"
+                disabled={workspace.cannotCreate}
+                onclick={() => workspace.startCreate('directory')}
+                ><FolderPlus size={14} strokeWidth={1.5} /></Button
+              >
+            </Row>
           </Row>
-        </Row>
-      </SidebarHeader>
-      <SidebarContent>
-        {#if workspace.creationError}<p class="sidebar-message error" role="alert">
-            {workspace.creationError}
-          </p>{/if}
-        {#if workspace.loading}
-          <p class="sidebar-message" role="status">Opening workspace…</p>
-        {:else if workspace.error}
-          <p class="sidebar-message error" role="alert">{workspace.error}</p>
-          {#if isTauri()}<Button variant="text" size="sm" onclick={() => workspace.open()}
-              >Retry</Button
-            >{/if}
-        {:else if !workspace.entries.length && !workspace.pendingEntry}
-          <p class="sidebar-message">
-            Your workspace is empty. Create your first article with New article.
-          </p>
-        {:else}
-          {#key workspace.treeVersion}<WorkspaceExplorer {workspace} />{/key}
-        {/if}
-      </SidebarContent>
-    </Sidebar>
-    <ContentPane {workspace} />
-  </Row>
-</SidebarProvider>
+        </SidebarHeader>
+        <SidebarContent>
+          {#if workspace.creationError}<p class="sidebar-message error" role="alert">
+              {workspace.creationError}
+            </p>{/if}
+          {#if workspace.loading}
+            <p class="sidebar-message" role="status">Opening workspace…</p>
+          {:else if workspace.error}
+            <p class="sidebar-message error" role="alert">{workspace.error}</p>
+            {#if isTauri()}<Button variant="text" size="sm" onclick={() => workspace.open()}
+                >Retry</Button
+              >{/if}
+          {:else if !workspace.entries.length && !workspace.pendingEntry}
+            <p class="sidebar-message">
+              Your workspace is empty. Create your first article with New article.
+            </p>
+          {:else}
+            {#key workspace.treeVersion}<WorkspaceExplorer {workspace} />{/key}
+          {/if}
+        </SidebarContent>
+      </Sidebar>
+      <ContentPane {workspace} />
+    </Row>
+  </SidebarProvider>
+
+  <WhichKey />
+</WhichKeyProvider>
 
 <DraftRecoveryDialog
   open={editor.recoveryOpen && Boolean(editor.codecError || editor.save.error)}

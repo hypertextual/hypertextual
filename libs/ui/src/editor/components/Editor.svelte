@@ -1,12 +1,15 @@
 <script lang="ts">
   import { editorSurface, editorTypography } from './styles'
-  import { cn } from '@cloudvoyant/helical-ui'
+  import { cn, registerModalEditor } from '@cloudvoyant/helical-ui'
+  import { useOptionalWhichKeyController } from '@cloudvoyant/helical-svelte'
   import type { EditorProps, EditorOverlayViewProps } from './types'
   import { onMount, onDestroy, type Component } from 'svelte'
   import { Editor, type EditorOptions } from '@tiptap/core'
   import { SvelteNodeViewRenderer } from 'svelte-tiptap'
   import {
     buildExtensions,
+    getEditorModalTarget,
+    modalKeymapPluginKey,
     type SlashCommandItem,
     type MentionItem,
     type MentionListElement,
@@ -34,6 +37,7 @@
     content,
     editable = true,
     onedit,
+    onexit,
     enforceTitle = true,
     onchange,
     mentionSource,
@@ -43,9 +47,15 @@
   }: EditorProps = $props()
 
   // State ---------------------------------------------------------------------
+  const whichKeyController = useOptionalWhichKeyController()
+
   let editor = $state<Editor | null>(null)
 
+  let surfaceEl: HTMLDivElement
+
   let element: HTMLDivElement
+
+  let modalDomCleanups: (() => void)[] = []
 
   let slashMenuProps = $state<SuggestionProps<SlashCommandItem> | null>(null)
 
@@ -190,13 +200,20 @@
           if (
             target instanceof Element &&
             target.closest(
-              'a, button, input, select, summary, iframe, [role="button"], [role="combobox"]',
+              'a, button, input, select, summary, iframe, [role="button"], [role="combobox"], [data-modal-ignore-pointer]',
             )
           )
             return false
           if (!onedit()) return false
           // Enable before ProseMirror places the caret for this click.
           editor?.setEditable(true)
+          if (editor) {
+            getEditorModalTarget(editor)?.setModalState({
+              mode: 'insert',
+              preset: whichKeyController?.getState().preset ?? 'helix',
+            })
+          }
+          whichKeyController?.setMode('insert')
           editor?.commands.setTextSelection(position)
           view.focus()
           return true
@@ -206,10 +223,30 @@
         },
       },
     })
+
+    const target = getEditorModalTarget(editor)
+    if (target) {
+      target.setModalState({
+        mode: editable ? 'insert' : 'normal',
+        preset: whichKeyController?.getState().preset ?? 'helix',
+      })
+      if (surfaceEl) {
+        modalDomCleanups.push(registerModalEditor(surfaceEl, target))
+        const region = surfaceEl.closest('[role="region"]')
+        if (region instanceof HTMLElement) {
+          modalDomCleanups.push(registerModalEditor(region, target))
+        }
+      }
+    }
+
+    editor.on('transaction', syncModalEditableState)
   })
 
   onDestroy(() => {
+    for (const cleanup of modalDomCleanups) cleanup()
+    modalDomCleanups = []
     if (editor) {
+      editor.off('transaction', syncModalEditableState)
       editor.destroy()
     }
   })
@@ -218,15 +255,55 @@
   $effect(() => {
     if (editor) {
       editor.setEditable(editable)
-      if (!editable) {
+      const target = getEditorModalTarget(editor)
+      const currentMode = modalKeymapPluginKey.getState(editor.state)?.mode ?? 'insert'
+      const preset = whichKeyController?.getState().preset ?? 'helix'
+      if (editable) {
+        if (currentMode !== 'insert') {
+          target?.setModalState({ mode: 'insert', preset })
+        }
+        if (whichKeyController && whichKeyController.getState().mode !== 'insert') {
+          whichKeyController.setMode('insert')
+        }
+      } else {
         if (activeOverlay) editor.commands.closeOverlay(activeOverlay.name)
         slashMenuProps = null
         mentionMenuProps = null
+        if (currentMode === 'insert') {
+          target?.setModalState({ mode: 'normal', preset })
+        }
+        if (whichKeyController && whichKeyController.getState().mode === 'insert') {
+          whichKeyController.setMode('normal')
+        }
       }
     }
   })
 
   // Methods -------------------------------------------------------------------
+  function syncModalEditableState() {
+    if (!editor) return
+    if (whichKeyController?.getState().explorerOpen) return
+    const active = typeof document !== 'undefined' ? document.activeElement : null
+    if (
+      active?.closest(
+        '#workspace-sidebar, [data-which-key-explorer], [data-part="node-rename-input"]',
+      )
+    ) {
+      return
+    }
+    const pluginState = modalKeymapPluginKey.getState(editor.state)
+    if (!pluginState) return
+    if (pluginState.mode === 'insert' && !editor.isEditable) {
+      if (!onedit || onedit()) {
+        editor.setEditable(true)
+        editor.view.focus()
+      }
+    } else if (pluginState.mode !== 'insert' && editor.isEditable) {
+      onexit?.()
+      editor.setEditable(false)
+    }
+  }
+
   function closeOverlay(name: string) {
     editor?.commands.closeOverlay(name)
   }
@@ -259,7 +336,7 @@
   }
 </script>
 
-<div class={cn(editorSurface())}>
+<div bind:this={surfaceEl} class={cn(editorSurface())}>
   <div bind:this={element}></div>
   {#if editor && editable}
     <BubbleMenuContent {editor} />

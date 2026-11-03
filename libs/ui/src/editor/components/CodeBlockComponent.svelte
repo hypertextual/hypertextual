@@ -1,6 +1,7 @@
 <script lang="ts">
   import { codeContent } from './styles'
   import type { CodeBlockComponentProps } from './types'
+  import { isEditorInInsertMode } from '../core'
   import { NodeViewWrapper, NodeViewContent } from 'svelte-tiptap'
   import {
     CodeBlock,
@@ -28,8 +29,10 @@
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => {
     editor.on('update', update)
+    editor.on('transaction', update)
     return () => {
       editor.off('update', update)
+      editor.off('transaction', update)
     }
   })
   const languages = [
@@ -56,7 +59,7 @@
 
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable
+    return editor.isEditable && isEditorInInsertMode(editor)
   })
 
   const currentLanguageLabel = $derived(

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LinkPreviewCardProps } from './types'
+  import { isEditorInInsertMode } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
@@ -12,8 +13,10 @@
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => {
     editor.on('update', update)
+    editor.on('transaction', update)
     return () => {
       editor.off('update', update)
+      editor.off('transaction', update)
     }
   })
   let imageError = $state(false)
@@ -23,7 +26,7 @@
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable
+    return editor.isEditable && isEditorInInsertMode(editor)
   })
   const { url, title, description, image, favicon, type } = $derived(node.attrs)
   const chapters = $derived.by(() => {
@@ -47,7 +50,7 @@
   })
 </script>
 
-<NodeViewWrapper class="link-preview relative my-4" data-type={type}>
+<NodeViewWrapper class="link-preview relative my-4" data-type={type} contenteditable={false}>
   {#if type === 'bookmark'}
     <a
       href={url}
@@ -91,9 +94,11 @@
       {/if}
     </a>
   {:else if type === 'embed'}
-    <YouTube {url} class={youtubeSurface}>
-      {#if chapters.length}<YoutubeTimestamps {chapters} />{/if}
-    </YouTube>
+    <div data-modal-ignore-pointer="true">
+      <YouTube {url} class={youtubeSurface}>
+        {#if chapters.length}<YoutubeTimestamps {chapters} />{/if}
+      </YouTube>
+    </div>
   {/if}
 
   {#if editable}<button

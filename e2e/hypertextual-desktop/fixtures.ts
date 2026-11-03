@@ -270,7 +270,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           try {
             await page.close()
           } finally {
-            await rm(root, { recursive: true, force: true })
+            await rm(root, { recursive: true, force: true, maxRetries: 3 })
           }
         }
       }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from '@cloudvoyant/helical-svelte'
+  import { Button, WhichKeyMode, useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
   import { Breadcrumb, DocumentEditor } from '@hypertextual/ui'
   import { FileText } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
@@ -9,6 +9,18 @@
     workspace: WorkspaceService
   }
   let { workspace }: ContentPaneProps = $props()
+
+  // State ---------------------------------------------------------------------
+  let mainEl = $state<HTMLElement | null>(null)
+  const pane = useOptionalPaneRegistration(
+    () => mainEl,
+    () => ({
+      paneId: 'article',
+      paneTitle: 'Article',
+      paneOrder: 2,
+      defaultTitle: 'Article',
+    }),
+  )
 
   // Derived -------------------------------------------------------------------
   const editor = $derived(workspace.editor)
@@ -23,7 +35,13 @@
   )
 </script>
 
-<main class="document-pane" aria-label="Article">
+<main
+  bind:this={mainEl}
+  {...pane.dataAttributes}
+  tabindex="-1"
+  class="document-pane"
+  aria-label="Article"
+>
   {#if editor.loading}
     <div class="empty-pane" role="status">Opening article…</div>
   {:else if editor.openingError}
@@ -70,9 +88,7 @@
       <Breadcrumb items={crumbs} label="Article path" title={editor.selected.path} />
     {:else}<span>No article selected</span>{/if}
     <div class="document-state">
-      {#if editor.document?.content}<span aria-label="Editor mode"
-          >{editor.editable ? 'Edit' : 'View'}</span
-        >{/if}
+      <WhichKeyMode showPreset aria-label="Editor mode" />
       <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span
       >
     </div>

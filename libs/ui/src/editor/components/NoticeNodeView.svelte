@@ -4,6 +4,7 @@
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
   import { NodeViewContent, NodeViewWrapper } from 'svelte-tiptap'
   import { Selection } from '@tiptap/pm/state'
+  import { isEditorInInsertMode } from '../core'
   import { noticeBody } from './styles'
   import { createSubscriber } from 'svelte/reactivity'
   import {
@@ -26,8 +27,10 @@
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => {
     editor.on('update', update)
+    editor.on('transaction', update)
     return () => {
       editor.off('update', update)
+      editor.off('transaction', update)
     }
   })
   const variants = [
@@ -40,7 +43,7 @@
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable
+    return editor.isEditable && isEditorInInsertMode(editor)
   })
   const variant = $derived((node.attrs.variant as NoticeType | undefined) ?? 'info')
 

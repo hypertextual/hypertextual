@@ -21,3 +21,14 @@ export { NoticeNode, type NoticeAttributes, type NoticeVariant } from './extensi
 
 export { UnparsedBlock } from './extensions/unparsed-block'
 export { UnparsedInline } from './extensions/unparsed-inline'
+export {
+  ModalKeymap,
+  modalKeymapPluginKey,
+  getEditorModalTarget,
+  isEditorInInsertMode,
+  serializeModalSliceText,
+  type ModalKeymapOptions,
+  type ModalKeymapPluginState,
+  type ModalKeymapStorage,
+  type SecondaryCursorRange,
+} from './extensions/modal-keymap'

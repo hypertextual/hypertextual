@@ -38,7 +38,7 @@ flowchart TD
     overlays -->|position, scroll lock, cleanup| surfaces
 ```
 
-DocumentEditor uses the supplied `editable` flag and forwards its focus handle. EditorService owns that flag. There is no separate `editing` state or modal state context. It does not import the format SDK, parse Markdown, or perform filesystem operations.
+DocumentEditor uses the supplied `editable` flag and forwards its focus handle (`focus()` and `focusNormal()`). `EditorService` owns that flag (`editable=false` in `normal` and `select` modes, `editable=true` in `insert` mode) and synchronizes with `WhichKeyController` and `ModalKeymap`. `DocumentEditor` also registers `view.center`, `view.top`, `view.bottom`, `view.scrollDown`, and `view.scrollUp` commands for the article scroll region. It does not import the format SDK, parse Markdown, or perform filesystem operations.
 
 ### Layout
 

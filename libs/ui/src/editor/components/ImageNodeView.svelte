@@ -1,6 +1,7 @@
 <script lang="ts">
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
+  import { isEditorInInsertMode } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
@@ -11,8 +12,10 @@
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => {
     editor.on('update', update)
+    editor.on('transaction', update)
     return () => {
       editor.off('update', update)
+      editor.off('transaction', update)
     }
   })
   let captionFocused = $state(false)
@@ -20,7 +23,7 @@
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable
+    return editor.isEditable && isEditorInInsertMode(editor)
   })
   const { src, srcset, alt } = $derived(node.attrs)
 

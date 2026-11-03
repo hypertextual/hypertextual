@@ -2,7 +2,7 @@
 
 ## Overview
 
-The content pane presents the selected document, image, or empty workspace preview. Its footer shows the article breadcrumb, current mode, and save status.
+The content pane presents the selected document, image, or empty workspace preview as the `article` spatial pane (`paneId="article"`). Its footer shows the article breadcrumb, live `WhichKeyMode` badge (`helix · normal`, `helix · select`, `helix · insert`, or `helix · jump`), and save status.
 
 ## Design
 

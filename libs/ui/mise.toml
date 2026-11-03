@@ -11,3 +11,8 @@ run = "bun run build"
 description = "Check UI types and component diagnostics"
 depends = ["install"]
 run = "bun run lint"
+
+[tasks.test]
+description = "Run UI library unit and integration tests"
+depends = ["install"]
+run = "bun run test"

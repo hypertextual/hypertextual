@@ -8,6 +8,7 @@ import { Node } from '@tiptap/core'
 import { Plugin, PluginKey, NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { DecorationSet, Decoration } from '@tiptap/pm/view'
 import type { NodeViewOptions } from '../types'
+import { isEditorInInsertMode } from './modal-keymap'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -86,6 +87,7 @@ export const ImageNode = Node.create<NodeViewOptions>({
   },
 
   addProseMirrorPlugins() {
+    const editor = this.editor
     // ── Plugin 1: arrow keys into imageNode → focus caption ──────────────────
     let arrowKeyPressed = false
 
@@ -93,6 +95,10 @@ export const ImageNode = Node.create<NodeViewOptions>({
       key: new PluginKey('imageNodeCaptionFocus'),
       props: {
         handleKeyDown(_view, event) {
+          if (!isEditorInInsertMode(editor)) {
+            arrowKeyPressed = false
+            return false
+          }
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             arrowKeyPressed = true
           }
@@ -102,6 +108,10 @@ export const ImageNode = Node.create<NodeViewOptions>({
       view() {
         return {
           update(view, prevState) {
+            if (!isEditorInInsertMode(editor)) {
+              arrowKeyPressed = false
+              return
+            }
             const { selection } = view.state
             const { selection: prevSelection } = prevState
 

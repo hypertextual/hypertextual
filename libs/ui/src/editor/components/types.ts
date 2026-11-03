@@ -55,6 +55,7 @@ export interface EditorProps {
   content?: JSONContent
   editable?: boolean
   onedit?: () => boolean
+  onexit?: () => void
   /** Keep the required first H1 title. Disable for compact inputs such as mentions. */
   enforceTitle?: boolean
   onchange?: (document: JSONContent) => void

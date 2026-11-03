@@ -2,6 +2,7 @@
   import LocalEditor from './components/Editor.svelte'
   import { tick, onMount } from 'svelte'
   import { cn } from '@cloudvoyant/helical-ui'
+  import { useOptionalWhichKeyController } from '@cloudvoyant/helical-svelte'
   import { editorViewport } from './styles'
   import type { DocumentEditorProps, EditorHandle } from './types'
 
@@ -17,6 +18,8 @@
   }: DocumentEditorProps = $props()
 
   // State ---------------------------------------------------------------------
+  const whichKeyController = useOptionalWhichKeyController()
+
   let view = $state<EditorHandle>()
   let surface = $state<HTMLDivElement>()
 
@@ -24,6 +27,50 @@
   onMount(() => {
     window.addEventListener('keydown', exitEdit, true)
     return () => window.removeEventListener('keydown', exitEdit, true)
+  })
+
+  $effect(() => {
+    if (!whichKeyController || !surface) return
+    const scrollEl = surface
+    const isArticleTarget = () => {
+      const active = window.document.activeElement
+      return !active || active === scrollEl || scrollEl.contains(active)
+    }
+    const alignCursor = (where: 'center' | 'top' | 'bottom'): boolean => {
+      if (!isArticleTarget()) return false
+      const cursorEl = scrollEl.querySelector<HTMLElement>(
+        '[data-pm-modal-cursor], [data-pm-modal-node-selection]',
+      )
+      if (!cursorEl) return false
+      const containerRect = scrollEl.getBoundingClientRect()
+      const cursorRect = cursorEl.getBoundingClientRect()
+      const pad = 16
+      if (where === 'center') {
+        scrollEl.scrollTop +=
+          cursorRect.top + cursorRect.height / 2 - (containerRect.top + containerRect.height / 2)
+      } else if (where === 'top') {
+        scrollEl.scrollTop += cursorRect.top - (containerRect.top + pad)
+      } else {
+        scrollEl.scrollTop += cursorRect.bottom - (containerRect.bottom - pad)
+      }
+      return true
+    }
+    const stepScroll = (dir: 1 | -1, count: number): boolean => {
+      if (!isArticleTarget()) return false
+      const step = Math.max(120, Math.round(scrollEl.clientHeight * 0.5)) * Math.max(1, count)
+      scrollEl.scrollTop = Math.max(0, scrollEl.scrollTop + dir * step)
+      return true
+    }
+    const cleanups = [
+      whichKeyController.registerCommand('view.center', () => alignCursor('center')),
+      whichKeyController.registerCommand('view.top', () => alignCursor('top')),
+      whichKeyController.registerCommand('view.bottom', () => alignCursor('bottom')),
+      whichKeyController.registerCommand('view.scrollDown', (ctx) => stepScroll(1, ctx.count)),
+      whichKeyController.registerCommand('view.scrollUp', (ctx) => stepScroll(-1, ctx.count)),
+    ]
+    return () => {
+      for (const fn of cleanups) fn()
+    }
   })
 
   $effect(() => {
@@ -38,8 +85,19 @@
     if (enterEdit()) void tick().then(() => view?.focus())
   }
 
+  export function focusNormal() {
+    oneditablechange?.(false)
+    whichKeyController?.setMode('normal')
+    void tick().then(() => surface?.focus({ preventScroll: true }))
+  }
+
   function enterEdit(): boolean {
     return oneditablechange?.(true) ?? false
+  }
+
+  function exitToNormal() {
+    oneditablechange?.(false)
+    whichKeyController?.setMode('normal')
   }
 
   function exitEdit(event: KeyboardEvent) {
@@ -47,13 +105,16 @@
       event.key !== 'Escape' ||
       event.isComposing ||
       !editable ||
+      whichKeyController?.getState().isOpen ||
+      whichKeyController?.getState().explorerOpen ||
+      whichKeyController?.getState().mode === 'jump' ||
       !(event.target instanceof Element) ||
       (!surface?.contains(event.target) && !event.target.closest('[data-editor-controls]'))
     )
       return
     event.preventDefault()
     event.stopPropagation()
-    oneditablechange?.(false)
+    exitToNormal()
   }
 </script>
 
@@ -61,6 +122,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   bind:this={surface}
+  data-pane-focus-target=""
   class={cn(editorViewport, className)}
   tabindex="0"
   role="region"
@@ -72,6 +134,7 @@
       content={document}
       {editable}
       onedit={enterEdit}
+      onexit={exitToNormal}
       enforceTitle={false}
       {onUpload}
       {onchange}

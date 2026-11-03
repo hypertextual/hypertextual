@@ -26,8 +26,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",
-    "@cloudvoyant/helical-svelte": "0.19.0",
-    "@cloudvoyant/helical-ui": "0.19.0",
+    "@cloudvoyant/helical-svelte": "0.21.1-rc.202611031218.5085f0d",
+    "@cloudvoyant/helical-ui": "0.21.1-rc.202611031218.5085f0d",
     "manim-web": "0.3.24",
     "@hypertextual/ui": "workspace:*",
     "@tiptap/core": "3.31.4",

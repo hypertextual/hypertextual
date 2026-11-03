@@ -1628,7 +1628,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         await page.keyboard.type(' updated')
 
         // Assert
-        await expect(page.getByRole('status')).toContainText('Saved')
+        await expect(page.getByRole('status')).toContainText(['Saved'])
         await expect
           .poll(() => readFile(join(workspace.root, 'lists.md'), 'utf8'))
           .toContain('1) <p></p>')

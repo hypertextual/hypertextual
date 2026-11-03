@@ -76,8 +76,8 @@
 - Implement services as stateful classes.
 - Register desktop close and quit handlers in the shell lifecycle.
 - Keep pending-save flushing and overlapping-close guards in the editor service.
-- [Proposed] Keep the current editor interaction state in one `editable` flag on `EditorService`. Defer a separate modal-editing state model until its own design ticket.
-- [Proposed] Keep article scrolling and keyboard reactions in the reusable editor component. Keep the application content pane focused on composition.
+- Synchronize `EditorService.editable` (`false` in `normal`/`select` modes, `true` in `insert` mode) with `WhichKeyProvider` and `ModalKeymap`. See [the keybindings guide](docs/keybindings/index.md).
+- Keep article scrolling and keyboard reactions in the reusable editor component. Keep the application content pane focused on composition.
 
 ### Workspace UI
 
