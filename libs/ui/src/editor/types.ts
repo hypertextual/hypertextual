@@ -5,7 +5,6 @@ export type EditorImageUploadResult = ImageUploadResult
 
 export interface EditorHandle {
   focus: () => void
-  focusNormal?: () => void
 }
 
 export interface DocumentEditorProps {

@@ -10,6 +10,20 @@ The status bar at the bottom right of the Article pane displays the active prese
 
 ## Modal States
 
+```mermaid
+stateDiagram-v2
+  [*] --> Normal: Open existing article
+  [*] --> Insert: Create new article ("New article" / Space n)
+  Normal --> Insert: Click editable text or press i, a, I, A, o, O, c
+  Normal --> Select: Press v or x
+  Normal --> Jump: Press gw, Space j, or s (Vim)
+  Select --> Normal: Press Escape, ;, y, d, p, P
+  Select --> Insert: Press c, i, a
+  Insert --> Insert: Escape closes active menu, overlay, or widget control first
+  Insert --> Normal: Press Escape
+  Jump --> Normal: Type jump badge or press Escape
+```
+
 | Mode | Badge | Entry | Behavior |
 | --- | --- | --- | --- |
 | **Normal** | `NORMAL` | Default when opening an existing article; press `Escape` from `insert` or `select` mode | Single-key motions, operators, and prefix menus are active. Unbound printable keys are blocked from mutating the document. `.ProseMirror` renders a block cursor (`[data-pm-modal-cursor]`). Node views (notices, images, link previews, code blocks) render clean reading chrome without form inputs or remove buttons. |

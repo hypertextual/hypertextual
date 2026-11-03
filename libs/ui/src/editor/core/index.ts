@@ -26,7 +26,7 @@ export {
   modalKeymapPluginKey,
   getEditorModalTarget,
   isEditorInInsertMode,
-  serializeModalSliceText,
+  subscribeToEditorTransactions,
   type ModalKeymapOptions,
   type ModalKeymapPluginState,
   type ModalKeymapStorage,

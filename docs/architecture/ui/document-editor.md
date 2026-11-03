@@ -38,7 +38,7 @@ flowchart TD
     overlays -->|position, scroll lock, cleanup| surfaces
 ```
 
-DocumentEditor uses the supplied `editable` flag and forwards its focus handle (`focus()` and `focusNormal()`). `EditorService` owns that flag (`editable=false` in `normal` and `select` modes, `editable=true` in `insert` mode) and synchronizes with `WhichKeyController` and `ModalKeymap`. `DocumentEditor` also registers `view.center`, `view.top`, `view.bottom`, `view.scrollDown`, and `view.scrollUp` commands for the article scroll region. It does not import the format SDK, parse Markdown, or perform filesystem operations.
+DocumentEditor uses the supplied `editable` flag and forwards its focus handle (`focus()`). `EditorService` owns that flag (`editable=false` in `normal` and `select` modes, `editable=true` in `insert` mode) and synchronizes with `WhichKeyController` and `ModalKeymap`. `DocumentEditor` also registers `view.center`, `view.top`, `view.bottom`, `view.scrollDown`, and `view.scrollUp` commands for the article scroll region. It does not import the format SDK, parse Markdown, or perform filesystem operations.
 
 ### Layout
 
@@ -67,12 +67,17 @@ The wrapper fills the host content area without a toolbar or footer of its own. 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> View: host supplies document
-    View --> Edit: click article text or call focus
-    Edit --> Edit: emit JSON change to app
-    Edit --> View: Escape
-    View --> [*]: host replaces document
-    Edit --> [*]: host replaces document
+    [*] --> Normal: host supplies document (editable = false)
+    [*] --> Insert: host creates new document (editable = true)
+    Normal --> Select: v or x
+    Select --> Normal: Escape, ;, y, d, p, P
+    Normal --> Insert: click article text, call focus, or press i, a, I, A, o, O, c
+    Select --> Insert: press c, i, a
+    Insert --> Insert: emit JSON change to app
+    Insert --> Normal: Escape
+    Normal --> [*]: host replaces document
+    Select --> [*]: host replaces document
+    Insert --> [*]: host replaces document
 ```
 
 The editor keeps selection, transactions, and node views. EditorService owns the current `editable` flag and resets it when the selected article changes. If the host disables editing, the component hides edit controls and preserves the chosen mode. The app processes emitted JSON synchronously through `htmd-ts` before scheduling a save. Format or storage errors retain the app draft and open app recovery. Replacing the article destroys the previous editor and overlay bindings.
@@ -81,20 +86,22 @@ The editor keeps selection, transactions, and node views. EditorService owns the
 
 ```mermaid
 stateDiagram-v2
-    [*] --> View
-    View --> Editing: click article text
-    Editing --> View: Escape
-    Editing --> BlockMenu: type slash in a text block
+    [*] --> Normal
+    Normal --> Select: v or x
+    Select --> Normal: Escape
+    Normal --> Insert: click article text or press i, a, o, O, c
+    Insert --> Normal: Escape
+    Insert --> BlockMenu: type slash in a text block
     BlockMenu --> BlockMenu: filter or move with arrow keys
-    BlockMenu --> Editing: Enter inserts a direct block
+    BlockMenu --> Insert: Enter inserts a direct block
     BlockMenu --> InsertionForm: choose image, bookmark, or YouTube
     InsertionForm --> InsertionForm: map anchor through document edits
-    InsertionForm --> Editing: submit or cancel
-    InsertionForm --> Editing: anchor deleted or article replaced
-    BlockMenu --> View: Escape cancels
-    Editing --> Formatting: select text
-    Formatting --> Editing: apply formatting
-    Formatting --> View: Escape
+    InsertionForm --> Insert: submit or cancel
+    InsertionForm --> Insert: anchor deleted or article replaced
+    BlockMenu --> Insert: Escape cancels
+    Insert --> Formatting: select text
+    Formatting --> Insert: apply formatting
+    Formatting --> Insert: Escape
 ```
 
 The component disables forced-title enforcement. The app extracts the first H1 from document JSON for display titles and saved filenames. `EditorOverlays` owns insertion requests, surface positioning, and scroll locks. Forms follow mapped document anchors, slash suggestions follow their range, and the toolbar follows selection. Svelte and Ark own the controls and keyboard interaction. Text formatting includes highlight and font color; text alignment is unavailable for both headings and paragraphs.

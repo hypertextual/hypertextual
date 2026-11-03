@@ -215,15 +215,7 @@
       } else if (event.key === 'Enter' && !isBranch) {
         event.preventDefault()
         event.stopPropagation()
-        if (selected === nodeValue) {
-          if (!controller?.focusPane('article')) {
-            rootEl.ownerDocument
-              .querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')
-              ?.focus()
-          }
-        } else {
-          onselect?.(nodeValue)
-        }
+        onselect?.(nodeValue)
       } else if (event.key === 'r' || event.key === 'F2') {
         if (!onrename) return
         event.preventDefault()

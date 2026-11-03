@@ -85,12 +85,6 @@
     if (enterEdit()) void tick().then(() => view?.focus())
   }
 
-  export function focusNormal() {
-    oneditablechange?.(false)
-    whichKeyController?.setMode('normal')
-    void tick().then(() => surface?.focus({ preventScroll: true }))
-  }
-
   function enterEdit(): boolean {
     return oneditablechange?.(true) ?? false
   }

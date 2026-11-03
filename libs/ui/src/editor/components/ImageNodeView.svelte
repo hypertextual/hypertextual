@@ -1,7 +1,7 @@
 <script lang="ts">
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
-  import { isEditorInInsertMode } from '../core'
+  import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
@@ -10,14 +10,7 @@
   let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => {
-    editor.on('update', update)
-    editor.on('transaction', update)
-    return () => {
-      editor.off('update', update)
-      editor.off('transaction', update)
-    }
-  })
+  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   let captionFocused = $state(false)
 
   // Derived -------------------------------------------------------------------

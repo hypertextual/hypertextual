@@ -16,8 +16,7 @@
   },
   "scripts": {
     "build": "svelte-check --tsconfig ./tsconfig.json",
-    "lint": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "bun test"
+    "lint": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
     "@ark-ui/svelte": "5.24.3",

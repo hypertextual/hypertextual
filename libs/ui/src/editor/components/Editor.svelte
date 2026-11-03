@@ -285,9 +285,11 @@
     if (whichKeyController?.getState().explorerOpen) return
     const active = typeof document !== 'undefined' ? document.activeElement : null
     if (
-      active?.closest(
-        '#workspace-sidebar, [data-which-key-explorer], [data-part="node-rename-input"]',
-      )
+      active &&
+      surfaceEl &&
+      !surfaceEl.contains(active) &&
+      !active.contains(surfaceEl) &&
+      active.closest('[data-pane-id], [data-which-key-explorer], [data-part="node-rename-input"]')
     ) {
       return
     }

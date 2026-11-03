@@ -207,6 +207,18 @@ export function isEditorInInsertMode(editor: Editor): boolean {
   return storage.mode === 'insert'
 }
 
+export function subscribeToEditorTransactions(
+  editor: Editor,
+  onUpdate: () => void,
+): () => void {
+  editor.on('update', onUpdate)
+  editor.on('transaction', onUpdate)
+  return () => {
+    editor.off('update', onUpdate)
+    editor.off('transaction', onUpdate)
+  }
+}
+
 export function getEditorModalTarget(editor: Editor): ModalEditorTarget | undefined {
   const storage = (editor.storage as unknown as { modalKeymap?: ModalKeymapStorage }).modalKeymap
   if (!storage) return undefined
@@ -220,8 +232,6 @@ export function getEditorModalTarget(editor: Editor): ModalEditorTarget | undefi
   }
   return storage.target
 }
-
-let sharedRegisterSlice: Slice | null = null
 
 function getCharEnd(doc: PMNode, pos: number): number {
   if (pos < 0 || pos >= doc.content.size) return pos
@@ -329,9 +339,8 @@ function expandWholeContainerRange(
   doc: PMNode,
   from: number,
   to: number,
-  expandNotices = true,
 ): { from: number; to: number } {
-  if (!expandNotices || from >= to) return { from, to }
+  if (from >= to) return { from, to }
   let nextFrom = from
   let nextTo = to
   doc.nodesBetween(from, to, (node, pos) => {
@@ -453,7 +462,7 @@ function findCurrentBlockIndex(
   return atomIdx !== -1 ? atomIdx : 0
 }
 
-export function serializeModalSliceText(doc: PMNode, from: number, to: number): string {
+function serializeModalSliceText(doc: PMNode, from: number, to: number): string {
   if (from >= to) return ''
   let hasRichNode = false
   const parts: string[] = []
@@ -791,8 +800,7 @@ function createModalTargetForEditor(
 
       if (motion === 'left' || motion === 'right') {
         const dir = motion === 'left' ? -1 : 1
-        const blocks = collectLeafBlocks(doc)
-        if (blocks.length === 0) return false
+        if (doc.content.size === 0) return false
 
         let targetPos = getCursorCharPos(doc, sel, pluginState?.extendedRange)
         for (let i = 0; i < steps; i += 1) {
@@ -969,49 +977,13 @@ function createModalTargetForEditor(
       let targetNode: PMNode | null = null
       let targetPos = -1
 
-      if (kind === 'p') {
-        for (let d = $head.depth; d >= 1; d -= 1) {
-          const ancestor = $head.node(d)
-          if (ancestor.type.name === 'paragraph') {
-            targetNode = ancestor
-            targetPos = $head.before(d)
-            break
-          }
+      for (let d = $head.depth; d >= 1; d -= 1) {
+        const ancestor = $head.node(d)
+        if (matchesNodeType(ancestor.type.name)) {
+          targetNode = ancestor
+          targetPos = $head.before(d)
+          break
         }
-        if (!targetNode) {
-          doc.descendants((node, pos) => {
-            if (targetNode) return false
-            if (node.type.name === 'paragraph') {
-              targetNode = node
-              targetPos = pos
-              return false
-            }
-            return true
-          })
-        }
-      }
-
-      if (!targetNode) {
-        for (let d = $head.depth; d >= 1; d -= 1) {
-          const ancestor = $head.node(d)
-          if (matchesNodeType(ancestor.type.name)) {
-            targetNode = ancestor
-            targetPos = $head.before(d)
-            break
-          }
-        }
-      }
-
-      if (!targetNode) {
-        doc.descendants((node, pos) => {
-          if (targetNode) return false
-          if (matchesNodeType(node.type.name)) {
-            targetNode = node
-            targetPos = pos
-            return false
-          }
-          return true
-        })
       }
 
       if (!targetNode || targetPos < 0) return false
@@ -1211,7 +1183,7 @@ function createModalTargetForEditor(
           }
         }
       } else if (mode === 'select') {
-        const expanded = expandWholeContainerRange(doc, primaryFrom, primaryTo, true)
+        const expanded = expandWholeContainerRange(doc, primaryFrom, primaryTo)
         primaryFrom = expanded.from
         primaryTo = expanded.to
       }
@@ -1219,7 +1191,6 @@ function createModalTargetForEditor(
       if (op === 'yank') {
         const slice = doc.slice(primaryFrom, primaryTo)
         storage.registerSlice = slice
-        sharedRegisterSlice = slice
         const yankedText = serializeModalSliceText(doc, primaryFrom, primaryTo)
         if (yankedText && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
           void navigator.clipboard.writeText(yankedText).catch(() => {})
@@ -1258,7 +1229,6 @@ function createModalTargetForEditor(
         const primaryClamped = clampRange(primaryFrom, primaryTo)
         const slice = doc.slice(primaryClamped.from, primaryClamped.to)
         storage.registerSlice = slice
-        sharedRegisterSlice = slice
 
         const allRanges = [
           primaryClamped,
@@ -1289,7 +1259,7 @@ function createModalTargetForEditor(
       }
 
       if (op === 'pasteAfter' || op === 'pasteBefore') {
-        const slice = storage.registerSlice ?? sharedRegisterSlice
+        const slice = storage.registerSlice
         if (!slice || slice.size === 0) return false
 
         const isClosedBlockSlice =

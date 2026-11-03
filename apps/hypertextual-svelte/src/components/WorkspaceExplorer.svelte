@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getDocumentWhichKeyController } from '@cloudvoyant/helical-ui'
   import { TreeView } from '@hypertextual/ui'
   import { Folder, FolderOpen, FileText, Image } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
@@ -25,7 +26,17 @@
   }}
   getLabel={(node) => workspace.titles[node.value] ?? node.label}
   selected={workspace.editor.selected?.path ?? null}
-  onselect={(path) => void workspace.select(path)}
+  onselect={(path) => {
+    if (workspace.editor.selected?.path === path) {
+      if (!getDocumentWhichKeyController(document)?.focusPane('article')) {
+        document
+          .querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')
+          ?.focus()
+      }
+      return
+    }
+    void workspace.select(path)
+  }}
   loadChildren={(node) => workspace.loadChildren(node)}
 >
   {#snippet icon(node, expanded)}

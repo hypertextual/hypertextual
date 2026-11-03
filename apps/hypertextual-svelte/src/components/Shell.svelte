@@ -89,8 +89,14 @@
   const appCommands = {
     'workspace.toggleExplorer': () => toggleExplorer(),
     'workspace.newArticle': () => {
+      const previousPath = editor.selected?.path
       void workspace.newArticle().then(() => {
-        if (editor.setEditable(true)) {
+        if (
+          !workspace.creationError &&
+          editor.selected?.path &&
+          editor.selected.path !== previousPath &&
+          editor.setEditable(true)
+        ) {
           getDocumentWhichKeyController(document)?.setMode('insert')
           void tick().then(() => {
             document.querySelector<HTMLElement>('.ProseMirror')?.focus()

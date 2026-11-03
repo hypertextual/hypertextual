@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LinkPreviewCardProps } from './types'
-  import { isEditorInInsertMode } from '../core'
+  import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
@@ -11,14 +11,7 @@
   let { node, editor, deleteNode }: LinkPreviewCardProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => {
-    editor.on('update', update)
-    editor.on('transaction', update)
-    return () => {
-      editor.off('update', update)
-      editor.off('transaction', update)
-    }
-  })
+  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   let imageError = $state(false)
 
   let faviconError = $state(false)

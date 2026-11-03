@@ -1,7 +1,7 @@
 <script lang="ts">
   import { codeContent } from './styles'
   import type { CodeBlockComponentProps } from './types'
-  import { isEditorInInsertMode } from '../core'
+  import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
   import { NodeViewWrapper, NodeViewContent } from 'svelte-tiptap'
   import {
     CodeBlock,
@@ -27,14 +27,7 @@
   let { node, editor, updateAttributes }: CodeBlockComponentProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => {
-    editor.on('update', update)
-    editor.on('transaction', update)
-    return () => {
-      editor.off('update', update)
-      editor.off('transaction', update)
-    }
-  })
+  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   const languages = [
     { value: 'javascript', label: 'JavaScript' },
     { value: 'typescript', label: 'TypeScript' },
