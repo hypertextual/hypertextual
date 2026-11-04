@@ -3,13 +3,15 @@
   import { cn, registerModalEditor } from '@cloudvoyant/helical-ui'
   import { useOptionalWhichKeyController } from '@cloudvoyant/helical-svelte'
   import type { EditorProps, EditorOverlayViewProps } from './types'
-  import { onMount, onDestroy, type Component } from 'svelte'
+  import { onMount, onDestroy, tick, type Component } from 'svelte'
   import { Editor, type EditorOptions } from '@tiptap/core'
+  import { NodeSelection } from '@tiptap/pm/state'
   import { SvelteNodeViewRenderer } from 'svelte-tiptap'
   import {
     buildExtensions,
     getEditorModalTarget,
     modalKeymapPluginKey,
+    type ModalKeymapStorage,
     type SlashCommandItem,
     type MentionItem,
     type MentionListElement,
@@ -36,6 +38,7 @@
   let {
     content,
     editable = true,
+    clickToEdit = true,
     onedit,
     onexit,
     enforceTitle = true,
@@ -204,6 +207,40 @@
             )
           )
             return false
+          if (!clickToEdit) {
+            let compoundPos: number | null = null
+            if (target instanceof Element) {
+              view.state.doc.descendants((node, pos) => {
+                if (
+                  node.type.name === 'notice' ||
+                  node.type.name === 'codeBlock' ||
+                  node.type.name === 'image' ||
+                  node.type.name === 'imageNode' ||
+                  node.type.name === 'linkPreview'
+                ) {
+                  const nodeDom = view.nodeDOM(pos)
+                  if (nodeDom instanceof HTMLElement && nodeDom.contains(target)) {
+                    compoundPos = pos
+                  }
+                  return false
+                }
+                return true
+              })
+            }
+            if (compoundPos !== null) {
+              const node = view.state.doc.nodeAt(compoundPos)
+              if (node && NodeSelection.isSelectable(node)) {
+                view.dispatch(
+                  view.state.tr.setSelection(NodeSelection.create(view.state.doc, compoundPos)),
+                )
+              }
+            } else {
+              editor?.commands.setTextSelection(position)
+            }
+            const region = surfaceEl?.closest<HTMLElement>('[role="region"]') ?? surfaceEl
+            region?.focus({ preventScroll: true })
+            return true
+          }
           if (!onedit()) return false
           // Enable before ProseMirror places the caret for this click.
           editor?.setEditable(true)
@@ -254,6 +291,11 @@
   // Update editable state
   $effect(() => {
     if (editor) {
+      const storage = (editor.storage as unknown as { modalKeymap?: ModalKeymapStorage })
+        .modalKeymap
+      if (storage) {
+        storage.clickToInsert = clickToEdit
+      }
       editor.setEditable(editable)
       const target = getEditorModalTarget(editor)
       const currentMode = modalKeymapPluginKey.getState(editor.state)?.mode ?? 'insert'
@@ -321,6 +363,85 @@
     if (editor) {
       editor.commands.focus('start')
     }
+  }
+
+  // Enter the interior controls of a whole-block highlighted compound block
+  export function enterCompoundBlock(): boolean {
+    if (!editor || editor.isEditable) return false
+    const sel = editor.state.selection
+    let blockPos: number | null = null
+    let blockType: string | null = null
+    if (
+      sel instanceof NodeSelection &&
+      (sel.node.type.name === 'notice' ||
+        sel.node.type.name === 'codeBlock' ||
+        sel.node.type.name === 'image' ||
+        sel.node.type.name === 'imageNode' ||
+        sel.node.type.name === 'linkPreview')
+    ) {
+      blockPos = sel.from
+      blockType = sel.node.type.name
+    } else {
+      const resolvedFrom = sel.$from
+      for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
+        const name = resolvedFrom.node(d).type.name
+        if (name === 'notice' || name === 'codeBlock') {
+          blockPos = resolvedFrom.before(d)
+          blockType = name
+          break
+        }
+      }
+    }
+    if (blockPos === null || !blockType) return false
+    if (onedit && !onedit()) return false
+
+    const storage = (editor.storage as unknown as { modalKeymap?: ModalKeymapStorage }).modalKeymap
+    if (storage) {
+      storage.activeCompoundBlockPos = blockPos
+    }
+    editor.setEditable(true)
+    const preset = whichKeyController?.getState().preset ?? 'helix'
+    getEditorModalTarget(editor)?.setModalState({ mode: 'insert', preset })
+    whichKeyController?.setMode('insert')
+
+    const pos = blockPos
+    const type = blockType
+    void tick().then(() => {
+      if (!editor) return
+      const dom = editor.view.nodeDOM(pos)
+      if (!(dom instanceof HTMLElement)) return
+      if (type === 'notice') {
+        const input = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+        if (input) {
+          input.focus()
+          input.setSelectionRange(input.value.length, input.value.length)
+        }
+      } else if (type === 'codeBlock') {
+        const trigger = dom.querySelector<HTMLElement>(
+          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+        )
+        if (trigger) {
+          trigger.focus()
+        } else {
+          editor.commands.setTextSelection(pos + 1)
+          editor.view.focus()
+        }
+      } else if (type === 'image' || type === 'imageNode') {
+        const input = dom.querySelector<HTMLInputElement>(
+          'input.caption-input, input[aria-label="Image caption"]',
+        )
+        if (input) {
+          input.focus()
+          input.setSelectionRange(input.value.length, input.value.length)
+        }
+      } else if (type === 'linkPreview') {
+        const action = dom.querySelector<HTMLElement>(
+          'button[aria-label="Play video"], a.bookmark-card-edit, button[aria-label="Remove preview"]',
+        )
+        action?.focus()
+      }
+    })
+    return true
   }
 
   // Expose method to get analytics counts

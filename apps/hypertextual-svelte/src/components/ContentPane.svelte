@@ -61,6 +61,7 @@
         <DocumentEditor
           document={editor.document.content}
           editable={editor.editable && !workspace.blocked}
+          clickToEdit={workspace.settings.clickToInsert}
           oneditablechange={(editable) => editor.setEditable(editable && !workspace.blocked)}
           class="article-scroll"
           contentClass="article-editor"

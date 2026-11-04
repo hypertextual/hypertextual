@@ -7,3 +7,6 @@ export type { EditorImageUploadResult, EditorHandle, DocumentEditorProps } from 
 export type { ContextMenuItem, ContextMenuProps } from './context-menu/types'
 export { default as Breadcrumb } from './breadcrumb/Breadcrumb.svelte'
 export type { BreadcrumbProps } from './breadcrumb/types'
+export { default as FontSelector } from './font-selector/FontSelector.svelte'
+export { EDITOR_FONTS } from './font-selector/types'
+export type { EditorFont, FontSelectorProps } from './font-selector/types'

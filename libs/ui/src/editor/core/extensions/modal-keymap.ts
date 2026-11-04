@@ -40,6 +40,7 @@ export interface ModalKeymapPluginState {
   secondaryRanges: SecondaryCursorRange[]
   goalColumn: number | null
   extendedRange?: { anchor: number; head: number } | null
+  focused?: boolean
 }
 
 export interface ModalKeymapStorage {
@@ -47,6 +48,8 @@ export interface ModalKeymapStorage {
   mode: KeymapMode
   preset: KeybindingPreset
   registerSlice: Slice | null
+  clickToInsert: boolean
+  activeCompoundBlockPos?: number | null
   cleanupDomRegistration?: () => void
 }
 
@@ -86,6 +89,17 @@ interface WordToken {
 function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
+    if (node.type.name === 'notice' || node.type.name === 'codeBlock') {
+      blocks.push({
+        node,
+        pos,
+        start: pos,
+        end: pos + node.nodeSize,
+        isTextblock: false,
+        isAtom: true,
+      })
+      return false
+    }
     if (node.isTextblock) {
       blocks.push({
         node,
@@ -542,9 +556,11 @@ function createModalTargetForEditor(
       preset: getStorage().preset,
       secondaryRanges: [],
       goalColumn: null,
+      focused: true,
     }
     return tr.setMeta(modalKeymapPluginKey, {
       ...prev,
+      focused: true,
       ...patch,
     })
   }
@@ -977,12 +993,17 @@ function createModalTargetForEditor(
       let targetNode: PMNode | null = null
       let targetPos = -1
 
-      for (let d = $head.depth; d >= 1; d -= 1) {
-        const ancestor = $head.node(d)
-        if (matchesNodeType(ancestor.type.name)) {
-          targetNode = ancestor
-          targetPos = $head.before(d)
-          break
+      if (sel instanceof NodeSelection && matchesNodeType(sel.node.type.name)) {
+        targetNode = sel.node
+        targetPos = sel.from
+      } else {
+        for (let d = $head.depth; d >= 1; d -= 1) {
+          const ancestor = $head.node(d)
+          if (matchesNodeType(ancestor.type.name)) {
+            targetNode = ancestor
+            targetPos = $head.before(d)
+            break
+          }
         }
       }
 
@@ -1109,9 +1130,18 @@ function createModalTargetForEditor(
       }
 
       if (op === 'insertStart') {
-        let tr = state.tr.setSelection(
-          sel instanceof NodeSelection ? sel : TextSelection.create(doc, sel.from),
-        )
+        let nextSel: Selection
+        if (
+          sel instanceof NodeSelection &&
+          (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
+        ) {
+          const { firstTextStart } = getContainerInnerTextBounds(sel.node, sel.from)
+          nextSel =
+            firstTextStart !== -1 ? TextSelection.create(doc, firstTextStart) : sel
+        } else {
+          nextSel = sel instanceof NodeSelection ? sel : TextSelection.create(doc, sel.from)
+        }
+        let tr = state.tr.setSelection(nextSel)
         tr = updateMeta(tr, { mode: 'insert', secondaryRanges: [] })
         storage.mode = 'insert'
         dispatchTransaction(editor, tr)
@@ -1119,12 +1149,21 @@ function createModalTargetForEditor(
       }
 
       if (op === 'appendEnd') {
-        const dest =
-          sel instanceof NodeSelection
-            ? sel.to
-            : sel.empty
-              ? Math.min(sel.$head.end(), sel.to + 1)
-              : sel.to
+        let dest: number
+        if (
+          sel instanceof NodeSelection &&
+          (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
+        ) {
+          const { lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
+          dest = lastTextEnd !== -1 ? lastTextEnd : sel.to
+        } else {
+          dest =
+            sel instanceof NodeSelection
+              ? sel.to
+              : sel.empty
+                ? Math.min(sel.$head.end(), sel.to + 1)
+                : sel.to
+        }
         let tr = state.tr.setSelection(TextSelection.create(doc, dest))
         tr = updateMeta(tr, { mode: 'insert', secondaryRanges: [] })
         storage.mode = 'insert'
@@ -1298,7 +1337,13 @@ function createModalTargetForEditor(
           }
 
           const firstInserted = slice.content.firstChild
-          if (firstInserted && firstInserted.isAtom && NodeSelection.isSelectable(firstInserted)) {
+          if (
+            firstInserted &&
+            (firstInserted.isAtom ||
+              firstInserted.type.name === 'notice' ||
+              firstInserted.type.name === 'codeBlock') &&
+            NodeSelection.isSelectable(firstInserted)
+          ) {
             tr = tr.setSelection(NodeSelection.create(tr.doc, insertPos))
           } else {
             tr = tr.setSelection(
@@ -1345,11 +1390,33 @@ function createModalTargetForEditor(
     setModalState({ mode: nextMode, preset: nextPreset }): void {
       const storage = getStorage()
       const prev = modalKeymapPluginKey.getState(editor.state)
+      const exitingInsert = (prev?.mode === 'insert' || storage.mode === 'insert') && nextMode === 'normal'
+      let compoundPosToSelect: number | null = null
+      if (exitingInsert) {
+        if (
+          typeof storage.activeCompoundBlockPos === 'number' &&
+          storage.activeCompoundBlockPos >= 0 &&
+          storage.activeCompoundBlockPos < editor.state.doc.content.size
+        ) {
+          compoundPosToSelect = storage.activeCompoundBlockPos
+        } else {
+          const { $from } = editor.state.selection
+          for (let d = $from.depth; d >= 1; d -= 1) {
+            const name = $from.node(d).type.name
+            if (name === 'notice' || name === 'codeBlock') {
+              compoundPosToSelect = $from.before(d)
+              break
+            }
+          }
+        }
+        storage.activeCompoundBlockPos = null
+      }
       if (
         storage.mode === nextMode &&
         storage.preset === nextPreset &&
         prev?.mode === nextMode &&
-        prev?.preset === nextPreset
+        prev?.preset === nextPreset &&
+        compoundPosToSelect === null
       ) {
         return
       }
@@ -1359,12 +1426,20 @@ function createModalTargetForEditor(
         prev &&
         prev.mode === nextMode &&
         prev.preset === nextPreset &&
-        prev.secondaryRanges.length === 0
+        prev.secondaryRanges.length === 0 &&
+        compoundPosToSelect === null
       ) {
         return
       }
       try {
-        const tr = updateMeta(editor.state.tr, {
+        let tr = editor.state.tr
+        if (compoundPosToSelect !== null) {
+          const node = editor.state.doc.nodeAt(compoundPosToSelect)
+          if (node && NodeSelection.isSelectable(node)) {
+            tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
+          }
+        }
+        tr = updateMeta(tr, {
           mode: nextMode,
           preset: nextPreset,
           ...(nextMode === 'insert' ? { secondaryRanges: [] } : {}),
@@ -1423,6 +1498,8 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
       mode: 'insert',
       preset: 'helix',
       registerSlice: null,
+      clickToInsert: true,
+      activeCompoundBlockPos: null,
       cleanupDomRegistration: undefined,
     }
   },
@@ -1464,6 +1541,7 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
               secondaryRanges: [],
               goalColumn: null,
               extendedRange: null,
+              focused: true,
             }
           },
           apply(tr, prev): ModalKeymapPluginState {
@@ -1483,6 +1561,7 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
                     : meta.extendedRange !== undefined
                       ? meta.extendedRange
                       : prev.extendedRange,
+                focused: meta.focused !== undefined ? meta.focused : prev.focused,
               }
             }
             if (tr.docChanged && prev.secondaryRanges.length > 0) {
@@ -1507,8 +1586,75 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
           ) {
             storage.cleanupDomRegistration = registerModalEditor(editorView.dom, storage.target)
           }
+          const doc = editorView.dom?.ownerDocument
+          const isEditorScopeFocused = (): boolean => {
+            if (!doc) return true
+            const active = doc.activeElement
+            if (
+              !(active instanceof Element) ||
+              active === doc.body ||
+              active === doc.documentElement
+            ) {
+              return true
+            }
+            const scopeRoot =
+              editorView.dom.closest('.document-pane') ??
+              editorView.dom.closest('[role="region"]') ??
+              editorView.dom.closest('.editor-container') ??
+              editorView.dom
+            if (scopeRoot === active || scopeRoot.contains(active)) return true
+            if (active.closest('[data-editor-controls]')) return true
+            return false
+          }
+          const syncFocused = () => {
+            try {
+              const active = doc?.activeElement
+              if (active instanceof HTMLElement && editorView.dom.contains(active)) {
+                let foundPos: number | null = null
+                editorView.state.doc.descendants((node, pos) => {
+                  if (
+                    node.type.name === 'notice' ||
+                    node.type.name === 'codeBlock' ||
+                    node.type.name === 'image' ||
+                    node.type.name === 'imageNode' ||
+                    node.type.name === 'linkPreview'
+                  ) {
+                    const nodeDom = editorView.nodeDOM(pos)
+                    if (nodeDom instanceof HTMLElement && nodeDom.contains(active)) {
+                      foundPos = pos
+                    }
+                    return false
+                  }
+                  return true
+                })
+                if (foundPos !== null) {
+                  storage.activeCompoundBlockPos = foundPos
+                } else if (editorView.dom === active) {
+                  storage.activeCompoundBlockPos = null
+                }
+              }
+              const nextFocused = isEditorScopeFocused()
+              const prev = modalKeymapPluginKey.getState(editorView.state)
+              if (prev && prev.focused !== nextFocused) {
+                editorView.dispatch(
+                  editorView.state.tr.setMeta(modalKeymapPluginKey, {
+                    ...prev,
+                    focused: nextFocused,
+                  }),
+                )
+              }
+            } catch {
+              // Ignore if view was destroyed
+            }
+          }
+          const onFocusIn = () => syncFocused()
+          const onFocusOut = () => queueMicrotask(syncFocused)
+          doc?.addEventListener('focusin', onFocusIn, true)
+          doc?.addEventListener('focusout', onFocusOut, true)
           return {
             destroy() {
+              doc?.removeEventListener('focusin', onFocusIn, true)
+              doc?.removeEventListener('focusout', onFocusOut, true)
               storage.cleanupDomRegistration?.()
               storage.cleanupDomRegistration = undefined
             },
@@ -1517,6 +1663,9 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
         props: {
           handleDOMEvents: {
             mousedown(view, event) {
+              if (!storage.clickToInsert) {
+                return false
+              }
               const targetNode = event?.target instanceof Element ? event.target : null
               if (targetNode) {
                 if (targetNode.closest('[data-modal-ignore-pointer]')) {
@@ -1565,7 +1714,7 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
           },
           decorations(state) {
             const pluginState = modalKeymapPluginKey.getState(state)
-            if (!pluginState || pluginState.mode === 'insert') {
+            if (!pluginState || pluginState.mode === 'insert' || pluginState.focused === false) {
               return DecorationSet.empty
             }
 

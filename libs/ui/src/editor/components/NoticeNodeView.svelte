@@ -72,8 +72,25 @@
   }
 
   function handleTitleKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey)
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.key === 'Tab' && !event.shiftKey) {
+      const trigger = (event.currentTarget as HTMLElement | null)
+        ?.closest('.editor-notice-node')
+        ?.querySelector<HTMLElement>('[data-part="trigger"]')
+      if (trigger) {
+        event.preventDefault()
+        event.stopPropagation()
+        trigger.focus()
+        return
+      }
+    }
+    if (event.key === 'Tab' && event.shiftKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      focusBody()
       return
+    }
+    if (event.shiftKey) return
     if (event.key === 'ArrowUp') {
       event.preventDefault()
       event.stopPropagation()
@@ -83,6 +100,26 @@
       event.preventDefault()
       event.stopPropagation()
       focusBody()
+    }
+  }
+
+  function handleTypeKeydown(event: KeyboardEvent) {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    const trigger = event.currentTarget as HTMLElement | null
+    if (trigger?.getAttribute('aria-expanded') === 'true') return
+    if ((event.key === 'Tab' && !event.shiftKey) || event.key === 'ArrowDown') {
+      event.preventDefault()
+      event.stopPropagation()
+      focusBody()
+    } else if (event.key === 'Tab' && event.shiftKey) {
+      const titleInput = trigger
+        ?.closest('.editor-notice-node')
+        ?.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+      if (titleInput) {
+        event.preventDefault()
+        event.stopPropagation()
+        titleInput.focus()
+      }
     }
   }
 </script>
@@ -111,6 +148,7 @@
             aria-label="Notice type"
             size="sm"
             class="min-w-36 justify-between text-xs"
+            onkeydown={handleTypeKeydown}
           >
             <SelectValue />
             <SelectIndicator><ChevronsUpDown class="size-3 opacity-50" /></SelectIndicator>

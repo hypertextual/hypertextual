@@ -9,6 +9,8 @@ import type { NodeViewOptions } from '../types'
 
 export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions & NodeViewOptions>(
   {
+    selectable: true,
+
     addOptions() {
       return {
         ...this.parent!(),
@@ -22,6 +24,27 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
     },
 
     addKeyboardShortcuts() {
+      const focusLanguageSelector = () => {
+        const { selection } = this.editor.state
+        const { $from } = selection
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+          if ($from.node(depth).type.name === this.name) {
+            const dom = this.editor.view.nodeDOM($from.before(depth))
+            if (dom instanceof HTMLElement) {
+              const trigger = dom.querySelector<HTMLElement>(
+                '[aria-label="Code language"], [data-part="trigger"]',
+              )
+              if (trigger) {
+                trigger.focus()
+                return true
+              }
+            }
+            break
+          }
+        }
+        return false
+      }
+
       return {
         Tab: () => {
           if (this.editor.isActive('codeBlock')) {
@@ -31,7 +54,6 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
         },
         'Shift-Tab': () => {
           if (this.editor.isActive('codeBlock')) {
-            // Remove indent if at start of line
             const { state } = this.editor
             const { selection } = state
             const { $from } = selection
@@ -42,6 +64,19 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
                 from: $from.pos - 1,
                 to: $from.pos,
               })
+            }
+            return focusLanguageSelector()
+          }
+          return false
+        },
+        ArrowUp: () => {
+          if (this.editor.isActive('codeBlock')) {
+            const { selection } = this.editor.state
+            if (!selection.empty) return false
+            const { $from } = selection
+            const textBefore = $from.parent.textBetween(0, $from.parentOffset)
+            if (!textBefore.includes('\n')) {
+              return focusLanguageSelector()
             }
           }
           return false

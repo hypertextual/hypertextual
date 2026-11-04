@@ -29,6 +29,17 @@
   }
 
   function handleCaptionKeydown(event: KeyboardEvent) {
+    if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const removeBtn = (event.currentTarget as HTMLElement)
+        .closest('.image-node-view')
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Remove image"]')
+      if (removeBtn) {
+        event.preventDefault()
+        event.stopPropagation()
+        removeBtn.focus()
+        return
+      }
+    }
     if (event.key === 'ArrowUp') {
       event.preventDefault()
       updateAttributes({ caption })
@@ -82,6 +93,7 @@
         {#if editable}
           <input
             type="text"
+            aria-label="Image caption"
             bind:value={caption}
             onfocus={() => {
               captionFocused = true
@@ -101,8 +113,20 @@
 
   {#if editable}<button
       type="button"
-      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer z-10"
       onclick={deleteNode}
+      onkeydown={(event) => {
+        if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+          const cap = (event.currentTarget as HTMLElement)
+            .closest('.image-node-view')
+            ?.querySelector<HTMLInputElement>('input.caption-input')
+          if (cap) {
+            event.preventDefault()
+            event.stopPropagation()
+            cap.focus()
+          }
+        }
+      }}
       aria-label="Remove image"
     >
       <X class="size-3.5" aria-hidden="true" />

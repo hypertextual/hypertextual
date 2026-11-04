@@ -9,6 +9,7 @@ import {
   type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { EditorService } from './editorService.svelte'
+import { SettingsService } from './settingsService.svelte'
 
 export interface FolderRefresh {
   path: string
@@ -31,6 +32,7 @@ export class WorkspaceService {
   private listed = $state<Record<string, WorkspaceNode>>({})
   private active = true
   readonly editor: EditorService
+  readonly settings = new SettingsService()
 
   constructor(private client: WorkspaceClient) {
     this.editor = new EditorService(client, {

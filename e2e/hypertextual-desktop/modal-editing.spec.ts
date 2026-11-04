@@ -296,9 +296,21 @@ test.describe(
           await expect.poll(async () => (await docPane.boundingBox())?.x).toBe(0)
           await page.keyboard.press('Control+e')
           await expect.poll(async () => (await docPane.boundingBox())?.x).toBe(before!.x)
-          await expect(page.locator(`[role="treeitem"][data-value="${path}"]`)).toBeFocused()
+          const activeItem = page.locator(`[role="treeitem"][data-value="${path}"]`)
+          await expect(activeItem).toBeFocused()
+          await expect(activeItem).toHaveCSS('box-shadow', /rgb\(124, 58, 237\).*inset/)
+          await expect(page.locator('#workspace-sidebar')).toHaveCSS(
+            'outline-color',
+            'rgb(124, 58, 237)',
+          )
+          await expect(page.locator('.ProseMirror [data-pm-modal-cursor]')).toHaveCount(0)
 
           // Act
+          await page.keyboard.press('k')
+          await expect(
+            page.locator('[data-part="branch-control"][data-value="Drafts"]'),
+          ).toBeFocused()
+          await page.keyboard.press('j')
           await page.keyboard.press('j')
           await page.keyboard.press('j')
           await page.keyboard.press('k')
@@ -314,6 +326,104 @@ test.describe(
           await expect(page.getByTestId('which-key-mode-badge')).toHaveText('helix · insert')
         },
       )
+    })
+
+    test.describe('When the user enters a highlighted compound block with Enter and exits with Escape', () => {
+      test('it highlights the whole notice block, traverses title/type/body via Enter and Tab, and restores whole-block highlight on Escape', async ({
+        page,
+      }) => {
+        // Arrange
+        const prose = page.locator('.ProseMirror')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await expect(
+          prose.locator('[data-pm-modal-node-selection="normal"]:has(.editor-notice-node)'),
+        ).toHaveCount(1)
+
+        // Act
+        await page.keyboard.press('Enter')
+        const titleInput = page.getByLabel('Notice title')
+        await expect(titleInput).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('Escape')
+
+        // Assert
+        await expect(prose).toHaveAttribute('contenteditable', 'false')
+        await expect(
+          prose.locator('[data-pm-modal-node-selection="normal"]:has(.editor-notice-node)'),
+        ).toHaveCount(1)
+      })
+    })
+
+    test.describe('When the user toggles Pane Outline and Click to Insert settings via WhichKey (Space t)', () => {
+      test('it toggles the active pane outline and click-to-insert behavior', async ({ page }) => {
+        // Arrange
+        const shell = page.locator('.workspace-shell')
+        const prose = page.locator('.ProseMirror')
+        await expect(shell).toHaveAttribute('data-pane-outline', 'true')
+
+        // Act
+        await page.keyboard.press(' ')
+        await page.keyboard.press('t')
+        await page.keyboard.press('o')
+        await page.keyboard.press(' ')
+        await page.keyboard.press('t')
+        await page.keyboard.press('c')
+        await prose.locator('p').first().click()
+
+        // Assert
+        await expect(shell).toHaveAttribute('data-pane-outline', 'false')
+        await expect(prose).toHaveAttribute('contenteditable', 'false')
+        await expect(page.getByTestId('which-key-mode-badge')).toHaveText('helix · normal')
+      })
+    })
+
+    test.describe('When the user cycles the theme mode via the titlebar toggle or WhichKey (Space t d)', () => {
+      test('it cycles system -> light -> dark -> system and persists the chosen mode across reloads', async ({
+        page,
+      }) => {
+        // Arrange
+        const html = page.locator('html')
+        await expect(html).toHaveClass(/theme-hypertextual/)
+        await expect(page.getByRole('button', { name: 'Theme: system' })).toBeVisible()
+
+        // Act
+        await page.getByRole('button', { name: 'Theme: system' }).click()
+        await expect(page.getByRole('button', { name: 'Theme: light' })).toBeVisible()
+        await expect(html).not.toHaveClass(/\bdark\b/)
+
+        await page.getByRole('button', { name: 'Theme: light' }).click()
+        await expect(page.getByRole('button', { name: 'Theme: dark' })).toBeVisible()
+        await expect(html).toHaveClass(/\bdark\b/)
+
+        await page.reload()
+
+        // Assert
+        await expect(page.getByRole('button', { name: 'Theme: dark' })).toBeVisible()
+        await expect(html).toHaveClass(/\bdark\b/)
+      })
+
+      test('it cycles theme mode via Space t d and honors system dark mode when set to system', async ({
+        page,
+      }) => {
+        // Arrange
+        const html = page.locator('html')
+        await page.emulateMedia({ colorScheme: 'dark' })
+        await expect(page.getByRole('button', { name: 'Theme: system' })).toBeVisible()
+        await expect(html).toHaveClass(/\bdark\b/)
+
+        // Act
+        await page.keyboard.press(' ')
+        await page.keyboard.press('t')
+        await page.keyboard.press('d')
+
+        // Assert
+        await expect(page.getByRole('button', { name: 'Theme: light' })).toBeVisible()
+        await expect(html).not.toHaveClass(/\bdark\b/)
+      })
     })
   },
 )

@@ -24,7 +24,7 @@
   import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, updateAttributes }: CodeBlockComponentProps = $props()
+  let { node, editor, getPos, updateAttributes }: CodeBlockComponentProps = $props()
 
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
@@ -84,43 +84,74 @@
       localStorage.setItem('codeblock-last-language', newLanguage)
     }
   }
+
+  function focusBody() {
+    const position = typeof getPos === 'function' ? getPos() : undefined
+    if (typeof position !== 'number') return
+    editor.commands.setTextSelection(position + 1)
+    editor.view.focus()
+  }
+
+  function handleHeaderKeydown(event: KeyboardEvent) {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+    const target = event.target as HTMLElement | null
+    if (!target) return
+    const isTrigger = target.getAttribute('data-part') === 'trigger'
+    if (isTrigger && target.getAttribute('aria-expanded') === 'true') return
+    if (event.key === 'ArrowDown' || (isTrigger && event.key === 'Tab' && event.shiftKey)) {
+      event.preventDefault()
+      event.stopPropagation()
+      focusBody()
+    } else if (!isTrigger && event.key === 'Tab' && !event.shiftKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      focusBody()
+    }
+  }
 </script>
 
 <NodeViewWrapper class="my-4">
   <CodeBlock code={node.textContent} {language} class="my-0">
-    <CodeBlockHeader contenteditable={false}>
-      <div class="flex items-center gap-2">
-        {#if editable}
-          <Select
-            items={languages}
-            value={[language]}
-            onValueChange={(details) => {
-              const next = details.value[0]
-              if (next) changeLanguage(next)
-            }}
-            aria-label="Code language"
-          >
-            <SelectTrigger size="sm" class="min-w-36 justify-between font-mono text-xs">
-              <SelectValue />
-              <SelectIndicator>
-                <ChevronsUpDown class="size-3 opacity-50" />
-              </SelectIndicator>
-            </SelectTrigger>
-            <SelectContent data-editor-controls>
-              {#each languages as lang (lang.value)}
-                <SelectItem item={lang}>
-                  <SelectItemText>{lang.label}</SelectItemText>
-                  <SelectItemIndicator><Check class="size-4" /></SelectItemIndicator>
-                </SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
-        {:else}
-          <CodeBlockTitle>{currentLanguageLabel}</CodeBlockTitle>
-        {/if}
-      </div>
-      <CodeBlockCopyButton class="ml-auto" />
-    </CodeBlockHeader>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div onkeydown={handleHeaderKeydown}>
+      <CodeBlockHeader contenteditable={false}>
+        <div class="flex items-center gap-2">
+          {#if editable}
+            <Select
+              items={languages}
+              value={[language]}
+              onValueChange={(details) => {
+                const next = details.value[0]
+                if (next) changeLanguage(next)
+              }}
+              aria-label="Code language"
+            >
+              <SelectTrigger
+                aria-label="Code language"
+                size="sm"
+                class="min-w-36 justify-between font-mono text-xs"
+              >
+                <SelectValue />
+                <SelectIndicator>
+                  <ChevronsUpDown class="size-3 opacity-50" />
+                </SelectIndicator>
+              </SelectTrigger>
+              <SelectContent data-editor-controls>
+                {#each languages as lang (lang.value)}
+                  <SelectItem item={lang}>
+                    <SelectItemText>{lang.label}</SelectItemText>
+                    <SelectItemIndicator><Check class="size-4" /></SelectItemIndicator>
+                  </SelectItem>
+                {/each}
+              </SelectContent>
+            </Select>
+          {:else}
+            <CodeBlockTitle>{currentLanguageLabel}</CodeBlockTitle>
+          {/if}
+        </div>
+        <CodeBlockCopyButton class="ml-auto" />
+      </CodeBlockHeader>
+    </div>
     <div class={codeBlockBodyBase}>
       <pre class={cn(codeBlockContentBase, codeContent)}><NodeViewContent as="code" /></pre>
     </div>

@@ -54,6 +54,7 @@ export type YouTubeInputProps = EditorOverlayInputProps
 export interface EditorProps {
   content?: JSONContent
   editable?: boolean
+  clickToEdit?: boolean
   onedit?: () => boolean
   onexit?: () => void
   /** Keep the required first H1 title. Disable for compact inputs such as mentions. */

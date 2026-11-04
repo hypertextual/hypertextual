@@ -10,6 +10,7 @@
   let {
     document,
     editable = false,
+    clickToEdit = true,
     onchange,
     onUpload,
     oneditablechange,
@@ -96,6 +97,26 @@
 
   function exitEdit(event: KeyboardEvent) {
     if (
+      event.key === 'Enter' &&
+      !editable &&
+      !event.isComposing &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !whichKeyController?.getState().isOpen &&
+      !whichKeyController?.getState().explorerOpen &&
+      whichKeyController?.getState().mode !== 'jump' &&
+      event.target instanceof Element &&
+      (event.target === surface || surface?.contains(event.target))
+    ) {
+      if (view?.enterCompoundBlock()) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      return
+    }
+    if (
       event.key !== 'Escape' ||
       event.isComposing ||
       !editable ||
@@ -127,6 +148,7 @@
       bind:this={view}
       content={document}
       {editable}
+      {clickToEdit}
       onedit={enterEdit}
       onexit={exitToNormal}
       enforceTitle={false}

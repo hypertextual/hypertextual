@@ -5,11 +5,13 @@ export type EditorImageUploadResult = ImageUploadResult
 
 export interface EditorHandle {
   focus: () => void
+  enterCompoundBlock: () => boolean
 }
 
 export interface DocumentEditorProps {
   document: JSONContent
   editable?: boolean
+  clickToEdit?: boolean
   oneditablechange?: (editable: boolean) => boolean
   class?: string
   contentClass?: string

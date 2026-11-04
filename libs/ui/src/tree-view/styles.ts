@@ -13,7 +13,7 @@ export const treeViewIndentGuideBase =
 export const treeViewRowVariants = cva(
   cn(
     sidebarMenuButtonVariants({ size: 'sm' }),
-    'helical-tree-row h-6 cursor-pointer py-0 ps-[calc(10px_+_(var(--depth)_-_1)_*_16px)] text-xs data-[selected]:bg-sidebar-accent data-[selected]:text-sidebar-accent-foreground',
+    'helical-tree-row h-6 cursor-pointer py-0 ps-[calc(10px_+_(var(--depth)_-_1)_*_16px)] text-xs focus:bg-sidebar-accent/70 focus:text-sidebar-accent-foreground focus:ring-2 focus:ring-sidebar-ring focus:ring-inset focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset data-[selected]:bg-sidebar-accent data-[selected]:font-medium data-[selected]:text-sidebar-accent-foreground',
   ),
 )
 

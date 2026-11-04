@@ -55,6 +55,9 @@ Hypertextual defaults to the **Helix** preset (`storageKey="hypertextual"`) and 
 | `Space e` / `Ctrl-e` | `workspace.toggleExplorer` | Toggle Explorer | Toggle the Workspace Explorer sidebar open or closed (focusing the Workspace Explorer tree when opened, and returning focus to the Article editor when closed) |
 | `Space n` | `workspace.newArticle` | New Article | Create a new untitled article and open it in `insert` mode |
 | `Space N` | `workspace.newFolder` | New Folder | Create a new folder and start inline naming in the Workspace Explorer |
+| `Space t o` | `settings.togglePaneOutline` | Toggle Pane Outline | Toggle the purple focus outline around the active Workspace or Article pane (persisted in `localStorage`, enabled by default) |
+| `Space t c` | `settings.toggleClickToInsert` | Toggle Click to Insert | Toggle whether clicking in the Article editor enters `insert` mode or moves the `normal` mode cursor (persisted in `localStorage`, enabled by default) |
+| `Space t d` | `settings.cycleThemeMode` | Cycle Theme Mode | Cycle between `system`, `light`, and `dark` theme modes (persisted in `localStorage`, defaults to `system`) |
 | `Space w` | `+window` | Window / Pane | Open the spatial window/pane menu (proxies `Ctrl-w`) |
 | `Space j` | `jump.start` | Jump to Element | Overlay 2D jump labels across visible workspace and article targets |
 | `Space g` | `+goto` | Goto | Open the Goto menu (proxies `g`) |
@@ -109,8 +112,9 @@ Numeric counts (`2j`, `3w`, `5x`) prefix any motion or operator.
 | --- | --- | --- | --- |
 | `h` / `←` | `motion.left` | Move Left | Moves one character left. Stepping onto an inline atom (`urlMention`, `internalMention`) selects it in `normal` mode or extends the selection across it in `select` mode. |
 | `l` / `→` | `motion.right` | Move Right | Moves one character right. Stepping onto an inline atom selects it in `normal` mode or extends the selection across it in `select` mode. |
-| `j` / `↓` | `motion.down` | Move Down | Moves to the same column on the next line or block. Stepping onto an atom block (`imageNode`, `linkPreview`, `horizontalRule`, `unparsedBlock`) creates a `NodeSelection` in `normal` mode or extends the range selection across the block in `select` mode. Stepping into a `notice` or `codeBlock` moves through its lines. |
-| `k` / `↑` | `motion.up` | Move Up | Moves to the same column on the previous line or block, preserving selection anchors across atom and container blocks in `select` mode. |
+| `j` / `↓` | `motion.down` | Move Down | Moves to the same column on the next line or block. Stepping onto a compound or atom block (`notice`, `codeBlock`, `imageNode`, `linkPreview`, `horizontalRule`, `unparsedBlock`) highlights the whole block (`NodeSelection`) in `normal` mode or extends the range selection across the block in `select` mode. |
+| `k` / `↑` | `motion.up` | Move Up | Moves to the same column on the previous line or block, highlighting compound/atom blocks as a whole in `normal` mode and preserving selection anchors in `select` mode. |
+| `Enter` | — | Enter Compound Block | When a compound block (`notice`, `codeBlock`, `image`, `linkPreview`) is highlighted as a whole block in `normal` mode, enters the block's interior (`insert` mode) and focuses its primary control (`Notice title` input, `Code language` selector, `Image caption` input, or preview action). Inside the block, `Tab` / `Shift+Tab` (and `ArrowDown` / `ArrowUp`) cycles through header controls and body text, and `Escape` returns to the whole-block highlight in `normal` mode. |
 | `w` | `motion.wordForward` | Next Word | Moves to the start of the next word (in Helix `normal` mode, selects the word moved over; in `select` mode, extends selection). |
 | `b` | `motion.wordBackward` | Previous Word | Moves to the start of the previous word. |
 | `e` | `motion.wordEnd` | Word End | Moves to the end of the current/next word. |

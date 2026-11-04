@@ -133,7 +133,7 @@
       ) {
         return
       }
-      const itemEl = target.closest<HTMLElement>('[role="treeitem"][data-tree-node-value]')
+      const itemEl = target.closest<HTMLElement>('[data-tree-node-value]')
       if (!itemEl) return
       const nodeValue = itemEl.dataset.treeNodeValue
       if (!nodeValue) return

@@ -23,7 +23,7 @@
     WhichKey,
     type WhichKeyNode,
   } from '@cloudvoyant/helical-svelte'
-  import { FilePlus2, FolderPlus, PanelLeft, ChevronDown } from 'lucide-svelte'
+  import { FilePlus2, FolderPlus, PanelLeft, ChevronDown, Sun, Moon, Monitor } from 'lucide-svelte'
   import { invoke, isTauri } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -43,6 +43,7 @@
   // State ---------------------------------------------------------------------
   const workspace = untrack(() => new WorkspaceService(client))
   const editor = workspace.editor
+  const settings = workspace.settings
   let sidebarOpen = $state(true)
 
   const appKeymap: Record<string, WhichKeyNode> = {
@@ -82,12 +83,53 @@
           category: 'Workspace',
           commandId: 'workspace.newFolder',
         },
+        t: {
+          key: 't',
+          label: '+toggles',
+          group: 'Toggles',
+          category: 'Workspace',
+          children: {
+            o: {
+              key: 'o',
+              label: 'Toggle Pane Outline',
+              description: 'Toggle the focus outline on the active workspace or editor pane',
+              category: 'Workspace',
+              commandId: 'settings.togglePaneOutline',
+            },
+            c: {
+              key: 'c',
+              label: 'Toggle Click to Insert',
+              description: 'Toggle whether clicking the article enters insert mode',
+              category: 'Workspace',
+              commandId: 'settings.toggleClickToInsert',
+            },
+            d: {
+              key: 'd',
+              label: 'Cycle Theme Mode',
+              description: 'Cycle between system, light, and dark theme modes',
+              category: 'Workspace',
+              commandId: 'settings.cycleThemeMode',
+            },
+          },
+        },
       },
     },
   }
 
   const appCommands = {
     'workspace.toggleExplorer': () => toggleExplorer(),
+    'settings.togglePaneOutline': () => {
+      settings.togglePaneOutline()
+      return true
+    },
+    'settings.toggleClickToInsert': () => {
+      settings.toggleClickToInsert()
+      return true
+    },
+    'settings.cycleThemeMode': () => {
+      settings.cycleThemeMode()
+      return true
+    },
     'workspace.newArticle': () => {
       const previousPath = editor.selected?.path
       void workspace.newArticle().then(() => {
@@ -235,6 +277,7 @@
     }}
     class="workspace-shell"
     style="--sidebar-width: 236px"
+    data-pane-outline={settings.paneOutline ? 'true' : 'false'}
   >
     <header class="titlebar" data-tauri-drag-region>
       <SidebarTrigger title="Toggle sidebar" aria-controls="workspace-sidebar"
@@ -254,6 +297,22 @@
           >
         </Select>
       </div>
+      <Button
+        variant="text"
+        size="sm"
+        class="theme-toggle"
+        aria-label={`Theme: ${settings.themeMode}`}
+        title={`Theme: ${settings.themeMode}`}
+        onclick={() => settings.cycleThemeMode()}
+      >
+        {#if settings.themeMode === 'light'}
+          <Sun size={14} strokeWidth={1.5} />
+        {:else if settings.themeMode === 'dark'}
+          <Moon size={14} strokeWidth={1.5} />
+        {:else}
+          <Monitor size={14} strokeWidth={1.5} />
+        {/if}
+      </Button>
     </header>
     <Row class="workspace-body">
       <Sidebar
