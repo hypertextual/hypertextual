@@ -2,6 +2,7 @@
   import { codeContent } from './styles'
   import type { CodeBlockComponentProps } from './types'
   import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
+  import { Selection } from '@tiptap/pm/state'
   import { NodeViewWrapper, NodeViewContent } from 'svelte-tiptap'
   import {
     CodeBlock,
@@ -92,6 +93,15 @@
     editor.view.focus()
   }
 
+  function focusBefore() {
+    const position = typeof getPos === 'function' ? getPos() : undefined
+    if (typeof position !== 'number') return
+    const selection = Selection.findFrom(editor.state.doc.resolve(position), -1, true)
+    if (!selection) return
+    editor.commands.setTextSelection(selection.from)
+    editor.view.focus()
+  }
+
   function handleHeaderKeydownCapture(event: KeyboardEvent) {
     if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
     const target = event.target as HTMLElement | null
@@ -104,6 +114,10 @@
         event.preventDefault()
         event.stopPropagation()
         focusBody()
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBefore()
       } else if (event.key === 'Tab' && !event.shiftKey) {
         const copyBtn = header.querySelector<HTMLElement>(
           'button[aria-label*="Copy"], button:not([data-part="trigger"])',

@@ -3,12 +3,16 @@
   import { onMount, onDestroy } from 'svelte'
 
   // Props ---------------------------------------------------------------------
-  let { editor, position, onClose, fetchLinkPreview }: BookmarkInputProps = $props()
+  let { editor, position, data, onClose, fetchLinkPreview }: BookmarkInputProps = $props()
 
   // State ---------------------------------------------------------------------
+  const replaceData = $derived(
+    data && typeof data === 'object' ? (data as { replace?: boolean; url?: string }) : undefined,
+  )
+
   let active = true
 
-  let url = $state('')
+  let url = $derived(replaceData?.url ?? '')
 
   let isLoading = $state(false)
 
@@ -53,6 +57,20 @@
             provider: '',
           }
       if (!active) return
+      if (replaceData?.replace) {
+        const existing = editor.state.doc.nodeAt(position)
+        if (existing && existing.type.name === 'linkPreview') {
+          const tr = editor.state.tr.setNodeMarkup(position, undefined, {
+            ...existing.attrs,
+            url: trimmed,
+            type: 'bookmark',
+            ...metadata,
+          })
+          editor.view.dispatch(tr)
+          onClose()
+          return
+        }
+      }
       editor
         .chain()
         .focus()

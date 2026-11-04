@@ -127,6 +127,7 @@
       extensions: buildExtensions({
         mentionSource,
         hrefBuilder,
+        fetchLinkPreview,
         enforceTitle,
         nodeViews,
         overlays,
@@ -385,15 +386,17 @@
           input.setSelectionRange(caret, caret)
         }
       } else if (type === 'codeBlock') {
-        const trigger = dom.querySelector<HTMLElement>(
-          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-        )
-        if (trigger) {
-          trigger.focus()
-        } else {
-          editor.commands.setTextSelection(pos + 1)
-          editor.view.focus()
+        if (control === 'language') {
+          const trigger = dom.querySelector<HTMLElement>(
+            '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+          )
+          if (trigger) {
+            trigger.focus()
+            return
+          }
         }
+        editor.commands.setTextSelection(pos + 1)
+        editor.view.focus()
       } else if (type === 'image' || type === 'imageNode') {
         const input = dom.querySelector<HTMLInputElement>(
           'input.caption-input, input[aria-label="Image caption"]',
@@ -407,9 +410,23 @@
           input.setSelectionRange(caret, caret)
         }
       } else if (type === 'linkPreview') {
-        const bookmarkEdit = dom.querySelector<HTMLElement>('[data-bookmark-edit]')
-        if (bookmarkEdit) {
-          bookmarkEdit.click()
+        if (control === 'dialog') {
+          const bookmarkEdit = dom.querySelector<HTMLElement>('[data-bookmark-edit]')
+          if (bookmarkEdit) {
+            bookmarkEdit.click()
+            return
+          }
+        }
+        const input = dom.querySelector<HTMLInputElement>(
+          'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
+        )
+        if (input) {
+          input.focus()
+          const caret =
+            typeof offset === 'number'
+              ? Math.max(0, Math.min(input.value.length, offset))
+              : input.value.length
+          input.setSelectionRange(caret, caret)
           return
         }
         const action = dom.querySelector<HTMLElement>(
@@ -504,6 +521,9 @@
       if (pluginState.subtextCursor.kind === 'noticeTitle') {
         blockType = 'notice'
         control = 'type'
+      } else if (pluginState.subtextCursor.kind === 'linkPreviewUrl') {
+        blockType = 'linkPreview'
+        control = 'url'
       } else {
         blockType = 'image'
         control = 'caption'
@@ -518,6 +538,7 @@
     ) {
       blockPos = sel.from
       blockType = sel.node.type.name
+      if (blockType === 'codeBlock') control = 'language'
     } else {
       const resolvedFrom = sel.$from
       for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
@@ -531,6 +552,7 @@
         if (name === 'codeBlock') {
           blockPos = resolvedFrom.before(d)
           blockType = 'codeBlock'
+          control = 'language'
           break
         }
       }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Popover } from '@ark-ui/svelte/popover'
+  import { NodeSelection } from '@tiptap/pm/state'
   import type { BubbleMenuProps } from './types'
   import { onMount } from 'svelte'
   import { isEditorInInsertMode } from '../core'
@@ -94,8 +95,13 @@
     }
     if (dismissedSelection && dismissedSelection !== selectionKey) dismissedSelection = null
 
-    // Image node selections use their own controls; the text bubble menu must stay hidden.
-    if (props.editor.isActive('imageNode')) {
+    // Non-text block selections use their own controls; the text bubble menu must stay hidden.
+    if (
+      props.editor.state.selection instanceof NodeSelection ||
+      props.editor.isActive('imageNode') ||
+      props.editor.isActive('image') ||
+      props.editor.isActive('linkPreview')
+    ) {
       isVisible = false
       showLinkInput = false
       return

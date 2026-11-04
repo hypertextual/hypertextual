@@ -7,7 +7,7 @@
     subscribeToEditorTransactions,
   } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
-  import { X } from 'lucide-svelte'
+  import { ImagePlus, X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
@@ -16,6 +16,12 @@
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   let captionFocused = $state(false)
+
+  let captionInputEl = $state<HTMLInputElement>()
+
+  let replaceBtnEl = $state<HTMLButtonElement>()
+
+  let removeBtnEl = $state<HTMLButtonElement>()
 
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
@@ -45,6 +51,16 @@
   })
 
   // Methods -------------------------------------------------------------------
+  function handleReplaceImage() {
+    const pos = typeof getPos === 'function' ? getPos() : undefined
+    if (typeof pos === 'number') {
+      editor.commands.openOverlay('image', {
+        position: pos,
+        data: { replace: true, src: String(src ?? '') },
+      })
+    }
+  }
+
   function handleCaptionBlur() {
     captionFocused = false
     updateAttributes({ caption })
@@ -52,13 +68,11 @@
 
   function handleCaptionKeydown(event: KeyboardEvent) {
     if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      const removeBtn = (event.currentTarget as HTMLElement)
-        .closest('.image-node-view')
-        ?.querySelector<HTMLButtonElement>('button[aria-label="Remove image"]')
-      if (removeBtn) {
+      const targetBtn = event.shiftKey ? removeBtnEl : replaceBtnEl
+      if (targetBtn) {
         event.preventDefault()
         event.stopPropagation()
-        removeBtn.focus()
+        targetBtn.focus()
         return
       }
     }
@@ -102,18 +116,80 @@
 
 <NodeViewWrapper class={imageSurface} contenteditable={false}>
   <figure class="m-0">
-    <img
-      {src}
-      {srcset}
-      sizes="(max-width: 768px) 100vw, 720px"
-      alt={alt || ''}
-      class="w-full object-cover"
-      draggable="false"
-    />
+    <div class="relative">
+      <img
+        {src}
+        {srcset}
+        sizes="(max-width: 768px) 100vw, 720px"
+        alt={alt || ''}
+        class="w-full object-cover"
+        draggable="false"
+      />
+      {#if editable}
+        <button
+          bind:this={replaceBtnEl}
+          type="button"
+          class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-background/90 border border-border px-3 py-1.5 text-xs font-medium text-foreground shadow-sm flex items-center gap-1.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
+          onclick={handleReplaceImage}
+          onkeydown={(event) => {
+            if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+              const nextEl = event.shiftKey ? captionInputEl : removeBtnEl
+              if (nextEl) {
+                event.preventDefault()
+                event.stopPropagation()
+                nextEl.focus()
+              }
+            } else if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              event.stopPropagation()
+              captionInputEl?.focus()
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = (getPos as () => number)()
+              editor.chain().focus().setTextSelection(Math.max(pos - 1, 0)).run()
+            }
+          }}
+          aria-label="Replace image"
+        >
+          <ImagePlus class="size-3.5" aria-hidden="true" />
+          <span>Replace</span>
+        </button>
+        <button
+          bind:this={removeBtnEl}
+          type="button"
+          class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border text-foreground shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
+          onclick={deleteNode}
+          onkeydown={(event) => {
+            if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+              const nextEl = event.shiftKey ? replaceBtnEl : captionInputEl
+              if (nextEl) {
+                event.preventDefault()
+                event.stopPropagation()
+                nextEl.focus()
+              }
+            } else if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              event.stopPropagation()
+              captionInputEl?.focus()
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = (getPos as () => number)()
+              editor.chain().focus().setTextSelection(Math.max(pos - 1, 0)).run()
+            }
+          }}
+          aria-label="Remove image"
+        >
+          <X class="size-3.5" aria-hidden="true" />
+        </button>
+      {/if}
+    </div>
     {#if editable || caption || modalCharRange}
       <figcaption class="mt-2">
         {#if editable}
           <input
+            bind:this={captionInputEl}
             type="text"
             aria-label="Image caption"
             bind:value={caption}
@@ -140,27 +216,4 @@
       </figcaption>
     {/if}
   </figure>
-
-  {#if editable}<button
-      type="button"
-      class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer z-10"
-      onclick={deleteNode}
-      onkeydown={(event) => {
-        if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-          const cap = (event.currentTarget as HTMLElement)
-            .closest('.image-node-view')
-            ?.querySelector<HTMLInputElement>(
-              'input[aria-label="Image caption"], input.caption-input',
-            )
-          if (cap) {
-            event.preventDefault()
-            event.stopPropagation()
-            cap.focus()
-          }
-        }
-      }}
-      aria-label="Remove image"
-    >
-      <X class="size-3.5" aria-hidden="true" />
-    </button>{/if}
 </NodeViewWrapper>

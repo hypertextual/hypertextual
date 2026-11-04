@@ -5,6 +5,7 @@
 import CodeBlockLowlight, {
   type CodeBlockLowlightOptions,
 } from '@tiptap/extension-code-block-lowlight'
+import { NodeSelection } from '@tiptap/pm/state'
 import type { NodeViewOptions } from '../types'
 
 export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions & NodeViewOptions>(
@@ -24,20 +25,30 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
     },
 
     addKeyboardShortcuts() {
+      const focusLanguageSelectorAt = (pos: number) => {
+        const dom = this.editor.view.nodeDOM(pos)
+        if (dom instanceof HTMLElement) {
+          const trigger = dom.querySelector<HTMLElement>(
+            '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+          )
+          if (trigger) {
+            trigger.focus()
+            return true
+          }
+        }
+        return false
+      }
+
       const focusLanguageSelector = () => {
         const { selection } = this.editor.state
+        if (selection instanceof NodeSelection && selection.node.type.name === this.name) {
+          return focusLanguageSelectorAt(selection.from)
+        }
         const { $from } = selection
         for (let depth = $from.depth; depth > 0; depth -= 1) {
           if ($from.node(depth).type.name === this.name) {
-            const dom = this.editor.view.nodeDOM($from.before(depth))
-            if (dom instanceof HTMLElement) {
-              const trigger = dom.querySelector<HTMLElement>(
-                '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-              )
-              if (trigger) {
-                trigger.focus()
-                return true
-              }
+            if (focusLanguageSelectorAt($from.before(depth))) {
+              return true
             }
             break
           }
@@ -70,8 +81,11 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
           return false
         },
         ArrowUp: () => {
+          const { selection } = this.editor.state
+          if (selection instanceof NodeSelection && selection.node.type.name === this.name) {
+            return focusLanguageSelectorAt(selection.from)
+          }
           if (this.editor.isActive('codeBlock')) {
-            const { selection } = this.editor.state
             if (!selection.empty) return false
             const { $from } = selection
             const textBefore = $from.parent.textBetween(0, $from.parentOffset)

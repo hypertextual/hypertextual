@@ -36,7 +36,7 @@ export interface SecondaryCursorRange {
 
 export interface SubtextCursorState {
   pos: number
-  kind: 'noticeTitle' | 'imageCaption'
+  kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
   offset: number
   anchorOffset?: number
 }
@@ -90,7 +90,7 @@ interface BlockDescriptor {
   end: number
   isTextblock: boolean
   isAtom: boolean
-  subtextKind?: 'noticeTitle' | 'imageCaption'
+  subtextKind?: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
   subtextText?: string
 }
 
@@ -102,15 +102,21 @@ interface WordToken {
   blockEnd: number
   subtext?: {
     pos: number
-    kind: 'noticeTitle' | 'imageCaption'
+    kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
     offsetStart: number
     offsetEnd: number
   }
 }
 
-function getSubtextValue(node: PMNode, kind: 'noticeTitle' | 'imageCaption'): string {
+function getSubtextValue(
+  node: PMNode,
+  kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl',
+): string {
   if (kind === 'noticeTitle') {
     return String(node.attrs.title ?? 'Note')
+  }
+  if (kind === 'linkPreviewUrl') {
+    return String(node.attrs.url ?? '')
   }
   return String(node.attrs.caption ?? '')
 }
@@ -175,6 +181,20 @@ function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
         })
         return false
       }
+      if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
+        const subtextText = getSubtextValue(node, 'linkPreviewUrl')
+        blocks.push({
+          node,
+          pos,
+          start: pos,
+          end: pos + node.nodeSize,
+          isTextblock: true,
+          isAtom: true,
+          subtextKind: 'linkPreviewUrl',
+          subtextText,
+        })
+        return false
+      }
       blocks.push({
         node,
         pos,
@@ -234,6 +254,28 @@ function collectWords(doc: PMNode): WordToken[] {
           },
         })
         match = regex.exec(capText)
+      }
+      return false
+    }
+    if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
+      const urlText = getSubtextValue(node, 'linkPreviewUrl')
+      const regex = /\w+|[^\w\s]+/g
+      let match: RegExpExecArray | null = regex.exec(urlText)
+      while (match !== null) {
+        tokens.push({
+          start: pos,
+          end: pos,
+          text: match[0],
+          blockStart: pos,
+          blockEnd: pos,
+          subtext: {
+            pos,
+            kind: 'linkPreviewUrl',
+            offsetStart: match.index,
+            offsetEnd: match.index + match[0].length,
+          },
+        })
+        match = regex.exec(urlText)
       }
       return false
     }
@@ -1453,8 +1495,18 @@ function createModalTargetForEditor(
           storage.activeCompoundBlockPos = sub.pos
           storage.focusControlRequest = {
             pos: sub.pos,
-            type: sub.kind === 'noticeTitle' ? 'notice' : 'image',
-            control: sub.kind === 'noticeTitle' ? 'title' : 'caption',
+            type:
+              sub.kind === 'noticeTitle'
+                ? 'notice'
+                : sub.kind === 'linkPreviewUrl'
+                  ? 'linkPreview'
+                  : 'image',
+            control:
+              sub.kind === 'noticeTitle'
+                ? 'title'
+                : sub.kind === 'linkPreviewUrl'
+                  ? 'url'
+                  : 'caption',
             offset: sub.offset,
           }
           nextSel = sel
@@ -1491,8 +1543,18 @@ function createModalTargetForEditor(
           storage.activeCompoundBlockPos = sub.pos
           storage.focusControlRequest = {
             pos: sub.pos,
-            type: sub.kind === 'noticeTitle' ? 'notice' : 'image',
-            control: sub.kind === 'noticeTitle' ? 'title' : 'caption',
+            type:
+              sub.kind === 'noticeTitle'
+                ? 'notice'
+                : sub.kind === 'linkPreviewUrl'
+                  ? 'linkPreview'
+                  : 'image',
+            control:
+              sub.kind === 'noticeTitle'
+                ? 'title'
+                : sub.kind === 'linkPreviewUrl'
+                  ? 'url'
+                  : 'caption',
             offset: sub.offset + 1,
           }
           nextSel = sel
@@ -1801,6 +1863,12 @@ function createModalTargetForEditor(
                 restoredSubtextCursor = {
                   pos: compoundPosToSelect,
                   kind: 'imageCaption',
+                  offset: 0,
+                }
+              } else if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
+                restoredSubtextCursor = {
+                  pos: compoundPosToSelect,
+                  kind: 'linkPreviewUrl',
                   offset: 0,
                 }
               }
@@ -2227,7 +2295,9 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
                     'data-pm-modal-node-selection': pluginState.mode,
                     ...(sub.kind === 'noticeTitle'
                       ? { 'data-pm-modal-notice-title': pluginState.mode }
-                      : { 'data-pm-modal-image-caption': pluginState.mode }),
+                      : sub.kind === 'linkPreviewUrl'
+                        ? { 'data-pm-modal-link-preview-url': pluginState.mode }
+                        : { 'data-pm-modal-image-caption': pluginState.mode }),
                   }),
                 )
               }

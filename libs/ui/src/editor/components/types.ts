@@ -29,6 +29,7 @@ export interface SlashMenuProps {
 export interface EditorOverlayInputProps {
   editor: Editor
   position: number
+  data?: unknown
   onClose: () => void
 }
 

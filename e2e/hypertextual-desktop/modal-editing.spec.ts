@@ -403,8 +403,18 @@ test.describe(
         await page.keyboard.press('i')
         await expect(prose).toHaveAttribute('contenteditable', 'true')
         await expect(prose).toBeFocused()
-        await page.keyboard.press('Shift+Tab')
-        await expect(page.getByRole('combobox', { name: 'Code language' })).toBeFocused()
+        // ArrowUp from line 2 -> line 1 -> language selector (closed); ArrowUp again -> preceding block
+        await page.keyboard.press('ArrowUp')
+        await page.keyboard.press('ArrowUp')
+        const langSelect = page.getByRole('combobox', { name: 'Code language' })
+        await expect(langSelect).toBeFocused()
+        await expect(langSelect).toHaveAttribute('aria-expanded', 'false')
+        await page.keyboard.press('ArrowUp')
+        await expect(prose).toBeFocused()
+        await expect(langSelect).toHaveAttribute('aria-expanded', 'false')
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('ArrowUp')
+        await expect(langSelect).toBeFocused()
         await page.keyboard.press('ArrowDown')
         await expect(prose).toBeFocused()
         await page.keyboard.press('Escape')
@@ -422,11 +432,32 @@ test.describe(
         ).toHaveText('h')
         await page.keyboard.press('i')
         await expect(page.getByLabel('Image caption')).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('button', { name: 'Replace image' })).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('button', { name: 'Remove image' })).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(page.getByLabel('Image caption')).toBeFocused()
+        await page.keyboard.press('Escape')
+
+        // Move j onto YouTube embed in normal mode -> Enter/i focuses overlaying YouTube URL input -> Tab focuses Remove preview
+        await page.keyboard.press('j')
+        await expect(
+          prose.locator('[data-pm-modal-node-selection="normal"] [data-type="embed"]'),
+        ).toHaveCount(1)
+        await expect(page.getByLabel('YouTube URL')).toHaveCount(0)
+        await page.keyboard.press('Enter')
+        await expect(page.getByLabel('YouTube URL')).toBeFocused()
+        await expect(page.getByRole('toolbar', { name: 'Text formatting' })).toHaveCount(0)
+        await page.keyboard.press('Tab')
+        await expect(page.getByRole('button', { name: 'Remove preview' })).toBeFocused()
         await page.keyboard.press('Escape')
 
         // Assert
         await expect(prose).toHaveAttribute('contenteditable', 'false')
-        await expect(prose.locator('[data-pm-modal-node-selection="normal"] img')).toHaveCount(1)
+        await expect(
+          prose.locator('[data-pm-modal-node-selection="normal"] [data-type="embed"]'),
+        ).toHaveCount(1)
       })
     })
 
