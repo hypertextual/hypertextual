@@ -8,7 +8,7 @@ The content pane presents the selected document, image, or empty workspace previ
 
 ### Public API
 
-`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives native document JSON and emits JSON changes. The app editor service passes those changes through `ArticleViewModel` and `htmd-ts`. Unsupported nodes stay editable in the document as raw-source wrappers. This pane renders source read-only only after an unrecoverable parser failure.
+`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives native document JSON and emits JSON changes. The app editor service passes those changes through `ArticleViewModel` and `htmd-ts`. Unsupported nodes stay editable in the document as raw-source wrappers. `ContentFallback` renders loading, opening errors, unsupported file types (such as PDFs with an `Open In Default App` button), image previews, read-only source previews after an unrecoverable parser failure, and the unselected workspace state.
 
 ```svelte
 <ContentPane {workspace} />
@@ -92,10 +92,12 @@ stateDiagram-v2
     Opening --> Editing: SDK parses source into document JSON
     Opening --> ReadOnly: unrecoverable parser or schema failure
     Opening --> Image: image loads
+    Opening --> Unsupported: non-article file type (e.g. PDF)
     Opening --> Failed: file cannot open
     Failed --> Opening: Retry opening
     ReadOnly --> Opening: choose another entry
     Image --> Opening: choose another entry
+    Unsupported --> Opening: choose another entry
     Editing --> Opening: save and choose another entry
 
     state Editing {

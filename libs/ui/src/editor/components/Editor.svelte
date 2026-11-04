@@ -200,8 +200,11 @@
         handleClick(view, position, event) {
           if (view.editable || !onedit) return false
           const target = event.target
+          const bookmarkEdit =
+            target instanceof Element ? target.closest<HTMLElement>('[data-bookmark-edit]') : null
           if (
             target instanceof Element &&
+            !bookmarkEdit &&
             target.closest(
               'a, button, input, select, summary, iframe, [role="button"], [role="combobox"], [data-modal-ignore-pointer]',
             )
@@ -245,12 +248,21 @@
           // Enable before ProseMirror places the caret for this click.
           editor?.setEditable(true)
           if (editor) {
+            try {
+              editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+            } catch {
+              // Ignore
+            }
             getEditorModalTarget(editor)?.setModalState({
               mode: 'insert',
               preset: whichKeyController?.getState().preset ?? 'helix',
             })
           }
           whichKeyController?.setMode('insert')
+          if (bookmarkEdit) {
+            void tick().then(() => bookmarkEdit.click())
+            return true
+          }
           editor?.commands.setTextSelection(position)
           view.focus()
           return true
@@ -296,7 +308,15 @@
       if (storage) {
         storage.clickToInsert = clickToEdit
       }
+      const editableChanged = editor.isEditable !== editable
       editor.setEditable(editable)
+      if (editableChanged) {
+        try {
+          editor.view.dispatch(editor.state.tr.setMeta('editableChanged', editable))
+        } catch {
+          // Ignore if view is not yet mounted
+        }
+      }
       const target = getEditorModalTarget(editor)
       const currentMode = modalKeymapPluginKey.getState(editor.state)?.mode ?? 'insert'
       const preset = whichKeyController?.getState().preset ?? 'helix'
@@ -306,6 +326,19 @@
         }
         if (whichKeyController && whichKeyController.getState().mode !== 'insert') {
           whichKeyController.setMode('insert')
+        }
+        const sel = editor.state.selection
+        if (storage?.focusControlRequest) {
+          const req = storage.focusControlRequest
+          storage.focusControlRequest = null
+          focusCompoundBlockControl(req.pos, req.type, req.control)
+        } else if (
+          sel instanceof NodeSelection &&
+          (sel.node.type.name === 'image' ||
+            sel.node.type.name === 'imageNode' ||
+            sel.node.type.name === 'linkPreview')
+        ) {
+          focusCompoundBlockControl(sel.from, sel.node.type.name)
         }
       } else {
         if (activeOverlay) editor.commands.closeOverlay(activeOverlay.name)
@@ -322,6 +355,71 @@
   })
 
   // Methods -------------------------------------------------------------------
+  function focusCompoundBlockControl(
+    pos: number,
+    type: string,
+    control?: string,
+    offset?: number,
+  ) {
+    void tick().then(() => {
+      if (!editor) return
+      const dom = editor.view.nodeDOM(pos)
+      if (!(dom instanceof HTMLElement)) return
+      if (type === 'notice') {
+        if (control === 'type') {
+          const trigger = dom.querySelector<HTMLElement>(
+            '[aria-label="Notice type"][data-part="trigger"], [data-part="trigger"]',
+          )
+          if (trigger) {
+            trigger.focus()
+            return
+          }
+        }
+        const input = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+        if (input) {
+          input.focus()
+          const caret =
+            typeof offset === 'number'
+              ? Math.max(0, Math.min(input.value.length, offset))
+              : input.value.length
+          input.setSelectionRange(caret, caret)
+        }
+      } else if (type === 'codeBlock') {
+        const trigger = dom.querySelector<HTMLElement>(
+          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+        )
+        if (trigger) {
+          trigger.focus()
+        } else {
+          editor.commands.setTextSelection(pos + 1)
+          editor.view.focus()
+        }
+      } else if (type === 'image' || type === 'imageNode') {
+        const input = dom.querySelector<HTMLInputElement>(
+          'input.caption-input, input[aria-label="Image caption"]',
+        )
+        if (input) {
+          input.focus()
+          const caret =
+            typeof offset === 'number'
+              ? Math.max(0, Math.min(input.value.length, offset))
+              : input.value.length
+          input.setSelectionRange(caret, caret)
+        }
+      } else if (type === 'linkPreview') {
+        const bookmarkEdit = dom.querySelector<HTMLElement>('[data-bookmark-edit]')
+        if (bookmarkEdit) {
+          bookmarkEdit.click()
+          return
+        }
+        const action = dom.querySelector<HTMLElement>(
+          'button[aria-label="Play video"], a.bookmark-card-edit, button[aria-label="Remove preview"]',
+        )
+        action?.focus()
+      }
+    })
+  }
+
   function syncModalEditableState() {
     if (!editor) return
     if (whichKeyController?.getState().explorerOpen) return
@@ -340,11 +438,37 @@
     if (pluginState.mode === 'insert' && !editor.isEditable) {
       if (!onedit || onedit()) {
         editor.setEditable(true)
-        editor.view.focus()
+        try {
+          editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+        } catch {
+          // Ignore
+        }
+        const storage = (editor.storage as unknown as { modalKeymap?: ModalKeymapStorage })
+          .modalKeymap
+        const sel = editor.state.selection
+        if (storage?.focusControlRequest) {
+          const req = storage.focusControlRequest
+          storage.focusControlRequest = null
+          focusCompoundBlockControl(req.pos, req.type, req.control, req.offset)
+        } else if (
+          sel instanceof NodeSelection &&
+          (sel.node.type.name === 'image' ||
+            sel.node.type.name === 'imageNode' ||
+            sel.node.type.name === 'linkPreview')
+        ) {
+          focusCompoundBlockControl(sel.from, sel.node.type.name)
+        } else {
+          editor.view.focus()
+        }
       }
     } else if (pluginState.mode !== 'insert' && editor.isEditable) {
       onexit?.()
       editor.setEditable(false)
+      try {
+        editor.view.dispatch(editor.state.tr.setMeta('editableChanged', false))
+      } catch {
+        // Ignore
+      }
     }
   }
 
@@ -369,9 +493,22 @@
   export function enterCompoundBlock(): boolean {
     if (!editor || editor.isEditable) return false
     const sel = editor.state.selection
+    const pluginState = modalKeymapPluginKey.getState(editor.state)
     let blockPos: number | null = null
     let blockType: string | null = null
-    if (
+    let control: string | undefined
+    let offset: number | undefined
+    if (pluginState?.subtextCursor) {
+      blockPos = pluginState.subtextCursor.pos
+      offset = pluginState.subtextCursor.offset
+      if (pluginState.subtextCursor.kind === 'noticeTitle') {
+        blockType = 'notice'
+        control = 'type'
+      } else {
+        blockType = 'image'
+        control = 'caption'
+      }
+    } else if (
       sel instanceof NodeSelection &&
       (sel.node.type.name === 'notice' ||
         sel.node.type.name === 'codeBlock' ||
@@ -385,9 +522,15 @@
       const resolvedFrom = sel.$from
       for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
         const name = resolvedFrom.node(d).type.name
-        if (name === 'notice' || name === 'codeBlock') {
+        if (name === 'notice') {
           blockPos = resolvedFrom.before(d)
-          blockType = name
+          blockType = 'notice'
+          control = 'type'
+          break
+        }
+        if (name === 'codeBlock') {
+          blockPos = resolvedFrom.before(d)
+          blockType = 'codeBlock'
           break
         }
       }
@@ -403,44 +546,13 @@
     const preset = whichKeyController?.getState().preset ?? 'helix'
     getEditorModalTarget(editor)?.setModalState({ mode: 'insert', preset })
     whichKeyController?.setMode('insert')
+    try {
+      editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+    } catch {
+      // Ignore
+    }
 
-    const pos = blockPos
-    const type = blockType
-    void tick().then(() => {
-      if (!editor) return
-      const dom = editor.view.nodeDOM(pos)
-      if (!(dom instanceof HTMLElement)) return
-      if (type === 'notice') {
-        const input = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-        if (input) {
-          input.focus()
-          input.setSelectionRange(input.value.length, input.value.length)
-        }
-      } else if (type === 'codeBlock') {
-        const trigger = dom.querySelector<HTMLElement>(
-          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-        )
-        if (trigger) {
-          trigger.focus()
-        } else {
-          editor.commands.setTextSelection(pos + 1)
-          editor.view.focus()
-        }
-      } else if (type === 'image' || type === 'imageNode') {
-        const input = dom.querySelector<HTMLInputElement>(
-          'input.caption-input, input[aria-label="Image caption"]',
-        )
-        if (input) {
-          input.focus()
-          input.setSelectionRange(input.value.length, input.value.length)
-        }
-      } else if (type === 'linkPreview') {
-        const action = dom.querySelector<HTMLElement>(
-          'button[aria-label="Play video"], a.bookmark-card-edit, button[aria-label="Remove preview"]',
-        )
-        action?.focus()
-      }
-    })
+    focusCompoundBlockControl(blockPos, blockType, control, offset)
     return true
   }
 

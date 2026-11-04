@@ -88,6 +88,14 @@ pub async fn workspace_delete(
 }
 
 #[tauri::command]
+pub async fn workspace_open_default_app(
+    state: State<'_, WorkspaceState>,
+    relative_path: String,
+) -> Result<()> {
+    run(state, move |w| w.open_in_default_app(&relative_path)).await
+}
+
+#[tauri::command]
 pub async fn workspace_save_article(
     state: State<'_, WorkspaceState>,
     relative_path: String,

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Button, WhichKeyMode, useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
+  import { WhichKeyMode, useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
   import { Breadcrumb, DocumentEditor } from '@hypertextual/ui'
-  import { FileText } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
+  import ContentFallback from './ContentFallback.svelte'
 
   // Props ---------------------------------------------------------------------
   interface ContentPaneProps {
@@ -42,47 +42,21 @@
   class="document-pane"
   aria-label="Article"
 >
-  {#if editor.loading}
-    <div class="empty-pane" role="status">Opening article…</div>
-  {:else if editor.openingError}
-    <div class="empty-pane">
-      <p class="error" role="alert">{editor.openingError}</p>
-      {#if editor.selected}<Button
-          variant="outline"
-          size="sm"
-          onclick={() => editor.selected && editor.open(editor.selected)}>Retry opening</Button
-        >{/if}
-    </div>
-  {:else if editor.image && editor.selected}
-    <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
-  {:else if editor.document && editor.selected}
+  {#if !editor.loading && !editor.openingError && !editor.unsupported && !editor.image && editor.document?.content && editor.selected}
     {#key editor.version}
-      {#if editor.document.content}
-        <DocumentEditor
-          document={editor.document.content}
-          editable={editor.editable && !workspace.blocked}
-          clickToEdit={workspace.settings.clickToInsert}
-          oneditablechange={(editable) => editor.setEditable(editable && !workspace.blocked)}
-          class="article-scroll"
-          contentClass="article-editor"
-          onchange={(document) => editor.change(document)}
-          onUpload={(file) => editor.upload(file)}
-        />
-      {:else}
-        <div class="source-preview min-h-0 flex-1 overflow-auto p-6">
-          <p class="readonly-notice mb-5 text-xs text-muted-foreground">{editor.document.reason}</p>
-          <pre
-            aria-label="Original article source"
-            class="whitespace-pre-wrap break-words text-xs">{editor.document.source}</pre>
-        </div>
-      {/if}
+      <DocumentEditor
+        document={editor.document.content}
+        editable={editor.editable && !workspace.blocked}
+        clickToEdit={workspace.settings.clickToInsert}
+        oneditablechange={(editable) => editor.setEditable(editable && !workspace.blocked)}
+        class="article-scroll"
+        contentClass="article-editor"
+        onchange={(document) => editor.change(document)}
+        onUpload={(file) => editor.upload(file)}
+      />
     {/key}
   {:else}
-    <div class="empty-pane">
-      <FileText size={32} strokeWidth={1.5} />
-      <h1>Your workspace, ready to write.</h1>
-      <p>Select an article from the sidebar, or create a new one.</p>
-    </div>
+    <ContentFallback {editor} />
   {/if}
   <footer class="document-status" role="status" aria-live="polite">
     {#if editor.selected}

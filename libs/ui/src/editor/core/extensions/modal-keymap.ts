@@ -34,6 +34,13 @@ export interface SecondaryCursorRange {
   head: number
 }
 
+export interface SubtextCursorState {
+  pos: number
+  kind: 'noticeTitle' | 'imageCaption'
+  offset: number
+  anchorOffset?: number
+}
+
 export interface ModalKeymapPluginState {
   mode: KeymapMode
   preset: KeybindingPreset
@@ -41,6 +48,7 @@ export interface ModalKeymapPluginState {
   goalColumn: number | null
   extendedRange?: { anchor: number; head: number } | null
   focused?: boolean
+  subtextCursor?: SubtextCursorState | null
 }
 
 export interface ModalKeymapStorage {
@@ -50,6 +58,12 @@ export interface ModalKeymapStorage {
   registerSlice: Slice | null
   clickToInsert: boolean
   activeCompoundBlockPos?: number | null
+  focusControlRequest?: {
+    pos: number
+    type: string
+    control?: string
+    offset?: number
+  } | null
   cleanupDomRegistration?: () => void
 }
 
@@ -76,6 +90,8 @@ interface BlockDescriptor {
   end: number
   isTextblock: boolean
   isAtom: boolean
+  subtextKind?: 'noticeTitle' | 'imageCaption'
+  subtextText?: string
 }
 
 interface WordToken {
@@ -84,23 +100,56 @@ interface WordToken {
   text: string
   blockStart: number
   blockEnd: number
+  subtext?: {
+    pos: number
+    kind: 'noticeTitle' | 'imageCaption'
+    offsetStart: number
+    offsetEnd: number
+  }
+}
+
+function getSubtextValue(node: PMNode, kind: 'noticeTitle' | 'imageCaption'): string {
+  if (kind === 'noticeTitle') {
+    return String(node.attrs.title ?? 'Note')
+  }
+  return String(node.attrs.caption ?? '')
 }
 
 function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
-    if (node.type.name === 'notice' || node.type.name === 'codeBlock') {
+    if (node.type.name === 'notice') {
+      const subtextText = getSubtextValue(node, 'noticeTitle')
       blocks.push({
         node,
         pos,
         start: pos,
         end: pos + node.nodeSize,
-        isTextblock: false,
-        isAtom: true,
+        isTextblock: true,
+        isAtom: false,
+        subtextKind: 'noticeTitle',
+        subtextText,
       })
-      return false
+      return true
     }
     if (node.isTextblock) {
+      if (node.type.name === 'codeBlock') {
+        const text = node.textContent
+        const lines = text.split('\n')
+        let offset = pos + 1
+        for (const line of lines) {
+          blocks.push({
+            node,
+            pos,
+            start: offset,
+            end: offset + line.length,
+            isTextblock: true,
+            isAtom: false,
+          })
+          offset += line.length + 1
+        }
+        return false
+      }
       blocks.push({
         node,
         pos,
@@ -112,6 +161,20 @@ function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
       return false
     }
     if (node.isAtom && !node.isText) {
+      if (node.type.name === 'image' || node.type.name === 'imageNode') {
+        const subtextText = getSubtextValue(node, 'imageCaption')
+        blocks.push({
+          node,
+          pos,
+          start: pos,
+          end: pos + node.nodeSize,
+          isTextblock: true,
+          isAtom: true,
+          subtextKind: 'imageCaption',
+          subtextText,
+        })
+        return false
+      }
       blocks.push({
         node,
         pos,
@@ -130,6 +193,50 @@ function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
 function collectWords(doc: PMNode): WordToken[] {
   const tokens: WordToken[] = []
   doc.descendants((node, pos) => {
+    if (node.type.name === 'notice') {
+      const titleText = getSubtextValue(node, 'noticeTitle')
+      const regex = /\w+|[^\w\s]+/g
+      let match: RegExpExecArray | null = regex.exec(titleText)
+      while (match !== null) {
+        tokens.push({
+          start: pos,
+          end: pos,
+          text: match[0],
+          blockStart: pos,
+          blockEnd: pos,
+          subtext: {
+            pos,
+            kind: 'noticeTitle',
+            offsetStart: match.index,
+            offsetEnd: match.index + match[0].length,
+          },
+        })
+        match = regex.exec(titleText)
+      }
+      return true
+    }
+    if (node.type.name === 'image' || node.type.name === 'imageNode') {
+      const capText = getSubtextValue(node, 'imageCaption')
+      const regex = /\w+|[^\w\s]+/g
+      let match: RegExpExecArray | null = regex.exec(capText)
+      while (match !== null) {
+        tokens.push({
+          start: pos,
+          end: pos,
+          text: match[0],
+          blockStart: pos,
+          blockEnd: pos,
+          subtext: {
+            pos,
+            kind: 'imageCaption',
+            offsetStart: match.index,
+            offsetEnd: match.index + match[0].length,
+          },
+        })
+        match = regex.exec(capText)
+      }
+      return false
+    }
     if (!node.isTextblock) return true
     const blockStart = pos + 1
     const blockEnd = pos + 1 + node.content.size
@@ -447,8 +554,15 @@ function findCurrentBlockIndex(
   doc: PMNode,
   sel: Selection,
   extendedRange?: { anchor: number; head: number } | null,
+  subtextCursor?: SubtextCursorState | null,
 ): number {
   if (blocks.length === 0) return -1
+  if (subtextCursor) {
+    const subIdx = blocks.findIndex(
+      (b) => b.subtextKind === subtextCursor.kind && b.pos === subtextCursor.pos,
+    )
+    if (subIdx !== -1) return subIdx
+  }
   if (!extendedRange && sel instanceof NodeSelection) {
     const nodeIdx = blocks.findIndex((b) => b.pos === sel.from)
     if (nodeIdx !== -1) return nodeIdx
@@ -456,7 +570,7 @@ function findCurrentBlockIndex(
 
   const cursorPos = getCursorCharPos(doc, sel, extendedRange)
   const textIdx = blocks.findIndex(
-    (b) => b.isTextblock && cursorPos >= b.start && cursorPos <= b.end,
+    (b) => !b.subtextKind && b.isTextblock && cursorPos >= b.start && cursorPos <= b.end,
   )
   if (textIdx !== -1) return textIdx
 
@@ -561,6 +675,7 @@ function createModalTargetForEditor(
     return tr.setMeta(modalKeymapPluginKey, {
       ...prev,
       focused: true,
+      subtextCursor: null,
       ...patch,
     })
   }
@@ -581,31 +696,72 @@ function createModalTargetForEditor(
         const words = collectWords(doc)
         if (words.length === 0) return false
 
+        const sub = pluginState?.subtextCursor
         const cursor = sel.head
+        let currentWordIdx = -1
+        if (sub) {
+          currentWordIdx = words.findIndex(
+            (w) =>
+              w.subtext &&
+              w.subtext.pos === sub.pos &&
+              w.subtext.kind === sub.kind &&
+              sub.offset >= w.subtext.offsetStart &&
+              sub.offset < w.subtext.offsetEnd,
+          )
+        } else {
+          currentWordIdx = words.findIndex(
+            (w) => !w.subtext && cursor >= w.start && cursor < w.end,
+          )
+        }
+
+        const isAfterCurrent = (w: WordToken): boolean => {
+          if (sub) {
+            if (w.subtext && w.subtext.pos === sub.pos && w.subtext.kind === sub.kind) {
+              return motion === 'wordEnd'
+                ? w.subtext.offsetEnd > sub.offset + 1
+                : w.subtext.offsetStart > sub.offset
+            }
+            return w.start > sub.pos
+          }
+          if (w.subtext) {
+            return w.subtext.pos >= cursor
+          }
+          return motion === 'wordEnd' ? w.end > cursor : w.start > cursor
+        }
+
+        const isBeforeCurrent = (w: WordToken): boolean => {
+          if (sub) {
+            if (w.subtext && w.subtext.pos === sub.pos && w.subtext.kind === sub.kind) {
+              return w.subtext.offsetStart < sub.offset
+            }
+            return w.start < sub.pos
+          }
+          const backRef = sel.empty ? cursor : sel.from
+          if (w.subtext) {
+            return w.subtext.pos < backRef
+          }
+          return w.start < backRef
+        }
+
         let targetWord: WordToken | undefined
 
         if (motion === 'wordForward') {
-          const idx = words.findIndex((w) => w.start > cursor)
+          const idx = words.findIndex(isAfterCurrent)
           if (idx === -1) {
             targetWord = words[words.length - 1]
+          } else if (isSelectionFirst && currentWordIdx !== -1 && sel.empty && !sub?.anchorOffset) {
+            targetWord = words[Math.min(words.length - 1, currentWordIdx + (steps - 1))]
           } else {
-            const currentWord = words.find((w) => cursor >= w.start && cursor < w.end)
-            if (isSelectionFirst && currentWord && sel.empty) {
-              targetWord =
-                words[Math.min(words.length - 1, words.indexOf(currentWord) + (steps - 1))]
-            } else {
-              targetWord = words[Math.min(words.length - 1, idx + steps - 1)]
-            }
+            targetWord = words[Math.min(words.length - 1, idx + steps - 1)]
           }
         } else if (motion === 'wordEnd') {
-          const idx = words.findIndex((w) => w.end > cursor)
+          const idx = words.findIndex(isAfterCurrent)
           targetWord =
             idx === -1 ? words[words.length - 1] : words[Math.min(words.length - 1, idx + steps - 1)]
         } else {
-          const backRef = sel.empty ? cursor : sel.from
           let idx = -1
           for (let i = words.length - 1; i >= 0; i -= 1) {
-            if (words[i]!.start < backRef) {
+            if (isBeforeCurrent(words[i]!)) {
               idx = i
               break
             }
@@ -614,6 +770,43 @@ function createModalTargetForEditor(
         }
 
         if (!targetWord) return false
+
+        if (targetWord.subtext) {
+          const st = targetWord.subtext
+          const node = doc.nodeAt(st.pos)
+          if (node) {
+            if (st.kind === 'noticeTitle') {
+              const { firstTextStart } = getContainerInnerTextBounds(node, st.pos)
+              if (firstTextStart !== -1) {
+                tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
+              }
+            } else if (NodeSelection.isSelectable(node)) {
+              tr = tr.setSelection(NodeSelection.create(doc, st.pos))
+            }
+          }
+          const nextSubtext: SubtextCursorState = isSelectionFirst
+            ? {
+                pos: st.pos,
+                kind: st.kind,
+                offset: motion === 'wordBackward' ? st.offsetStart : st.offsetEnd,
+                anchorOffset: motion === 'wordBackward' ? st.offsetEnd : st.offsetStart,
+              }
+            : {
+                pos: st.pos,
+                kind: st.kind,
+                offset:
+                  motion === 'wordEnd'
+                    ? Math.max(st.offsetStart, st.offsetEnd - 1)
+                    : st.offsetStart,
+              }
+          tr = updateMeta(tr, {
+            goalColumn: null,
+            extendedRange: null,
+            subtextCursor: nextSubtext,
+          })
+          dispatchTransaction(editor, tr.scrollIntoView())
+          return true
+        }
 
         let nextExtendedRange: { anchor: number; head: number } | null = null
         if (isExtend) {
@@ -644,7 +837,7 @@ function createModalTargetForEditor(
           tr = tr.setSelection(TextSelection.create(doc, destPos))
         }
 
-        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange, subtextCursor: null })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -714,6 +907,19 @@ function createModalTargetForEditor(
       }
 
       if (motion === 'lineStart' || motion === 'lineEnd') {
+        if (pluginState?.subtextCursor && !isExtend) {
+          const sub = pluginState.subtextCursor
+          const node = doc.nodeAt(sub.pos)
+          const text = node ? getSubtextValue(node, sub.kind) : ''
+          const nextOffset = motion === 'lineStart' ? 0 : Math.max(0, text.length - 1)
+          tr = updateMeta(tr, {
+            goalColumn: null,
+            extendedRange: null,
+            subtextCursor: { pos: sub.pos, kind: sub.kind, offset: nextOffset },
+          })
+          dispatchTransaction(editor, tr.scrollIntoView())
+          return true
+        }
         if (sel instanceof NodeSelection && !isExtend) {
           return true
         }
@@ -722,10 +928,16 @@ function createModalTargetForEditor(
         if (!$head.parent.isTextblock) {
           return false
         }
+        const blocks = collectLeafBlocks(doc)
+        const lineBlock = blocks.find(
+          (b) => !b.subtextKind && b.isTextblock && cursorPos >= b.start && cursorPos <= b.end,
+        )
+        const lineStartPos = lineBlock ? lineBlock.start : $head.start()
+        const lineEndPos = lineBlock ? lineBlock.end : $head.end()
         let nextExtendedRange: { anchor: number; head: number } | null = null
         if (isExtend) {
           const dest =
-            motion === 'lineStart' ? $head.start() : Math.max($head.start(), $head.end() - 1)
+            motion === 'lineStart' ? lineStartPos : Math.max(lineStartPos, lineEndPos - 1)
           const ext = computeExtendedRangeAndSelection(
             doc,
             sel,
@@ -736,10 +948,10 @@ function createModalTargetForEditor(
           tr = tr.setSelection(ext.selection)
           nextExtendedRange = ext.extendedRange
         } else {
-          const dest = motion === 'lineStart' ? $head.start() : $head.end()
+          const dest = motion === 'lineStart' ? lineStartPos : lineEndPos
           tr = tr.setSelection(TextSelection.create(doc, dest))
         }
-        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange, subtextCursor: null })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -762,7 +974,7 @@ function createModalTargetForEditor(
         } else {
           tr = tr.setSelection(edgeSel)
         }
-        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange, subtextCursor: null })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -772,10 +984,17 @@ function createModalTargetForEditor(
         const blocks = collectLeafBlocks(doc)
         if (blocks.length === 0) return false
 
-        const currentIdx = findCurrentBlockIndex(blocks, doc, sel, pluginState?.extendedRange)
+        const currentIdx = findCurrentBlockIndex(
+          blocks,
+          doc,
+          sel,
+          pluginState?.extendedRange,
+          pluginState?.subtextCursor,
+        )
         const targetIdx = Math.max(0, Math.min(blocks.length - 1, currentIdx + dir * steps))
         const targetBlock = blocks[targetIdx]!
         let nextExtendedRange: { anchor: number; head: number } | null = null
+        let nextSubtextCursor: SubtextCursorState | null = null
 
         if (isExtend) {
           if (targetBlock.isAtom) {
@@ -784,6 +1003,19 @@ function createModalTargetForEditor(
               sel,
               targetBlock.start,
               targetBlock,
+              pluginState?.extendedRange,
+            )
+            tr = tr.setSelection(ext.selection)
+            nextExtendedRange = ext.extendedRange
+          } else if (targetBlock.subtextKind === 'noticeTitle') {
+            nextSubtextCursor = { pos: targetBlock.pos, kind: 'noticeTitle', offset: 0 }
+            const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
+            const dest = firstTextStart !== -1 ? firstTextStart : targetBlock.pos
+            const ext = computeExtendedRangeAndSelection(
+              doc,
+              sel,
+              dest,
+              undefined,
               pluginState?.extendedRange,
             )
             tr = tr.setSelection(ext.selection)
@@ -801,6 +1033,22 @@ function createModalTargetForEditor(
             tr = tr.setSelection(ext.selection)
             nextExtendedRange = ext.extendedRange
           }
+        } else if (targetBlock.subtextKind) {
+          nextSubtextCursor = {
+            pos: targetBlock.pos,
+            kind: targetBlock.subtextKind,
+            offset: 0,
+          }
+          if (targetBlock.subtextKind === 'noticeTitle') {
+            const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
+            if (firstTextStart !== -1) {
+              tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
+            } else if (NodeSelection.isSelectable(targetBlock.node)) {
+              tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
+            }
+          } else if (NodeSelection.isSelectable(targetBlock.node)) {
+            tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
+          }
         } else if (targetBlock.isAtom && NodeSelection.isSelectable(targetBlock.node)) {
           tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
         } else if (isSelectionFirst) {
@@ -809,7 +1057,11 @@ function createModalTargetForEditor(
           tr = tr.setSelection(TextSelection.create(doc, targetBlock.start))
         }
 
-        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, {
+          goalColumn: null,
+          extendedRange: nextExtendedRange,
+          subtextCursor: nextSubtextCursor,
+        })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -817,6 +1069,21 @@ function createModalTargetForEditor(
       if (motion === 'left' || motion === 'right') {
         const dir = motion === 'left' ? -1 : 1
         if (doc.content.size === 0) return false
+
+        if (pluginState?.subtextCursor && !isExtend) {
+          const sub = pluginState.subtextCursor
+          const node = doc.nodeAt(sub.pos)
+          const text = node ? getSubtextValue(node, sub.kind) : ''
+          const maxOffset = Math.max(0, text.length - 1)
+          const nextOffset = Math.max(0, Math.min(maxOffset, sub.offset + dir * steps))
+          tr = updateMeta(tr, {
+            goalColumn: null,
+            extendedRange: null,
+            subtextCursor: { pos: sub.pos, kind: sub.kind, offset: nextOffset },
+          })
+          dispatchTransaction(editor, tr.scrollIntoView())
+          return true
+        }
 
         let targetPos = getCursorCharPos(doc, sel, pluginState?.extendedRange)
         for (let i = 0; i < steps; i += 1) {
@@ -840,7 +1107,7 @@ function createModalTargetForEditor(
                 continue
               }
               tr = tr.setSelection(NodeSelection.create(doc, atomPos))
-              tr = updateMeta(tr, { goalColumn: null, extendedRange: null })
+              tr = updateMeta(tr, { goalColumn: null, extendedRange: null, subtextCursor: null })
               dispatchTransaction(editor, tr.scrollIntoView())
               return true
             }
@@ -871,7 +1138,7 @@ function createModalTargetForEditor(
         } else {
           tr = tr.setSelection(TextSelection.create(doc, targetPos))
         }
-        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, { goalColumn: null, extendedRange: nextExtendedRange, subtextCursor: null })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -882,16 +1149,25 @@ function createModalTargetForEditor(
         if (blocks.length === 0) return false
 
         const cursorPos = getCursorCharPos(doc, sel, pluginState?.extendedRange)
-        const currentIdx = findCurrentBlockIndex(blocks, doc, sel, pluginState?.extendedRange)
+        const currentIdx = findCurrentBlockIndex(
+          blocks,
+          doc,
+          sel,
+          pluginState?.extendedRange,
+          pluginState?.subtextCursor,
+        )
         const currentBlock = blocks[currentIdx]!
-        const currentColumn = currentBlock.isTextblock
-          ? Math.max(0, cursorPos - currentBlock.start)
-          : 0
+        const currentColumn = currentBlock.subtextKind
+          ? (pluginState?.subtextCursor?.offset ?? 0)
+          : currentBlock.isTextblock
+            ? Math.max(0, cursorPos - currentBlock.start)
+            : 0
         const goalCol = pluginState?.goalColumn ?? currentColumn
 
         const targetIdx = Math.max(0, Math.min(blocks.length - 1, currentIdx + dir * steps))
         const targetBlock = blocks[targetIdx]!
         let nextExtendedRange: { anchor: number; head: number } | null = null
+        let nextSubtextCursor: SubtextCursorState | null = null
 
         if (isExtend) {
           if (targetBlock.isAtom) {
@@ -900,6 +1176,25 @@ function createModalTargetForEditor(
               sel,
               targetBlock.start,
               targetBlock,
+              pluginState?.extendedRange,
+            )
+            tr = tr.setSelection(ext.selection)
+            nextExtendedRange = ext.extendedRange
+          } else if (targetBlock.subtextKind === 'noticeTitle') {
+            const textLen = (targetBlock.subtextText ?? '').length
+            const targetOffset = textLen > 0 ? Math.min(goalCol, textLen - 1) : 0
+            nextSubtextCursor = {
+              pos: targetBlock.pos,
+              kind: 'noticeTitle',
+              offset: targetOffset,
+            }
+            const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
+            const nextHead = firstTextStart !== -1 ? firstTextStart : targetBlock.pos
+            const ext = computeExtendedRangeAndSelection(
+              doc,
+              sel,
+              nextHead,
+              undefined,
               pluginState?.extendedRange,
             )
             tr = tr.setSelection(ext.selection)
@@ -919,6 +1214,24 @@ function createModalTargetForEditor(
             tr = tr.setSelection(ext.selection)
             nextExtendedRange = ext.extendedRange
           }
+        } else if (targetBlock.subtextKind) {
+          const textLen = (targetBlock.subtextText ?? '').length
+          const targetOffset = textLen > 0 ? Math.min(goalCol, textLen - 1) : 0
+          nextSubtextCursor = {
+            pos: targetBlock.pos,
+            kind: targetBlock.subtextKind,
+            offset: targetOffset,
+          }
+          if (targetBlock.subtextKind === 'noticeTitle') {
+            const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
+            if (firstTextStart !== -1) {
+              tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
+            } else if (NodeSelection.isSelectable(targetBlock.node)) {
+              tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
+            }
+          } else if (NodeSelection.isSelectable(targetBlock.node)) {
+            tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
+          }
         } else if (targetBlock.isAtom && NodeSelection.isSelectable(targetBlock.node)) {
           tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
         } else {
@@ -926,7 +1239,11 @@ function createModalTargetForEditor(
           tr = tr.setSelection(TextSelection.create(doc, nextHead))
         }
 
-        tr = updateMeta(tr, { goalColumn: goalCol, extendedRange: nextExtendedRange })
+        tr = updateMeta(tr, {
+          goalColumn: goalCol,
+          extendedRange: nextExtendedRange,
+          subtextCursor: nextSubtextCursor,
+        })
         dispatchTransaction(editor, tr.scrollIntoView())
         return true
       }
@@ -1131,41 +1448,76 @@ function createModalTargetForEditor(
 
       if (op === 'insertStart') {
         let nextSel: Selection
-        if (
+        if (pluginState?.subtextCursor) {
+          const sub = pluginState.subtextCursor
+          storage.activeCompoundBlockPos = sub.pos
+          storage.focusControlRequest = {
+            pos: sub.pos,
+            type: sub.kind === 'noticeTitle' ? 'notice' : 'image',
+            control: sub.kind === 'noticeTitle' ? 'title' : 'caption',
+            offset: sub.offset,
+          }
+          nextSel = sel
+        } else if (
           sel instanceof NodeSelection &&
           (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
         ) {
           const { firstTextStart } = getContainerInnerTextBounds(sel.node, sel.from)
           nextSel =
             firstTextStart !== -1 ? TextSelection.create(doc, firstTextStart) : sel
+        } else if (sel instanceof NodeSelection) {
+          storage.activeCompoundBlockPos = sel.from
+          storage.focusControlRequest = { pos: sel.from, type: sel.node.type.name }
+          nextSel = sel
         } else {
-          nextSel = sel instanceof NodeSelection ? sel : TextSelection.create(doc, sel.from)
+          nextSel = TextSelection.create(doc, sel.from)
         }
         let tr = state.tr.setSelection(nextSel)
-        tr = updateMeta(tr, { mode: 'insert', secondaryRanges: [] })
+        tr = updateMeta(tr, {
+          mode: 'insert',
+          secondaryRanges: [],
+          goalColumn: null,
+          subtextCursor: null,
+        })
         storage.mode = 'insert'
         dispatchTransaction(editor, tr)
         return { enterInsert: true }
       }
 
       if (op === 'appendEnd') {
-        let dest: number
-        if (
+        let nextSel: Selection
+        if (pluginState?.subtextCursor) {
+          const sub = pluginState.subtextCursor
+          storage.activeCompoundBlockPos = sub.pos
+          storage.focusControlRequest = {
+            pos: sub.pos,
+            type: sub.kind === 'noticeTitle' ? 'notice' : 'image',
+            control: sub.kind === 'noticeTitle' ? 'title' : 'caption',
+            offset: sub.offset + 1,
+          }
+          nextSel = sel
+        } else if (
           sel instanceof NodeSelection &&
           (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
         ) {
           const { lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
-          dest = lastTextEnd !== -1 ? lastTextEnd : sel.to
+          const dest = lastTextEnd !== -1 ? lastTextEnd : sel.to
+          nextSel = TextSelection.create(doc, dest)
+        } else if (sel instanceof NodeSelection) {
+          storage.activeCompoundBlockPos = sel.from
+          storage.focusControlRequest = { pos: sel.from, type: sel.node.type.name }
+          nextSel = sel
         } else {
-          dest =
-            sel instanceof NodeSelection
-              ? sel.to
-              : sel.empty
-                ? Math.min(sel.$head.end(), sel.to + 1)
-                : sel.to
+          const dest = sel.empty ? Math.min(sel.$head.end(), sel.to + 1) : sel.to
+          nextSel = TextSelection.create(doc, dest)
         }
-        let tr = state.tr.setSelection(TextSelection.create(doc, dest))
-        tr = updateMeta(tr, { mode: 'insert', secondaryRanges: [] })
+        let tr = state.tr.setSelection(nextSel)
+        tr = updateMeta(tr, {
+          mode: 'insert',
+          secondaryRanges: [],
+          goalColumn: null,
+          subtextCursor: null,
+        })
         storage.mode = 'insert'
         dispatchTransaction(editor, tr)
         return { enterInsert: true }
@@ -1399,15 +1751,6 @@ function createModalTargetForEditor(
           storage.activeCompoundBlockPos < editor.state.doc.content.size
         ) {
           compoundPosToSelect = storage.activeCompoundBlockPos
-        } else {
-          const { $from } = editor.state.selection
-          for (let d = $from.depth; d >= 1; d -= 1) {
-            const name = $from.node(d).type.name
-            if (name === 'notice' || name === 'codeBlock') {
-              compoundPosToSelect = $from.before(d)
-              break
-            }
-          }
         }
         storage.activeCompoundBlockPos = null
       }
@@ -1433,15 +1776,42 @@ function createModalTargetForEditor(
       }
       try {
         let tr = editor.state.tr
+        let restoredSubtextCursor: SubtextCursorState | null = null
         if (compoundPosToSelect !== null) {
           const node = editor.state.doc.nodeAt(compoundPosToSelect)
-          if (node && NodeSelection.isSelectable(node)) {
-            tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
+          if (node) {
+            if (node.type.name === 'notice' || node.type.name === 'codeBlock') {
+              const $cur = editor.state.selection.$from
+              let insideThisBlock = false
+              for (let d = $cur.depth; d >= 1; d -= 1) {
+                if ($cur.before(d) === compoundPosToSelect) {
+                  insideThisBlock = true
+                  break
+                }
+              }
+              if (!insideThisBlock) {
+                const { firstTextStart } = getContainerInnerTextBounds(node, compoundPosToSelect)
+                if (firstTextStart !== -1) {
+                  tr = tr.setSelection(TextSelection.create(editor.state.doc, firstTextStart))
+                }
+              }
+            } else if (NodeSelection.isSelectable(node)) {
+              tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
+              if (node.type.name === 'image' || node.type.name === 'imageNode') {
+                restoredSubtextCursor = {
+                  pos: compoundPosToSelect,
+                  kind: 'imageCaption',
+                  offset: 0,
+                }
+              }
+            }
           }
         }
         tr = updateMeta(tr, {
           mode: nextMode,
           preset: nextPreset,
+          goalColumn: null,
+          subtextCursor: restoredSubtextCursor,
           ...(nextMode === 'insert' ? { secondaryRanges: [] } : {}),
         })
         dispatchTransaction(editor, tr)
@@ -1562,6 +1932,12 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
                       ? meta.extendedRange
                       : prev.extendedRange,
                 focused: meta.focused !== undefined ? meta.focused : prev.focused,
+                subtextCursor:
+                  nextMode === 'insert'
+                    ? null
+                    : meta.subtextCursor !== undefined
+                      ? meta.subtextCursor
+                      : prev.subtextCursor,
               }
             }
             if (tr.docChanged && prev.secondaryRanges.length > 0) {
@@ -1745,17 +2121,20 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
                 }
 
                 if (fullyCovered || innerCovered) {
+                  const isInlineCursor =
+                    !node.isBlock &&
+                    isPrimary &&
+                    selection instanceof NodeSelection &&
+                    pos === selection.from
                   decos.push(
                     Decoration.node(pos, pos + node.nodeSize, {
                       class: isPrimary
-                        ? selection instanceof NodeSelection && pos === selection.from
+                        ? isInlineCursor
                           ? 'pm-modal-node-selection pm-modal-cursor'
                           : 'pm-modal-node-selection'
                         : 'pm-modal-node-selection pm-multi-selection',
                       'data-pm-modal-node-selection': pluginState.mode,
-                      ...(isPrimary && selection instanceof NodeSelection && pos === selection.from
-                        ? { 'data-pm-modal-cursor': pluginState.mode }
-                        : {}),
+                      ...(isInlineCursor ? { 'data-pm-modal-cursor': pluginState.mode } : {}),
                     }),
                   )
                 }
@@ -1787,9 +2166,11 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
               if (nodeAfter && nodeAfter.isAtom && !nodeAfter.isText) {
                 decos.push(
                   Decoration.node(pos, pos + nodeAfter.nodeSize, {
-                    class: 'pm-modal-node-selection pm-modal-cursor',
+                    class: nodeAfter.isBlock
+                      ? 'pm-modal-node-selection'
+                      : 'pm-modal-node-selection pm-modal-cursor',
                     'data-pm-modal-node-selection': pluginState.mode,
-                    'data-pm-modal-cursor': pluginState.mode,
+                    ...(!nodeAfter.isBlock ? { 'data-pm-modal-cursor': pluginState.mode } : {}),
                   }),
                 )
                 return
@@ -1836,19 +2217,65 @@ export const ModalKeymap = Extension.create<ModalKeymapOptions, ModalKeymapStora
                   anchor: selection.anchor,
                 }
 
-            if (!pluginState.extendedRange && selection instanceof NodeSelection) {
+            if (pluginState.subtextCursor) {
+              const sub = pluginState.subtextCursor
+              const subNode = doc.nodeAt(sub.pos)
+              if (subNode) {
+                decos.push(
+                  Decoration.node(sub.pos, sub.pos + subNode.nodeSize, {
+                    class: 'pm-modal-node-selection',
+                    'data-pm-modal-node-selection': pluginState.mode,
+                    ...(sub.kind === 'noticeTitle'
+                      ? { 'data-pm-modal-notice-title': pluginState.mode }
+                      : { 'data-pm-modal-image-caption': pluginState.mode }),
+                  }),
+                )
+              }
+            } else if (!pluginState.extendedRange && selection instanceof NodeSelection) {
               pushNodeDecorationsInRange(selection.from, selection.to, true)
             } else if (primaryRange.from === primaryRange.to) {
+              const $head = doc.resolve(Math.min(doc.content.size, Math.max(0, head)))
+              for (let d = $head.depth; d >= 1; d -= 1) {
+                const ancestor = $head.node(d)
+                if (ancestor.type.name === 'notice' || ancestor.type.name === 'codeBlock') {
+                  const ancestorPos = $head.before(d)
+                  decos.push(
+                    Decoration.node(ancestorPos, ancestorPos + ancestor.nodeSize, {
+                      class: 'pm-modal-node-selection',
+                      'data-pm-modal-node-selection': pluginState.mode,
+                    }),
+                  )
+                  break
+                }
+              }
               pushCursorDecoration(head, false)
             } else if (primaryRange.from < primaryRange.to) {
               pushNodeDecorationsInRange(primaryRange.from, primaryRange.to, true)
+              const $head = doc.resolve(Math.min(doc.content.size, primaryRange.head))
+              for (let d = $head.depth; d >= 1; d -= 1) {
+                const ancestor = $head.node(d)
+                if (ancestor.type.name === 'notice' || ancestor.type.name === 'codeBlock') {
+                  const ancestorPos = $head.before(d)
+                  const alreadyDecorated =
+                    ancestorPos >= primaryRange.from &&
+                    ancestorPos + ancestor.nodeSize <= primaryRange.to
+                  if (!alreadyDecorated) {
+                    decos.push(
+                      Decoration.node(ancestorPos, ancestorPos + ancestor.nodeSize, {
+                        class: 'pm-modal-node-selection',
+                        'data-pm-modal-node-selection': pluginState.mode,
+                      }),
+                    )
+                  }
+                  break
+                }
+              }
               decos.push(
                 Decoration.inline(primaryRange.from, primaryRange.to, {
                   class: 'pm-modal-selection',
                   'data-pm-modal-selection': pluginState.mode,
                 }),
               )
-              const $head = doc.resolve(Math.min(doc.content.size, primaryRange.head))
               if ($head.parent.isTextblock) {
                 const cursorPos =
                   primaryRange.head > primaryRange.anchor

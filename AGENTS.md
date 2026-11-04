@@ -77,7 +77,9 @@
 - Register desktop close and quit handlers in the shell lifecycle.
 - Keep pending-save flushing and overlapping-close guards in the editor service.
 - Synchronize `EditorService.editable` (`false` in `normal`/`select` modes, `true` in `insert` mode) with `WhichKeyProvider` and `ModalKeymap`. See [the keybindings guide](docs/keybindings/index.md).
+- [Proposed] Order the `WhichKey` leader menu with keybind help, explorer toggle, new file, new folder, file operations, and search before navigation, window, view, toggle, and preset groups.
 - Keep article scrolling and keyboard reactions in the reusable editor component. Keep the application content pane focused on composition.
+- [Proposed] Keep non-editor content states in `ContentFallback.svelte`, including unsupported file types with an `Open In Default App` action.
 
 ### Workspace UI
 

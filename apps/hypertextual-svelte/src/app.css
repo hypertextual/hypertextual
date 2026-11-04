@@ -47,8 +47,25 @@ button:focus-visible {
 }
 .workspace-shell[data-pane-outline='true'] .workspace-sidebar:focus-within,
 .workspace-shell[data-pane-outline='true'] .document-pane:focus-within {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
+  outline: none;
+}
+.workspace-shell[data-pane-outline='true'] .workspace-sidebar:focus-within::after,
+.workspace-shell[data-pane-outline='true'] .document-pane:focus-within::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  box-shadow:
+    inset 0 0 8px 0 color-mix(in srgb, var(--ring) 40%, transparent),
+    inset 0 0 4px 0 color-mix(in srgb, var(--ring) 15%, transparent);
+}
+.workspace-sidebar,
+.workspace-sidebar [data-slot='sidebar-inner'],
+.workspace-sidebar [data-slot='sidebar-content'],
+.workspace-sidebar [data-scope='tree-view'],
+.workspace-sidebar [role='tree'] {
+  outline: none;
 }
 .titlebar {
   height: 36px;
@@ -87,7 +104,7 @@ button:focus-visible {
   flex-shrink: 0;
   background: var(--sidebar);
   border-right: 1px solid var(--sidebar-border);
-  overflow-y: auto;
+  overflow: hidden;
 }
 .sidebar-heading {
   padding: 15px 14px 10px;
@@ -102,12 +119,14 @@ button:focus-visible {
   overflow-wrap: anywhere;
 }
 .document-pane {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
   background: var(--background);
+  overflow: hidden;
 }
 .article-editor {
   max-width: 820px;

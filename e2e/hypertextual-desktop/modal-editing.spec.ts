@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 const path = 'Drafts/Modes.md'
 const source =
-  '# Modes\n\nA paragraph to edit.\n\n> [!NOTE] Remember\n> Body text.\n\n```javascript\nconst value = 1\n```\n\n![Photo](.images/photo.png "Photo caption")\n\n:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"} :::\n\n' +
+  '# Modes\n\nA paragraph to edit.\n\n> [!NOTE] Remember\n> Body text.\n\n```javascript\nconst value = 1\nconst next = 2\n```\n\n![Photo](.images/photo.png "Photo caption")\n\n:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"} :::\n\n' +
   Array.from({ length: 60 }, (_, index) => `Paragraph ${index}.`).join('\n\n') +
   '\n'
 
@@ -172,6 +172,8 @@ test.describe(
         await page.keyboard.press('j')
         await page.keyboard.press('j')
         await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
         await page.keyboard.press('z')
         await page.keyboard.press('j')
 
@@ -260,6 +262,10 @@ test.describe(
         await expect(popup).toBeVisible()
         await expect(popup).toContainText('Toggle Explorer')
         await expect(popup).not.toContainText('Focus Pane 1')
+        const itemKeys = await popup
+          .locator('[data-testid="which-key-item"]')
+          .evaluateAll((els) => els.map((el) => el.getAttribute('data-key')))
+        expect(itemKeys).toEqual(['?', 'e', 'n', 'N', 'f', '/', 'g', 'j', 'w', 'v', 't', 'k'])
         await page.keyboard.press('k')
         await page.keyboard.press('v')
         await expect(badge).toHaveText('vim · normal')
@@ -298,11 +304,12 @@ test.describe(
           await expect.poll(async () => (await docPane.boundingBox())?.x).toBe(before!.x)
           const activeItem = page.locator(`[role="treeitem"][data-value="${path}"]`)
           await expect(activeItem).toBeFocused()
-          await expect(activeItem).toHaveCSS('box-shadow', /rgb\(124, 58, 237\).*inset/)
-          await expect(page.locator('#workspace-sidebar')).toHaveCSS(
-            'outline-color',
-            'rgb(124, 58, 237)',
-          )
+          await expect(activeItem).toHaveCSS('box-shadow', /0px 0px 0px 1px inset/)
+          await expect(
+            page
+              .locator('#workspace-sidebar')
+              .evaluate((el) => getComputedStyle(el, '::after').boxShadow),
+          ).resolves.toMatch(/inset/)
           await expect(page.locator('.ProseMirror [data-pm-modal-cursor]')).toHaveCount(0)
 
           // Act
@@ -329,19 +336,39 @@ test.describe(
     })
 
     test.describe('When the user enters a highlighted compound block with Enter and exits with Escape', () => {
-      test('it highlights the whole notice block, traverses title/type/body via Enter and Tab, and restores whole-block highlight on Escape', async ({
+      test('it highlights the whole notice, code block, and image while traversing text or reaching out-of-flow controls via Enter/Tab/i', async ({
         page,
       }) => {
-        // Arrange
+        // Arrange: j twice from H1 -> Paragraph -> Notice title
         const prose = page.locator('.ProseMirror')
         await page.keyboard.press('j')
         await page.keyboard.press('j')
         await expect(
+          prose.locator('[data-pm-modal-notice-title="normal"]:has(.editor-notice-node)'),
+        ).toHaveCount(1)
+        await expect(
+          prose.locator('[data-notice-title-text] [data-pm-modal-cursor="normal"]'),
+        ).toHaveText('R')
+        await page.keyboard.press('l')
+        await expect(
+          prose.locator('[data-notice-title-text] [data-pm-modal-cursor="normal"]'),
+        ).toHaveText('e')
+
+        // j once more -> Notice body paragraph (preserving goal column 1 -> "o" in "Body text.")
+        await page.keyboard.press('j')
+        await expect(
           prose.locator('[data-pm-modal-node-selection="normal"]:has(.editor-notice-node)'),
         ).toHaveCount(1)
+        await expect(
+          prose.locator('.editor-notice-node p [data-pm-modal-cursor="normal"]'),
+        ).toHaveText('o')
 
-        // Act
-        await page.keyboard.press('Enter')
+        // k back to Notice title -> i edits Notice title -> Tab to Notice type -> Tab to Notice body
+        await page.keyboard.press('k')
+        await expect(
+          prose.locator('[data-pm-modal-notice-title="normal"]:has(.editor-notice-node)'),
+        ).toHaveCount(1)
+        await page.keyboard.press('i')
         const titleInput = page.getByLabel('Notice title')
         await expect(titleInput).toBeFocused()
         await page.keyboard.press('Tab')
@@ -349,12 +376,57 @@ test.describe(
         await page.keyboard.press('Tab')
         await expect(prose).toBeFocused()
         await page.keyboard.press('Escape')
-
-        // Assert
         await expect(prose).toHaveAttribute('contenteditable', 'false')
         await expect(
           prose.locator('[data-pm-modal-node-selection="normal"]:has(.editor-notice-node)'),
         ).toHaveCount(1)
+
+        // Move j into CodeBlock line 1 ("const value = 1") and j again into line 2 ("const next = 2")
+        await page.keyboard.press('j')
+        await expect(
+          prose.locator(
+            '[data-pm-modal-node-selection="normal"] pre code [data-pm-modal-cursor="normal"]',
+          ),
+        ).toHaveText('c')
+        await page.keyboard.press('l')
+        await expect(
+          prose.locator(
+            '[data-pm-modal-node-selection="normal"] pre code [data-pm-modal-cursor="normal"]',
+          ),
+        ).toHaveText('o')
+        await page.keyboard.press('j')
+        await expect(
+          prose.locator(
+            '[data-pm-modal-node-selection="normal"] pre code [data-pm-modal-cursor="normal"]',
+          ),
+        ).toHaveText('o')
+        await page.keyboard.press('i')
+        await expect(prose).toHaveAttribute('contenteditable', 'true')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(page.getByRole('combobox', { name: 'Code language' })).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('Escape')
+        await page.keyboard.press('j')
+
+        // Move j onto Image caption in normal mode -> l moves caption cursor -> i focuses Image caption input
+        await page.keyboard.press('j')
+        await expect(prose.locator('[data-pm-modal-node-selection="normal"] img')).toHaveCount(1)
+        await expect(
+          prose.locator('[data-image-caption-text] [data-pm-modal-cursor="normal"]'),
+        ).toHaveText('P')
+        await page.keyboard.press('l')
+        await expect(
+          prose.locator('[data-image-caption-text] [data-pm-modal-cursor="normal"]'),
+        ).toHaveText('h')
+        await page.keyboard.press('i')
+        await expect(page.getByLabel('Image caption')).toBeFocused()
+        await page.keyboard.press('Escape')
+
+        // Assert
+        await expect(prose).toHaveAttribute('contenteditable', 'false')
+        await expect(prose.locator('[data-pm-modal-node-selection="normal"] img')).toHaveCount(1)
       })
     })
 

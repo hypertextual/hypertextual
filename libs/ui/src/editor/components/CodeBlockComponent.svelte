@@ -92,20 +92,57 @@
     editor.view.focus()
   }
 
-  function handleHeaderKeydown(event: KeyboardEvent) {
+  function handleHeaderKeydownCapture(event: KeyboardEvent) {
     if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
     const target = event.target as HTMLElement | null
     if (!target) return
-    const isTrigger = target.getAttribute('data-part') === 'trigger'
-    if (isTrigger && target.getAttribute('aria-expanded') === 'true') return
-    if (event.key === 'ArrowDown' || (isTrigger && event.key === 'Tab' && event.shiftKey)) {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBody()
-    } else if (!isTrigger && event.key === 'Tab' && !event.shiftKey) {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBody()
+    const header = event.currentTarget as HTMLElement
+    const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+    if (trigger) {
+      if (trigger.getAttribute('aria-expanded') === 'true') return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBody()
+      } else if (event.key === 'Tab' && !event.shiftKey) {
+        const copyBtn = header.querySelector<HTMLElement>(
+          'button[aria-label*="Copy"], button:not([data-part="trigger"])',
+        )
+        if (copyBtn) {
+          event.preventDefault()
+          event.stopPropagation()
+          copyBtn.focus()
+        } else {
+          event.preventDefault()
+          event.stopPropagation()
+          focusBody()
+        }
+      } else if (event.key === 'Tab' && event.shiftKey) {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBody()
+      }
+      return
+    }
+
+    const button = target.closest<HTMLElement>('button')
+    if (button) {
+      if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey)) {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBody()
+      } else if (event.key === 'Tab' && event.shiftKey) {
+        const langTrigger = header.querySelector<HTMLElement>('[data-part="trigger"]')
+        if (langTrigger) {
+          event.preventDefault()
+          event.stopPropagation()
+          langTrigger.focus()
+        } else {
+          event.preventDefault()
+          event.stopPropagation()
+          focusBody()
+        }
+      }
     }
   }
 </script>
@@ -113,7 +150,7 @@
 <NodeViewWrapper class="my-4">
   <CodeBlock code={node.textContent} {language} class="my-0">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div onkeydown={handleHeaderKeydown}>
+    <div onkeydowncapture={handleHeaderKeydownCapture}>
       <CodeBlockHeader contenteditable={false}>
         <div class="flex items-center gap-2">
           {#if editable}
@@ -129,7 +166,7 @@
               <SelectTrigger
                 aria-label="Code language"
                 size="sm"
-                class="min-w-36 justify-between font-mono text-xs"
+                class="min-w-36 justify-between font-mono text-xs focus:border-ring focus:ring-2 focus:ring-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <SelectValue />
                 <SelectIndicator>

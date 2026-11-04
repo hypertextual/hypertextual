@@ -4,7 +4,11 @@
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
   import { NodeViewContent, NodeViewWrapper } from 'svelte-tiptap'
   import { Selection } from '@tiptap/pm/state'
-  import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
+  import {
+    isEditorInInsertMode,
+    modalKeymapPluginKey,
+    subscribeToEditorTransactions,
+  } from '../core'
   import { noticeBody } from './styles'
   import { createSubscriber } from 'svelte/reactivity'
   import {
@@ -42,6 +46,24 @@
 
   const title = $derived((node.attrs.title as string | undefined) ?? 'Note')
 
+  const modalSubtext = $derived.by(() => {
+    subscribe()
+    const st = modalKeymapPluginKey.getState(editor.state)?.subtextCursor
+    const pos = typeof getPos === 'function' ? getPos() : undefined
+    if (!st || st.kind !== 'noticeTitle' || st.pos !== pos) return null
+    return st
+  })
+
+  const modalCharRange = $derived.by(() => {
+    if (!modalSubtext) return null
+    if (typeof modalSubtext.anchorOffset === 'number') {
+      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
+      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
+      return { from, to: Math.max(from + 1, to) }
+    }
+    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
+  })
+
   const empty = $derived(
     node.childCount === 1 &&
       node.firstChild?.type.name === 'paragraph' &&
@@ -71,54 +93,57 @@
     editor.view.focus()
   }
 
-  function handleTitleKeydown(event: KeyboardEvent) {
+  function handleHeaderKeydownCapture(event: KeyboardEvent) {
     if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-    if (event.key === 'Tab' && !event.shiftKey) {
-      const trigger = (event.currentTarget as HTMLElement | null)
-        ?.closest('.editor-notice-node')
-        ?.querySelector<HTMLElement>('[data-part="trigger"]')
-      if (trigger) {
-        event.preventDefault()
-        event.stopPropagation()
-        trigger.focus()
+    const target = event.target as HTMLElement | null
+    if (!target) return
+    const header = event.currentTarget as HTMLElement
+
+    if (target.matches('input[aria-label="Notice title"]')) {
+      if (event.key === 'Tab' && !event.shiftKey) {
+        const trigger = header.querySelector<HTMLElement>(
+          'button[data-part="trigger"], [aria-label="Notice type"][data-part="trigger"]',
+        )
+        if (trigger) {
+          event.preventDefault()
+          event.stopPropagation()
+          trigger.focus()
+        }
         return
       }
-    }
-    if (event.key === 'Tab' && event.shiftKey) {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBody()
-      return
-    }
-    if (event.shiftKey) return
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBefore()
-    }
-    if (event.key === 'ArrowDown' || event.key === 'Enter') {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBody()
-    }
-  }
-
-  function handleTypeKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-    const trigger = event.currentTarget as HTMLElement | null
-    if (trigger?.getAttribute('aria-expanded') === 'true') return
-    if ((event.key === 'Tab' && !event.shiftKey) || event.key === 'ArrowDown') {
-      event.preventDefault()
-      event.stopPropagation()
-      focusBody()
-    } else if (event.key === 'Tab' && event.shiftKey) {
-      const titleInput = trigger
-        ?.closest('.editor-notice-node')
-        ?.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-      if (titleInput) {
+      if (event.key === 'Tab' && event.shiftKey) {
         event.preventDefault()
         event.stopPropagation()
-        titleInput.focus()
+        focusBody()
+        return
+      }
+      if (event.shiftKey) return
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBefore()
+      } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBody()
+      }
+      return
+    }
+
+    const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+    if (trigger) {
+      if (trigger.getAttribute('aria-expanded') === 'true') return
+      if ((event.key === 'Tab' && !event.shiftKey) || event.key === 'ArrowDown') {
+        event.preventDefault()
+        event.stopPropagation()
+        focusBody()
+      } else if (event.key === 'Tab' && event.shiftKey) {
+        const titleInput = header.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+        if (titleInput) {
+          event.preventDefault()
+          event.stopPropagation()
+          titleInput.focus()
+        }
       }
     }
   }
@@ -126,13 +151,17 @@
 
 <NodeViewWrapper>
   <Notice {variant} class="editor-notice-node relative my-1 px-2 py-1">
-    <div class="flex items-center gap-2" contenteditable={false}>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="flex items-center gap-2"
+      contenteditable={false}
+      onkeydowncapture={handleHeaderKeydownCapture}
+    >
       {#if editable}
         <input
           aria-label="Notice title"
           value={title}
           oninput={(event) => updateAttributes({ title: event.currentTarget.value })}
-          onkeydown={handleTitleKeydown}
           class="min-w-0 flex-1 bg-transparent font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
           placeholder="Notice title"
         />
@@ -147,8 +176,7 @@
           <SelectTrigger
             aria-label="Notice type"
             size="sm"
-            class="min-w-36 justify-between text-xs"
-            onkeydown={handleTypeKeydown}
+            class="min-w-36 justify-between text-xs focus:border-ring focus:ring-2 focus:ring-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <SelectValue />
             <SelectIndicator><ChevronsUpDown class="size-3 opacity-50" /></SelectIndicator>
@@ -163,8 +191,16 @@
             {/each}
           </SelectContent>
         </Select>
+      {:else if modalCharRange}
+        <span data-notice-title-text class="font-semibold tracking-tight"
+          >{title.slice(0, modalCharRange.from)}<span
+            class="pm-modal-cursor"
+            data-pm-modal-cursor="normal"
+            >{title.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
+          >{title.slice(modalCharRange.to)}</span
+        >
       {:else}
-        <span class="font-semibold tracking-tight">{title}</span>
+        <span data-notice-title-text class="font-semibold tracking-tight">{title}</span>
       {/if}
     </div>
     <NodeViewContent data-empty={empty && editable} class={noticeBody} />

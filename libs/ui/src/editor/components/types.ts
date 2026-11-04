@@ -75,6 +75,8 @@ export type ImageNodeViewProps = NodeViewProps
 export interface LinkEditPopoverProps {
   editor: Editor
   initialUrl?: string
+  onSave?: (url: string) => void | Promise<void>
+  onRemove?: () => void
   onClose: () => void
 }
 

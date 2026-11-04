@@ -2,7 +2,7 @@
 
 ## Overview
 
-The shell is the desktop workspace frame. It composes navigation, file actions, the workspace explorer, the content pane, draft recovery, and global `WhichKeyProvider` / `WhichKey` modal keybinding orchestration (registering `<leader>e` and `Ctrl-e` to toggle the Workspace Explorer, `<leader>n` for new articles, and `<leader>N` for new folders).
+The shell is the desktop workspace frame. It composes navigation, file actions, the workspace explorer, the content pane, draft recovery, and global `WhichKeyProvider` / `WhichKey` modal keybinding orchestration (ordering `<leader>` with `?` keybind help, `e` toggle explorer, `n` new article, `N` new folder, `f` file operations, and `/` search before `g` goto, `j` jump, `w` window, `v` view, `t` toggles, and `k` preset).
 
 ## Design
 

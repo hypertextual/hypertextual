@@ -4,7 +4,7 @@
   import { Trash2, Globe, ExternalLink } from 'lucide-svelte'
 
   // Props ---------------------------------------------------------------------
-  let { editor, initialUrl = '', onClose }: LinkEditPopoverProps = $props()
+  let { editor, initialUrl = '', onSave, onRemove, onClose }: LinkEditPopoverProps = $props()
 
   // State ---------------------------------------------------------------------
   let inputElement: HTMLInputElement
@@ -23,8 +23,15 @@
 
   // Methods -------------------------------------------------------------------
   function saveAndClose() {
+    clearTimeout(blurTimer)
     if (linkUrl.trim()) {
-      editor.chain().focus().setLink({ href: linkUrl.trim() }).run()
+      if (onSave) {
+        void onSave(linkUrl.trim())
+      } else {
+        editor.chain().focus().setLink({ href: linkUrl.trim() }).run()
+      }
+    } else if (onRemove) {
+      onRemove()
     } else {
       // If empty, remove the link
       editor.chain().focus().unsetLink().run()
@@ -33,13 +40,19 @@
   }
 
   function removeLink() {
-    editor.chain().focus().unsetLink().run()
+    clearTimeout(blurTimer)
+    if (onRemove) {
+      onRemove()
+    } else {
+      editor.chain().focus().unsetLink().run()
+    }
     onClose()
   }
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' || event.key === 'Escape') {
       event.preventDefault()
+      event.stopPropagation()
       saveAndClose()
     }
   }

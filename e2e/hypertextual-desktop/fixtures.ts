@@ -14,6 +14,7 @@ export interface Workspace {
   destroyed: boolean
   quit: boolean
   writes: string[]
+  openedExternal: string[]
   emit: (event: string) => Promise<void>
 }
 
@@ -82,6 +83,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           destroyed: false,
           quit: false,
           writes: [],
+          openedExternal: [],
           emit: (event) => emit(page, event),
         }
 
@@ -156,6 +158,11 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
             if (command === 'workspace_delete') {
               if (workspace.failWrites) throw new Error('Disk unavailable')
               await rm(location(args.relativePath!), { recursive: true })
+              return null
+            }
+            if (command === 'workspace_open_default_app') {
+              await stat(location(args.relativePath!))
+              workspace.openedExternal.push(args.relativePath!)
               return null
             }
             if (command === 'workspace_create') {

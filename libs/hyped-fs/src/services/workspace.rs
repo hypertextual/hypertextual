@@ -198,4 +198,33 @@ impl WorkspaceService {
         }
         trash::delete(path).map_err(|e| error("io", e.to_string()))
     }
+
+    pub fn open_in_default_app(&self, relative: &str) -> Result<()> {
+        let path = self.resolve(relative)?;
+        if !fs::metadata(&path)?.is_file() {
+            return Err(error("unsupported", "Only workspace files can be opened."));
+        }
+        #[cfg(target_os = "macos")]
+        let status = std::process::Command::new("open").arg(&path).status();
+        #[cfg(target_os = "linux")]
+        let status = std::process::Command::new("xdg-open").arg(&path).status();
+        #[cfg(windows)]
+        let status = std::process::Command::new("explorer").arg(&path).status();
+        #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+        return Err(error(
+            "unsupported",
+            "Opening files in the default application is not supported on this platform.",
+        ));
+        #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+        {
+            let status = status.map_err(|e| error("io", e.to_string()))?;
+            if !status.success() {
+                return Err(error(
+                    "io",
+                    "Could not open the file in the default application.",
+                ));
+            }
+            Ok(())
+        }
+    }
 }

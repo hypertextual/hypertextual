@@ -32,7 +32,7 @@ export const CodeBlockCustom = CodeBlockLowlight.extend<CodeBlockLowlightOptions
             const dom = this.editor.view.nodeDOM($from.before(depth))
             if (dom instanceof HTMLElement) {
               const trigger = dom.querySelector<HTMLElement>(
-                '[aria-label="Code language"], [data-part="trigger"]',
+                '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
               )
               if (trigger) {
                 trigger.focus()

@@ -1,7 +1,11 @@
 <script lang="ts">
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
-  import { isEditorInInsertMode, subscribeToEditorTransactions } from '../core'
+  import {
+    isEditorInInsertMode,
+    modalKeymapPluginKey,
+    subscribeToEditorTransactions,
+  } from '../core'
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
@@ -21,6 +25,24 @@
   const { src, srcset, alt } = $derived(node.attrs)
 
   let caption = $derived(node.attrs.caption || '')
+
+  const modalSubtext = $derived.by(() => {
+    subscribe()
+    const st = modalKeymapPluginKey.getState(editor.state)?.subtextCursor
+    const pos = typeof getPos === 'function' ? getPos() : undefined
+    if (!st || st.kind !== 'imageCaption' || st.pos !== pos) return null
+    return st
+  })
+
+  const modalCharRange = $derived.by(() => {
+    if (!modalSubtext) return null
+    if (typeof modalSubtext.anchorOffset === 'number') {
+      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
+      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
+      return { from, to: Math.max(from + 1, to) }
+    }
+    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
+  })
 
   // Methods -------------------------------------------------------------------
   function handleCaptionBlur() {
@@ -88,7 +110,7 @@
       class="w-full object-cover"
       draggable="false"
     />
-    {#if editable || caption}
+    {#if editable || caption || modalCharRange}
       <figcaption class="mt-2">
         {#if editable}
           <input
@@ -104,8 +126,16 @@
             style="background: transparent; box-shadow: none; outline: none;"
             class={captionInput}
           />
+        {:else if modalCharRange}
+          <span data-image-caption-text
+            >{caption.slice(0, modalCharRange.from)}<span
+              class="pm-modal-cursor"
+              data-pm-modal-cursor="normal"
+              >{caption.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
+            >{caption.slice(modalCharRange.to)}</span
+          >
         {:else}
-          <span>{caption}</span>
+          <span data-image-caption-text>{caption}</span>
         {/if}
       </figcaption>
     {/if}
@@ -119,7 +149,9 @@
         if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
           const cap = (event.currentTarget as HTMLElement)
             .closest('.image-node-view')
-            ?.querySelector<HTMLInputElement>('input.caption-input')
+            ?.querySelector<HTMLInputElement>(
+              'input[aria-label="Image caption"], input.caption-input',
+            )
           if (cap) {
             event.preventDefault()
             event.stopPropagation()

@@ -4,17 +4,20 @@
   import { NodeViewWrapper } from 'svelte-tiptap'
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
+  import LinkEditPopover from './LinkEditPopover.svelte'
   import { Link, X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, deleteNode }: LinkPreviewCardProps = $props()
+  let { node, editor, updateAttributes, deleteNode }: LinkPreviewCardProps = $props()
 
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   let imageError = $state(false)
 
   let faviconError = $state(false)
+
+  let editingLink = $state(false)
 
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
@@ -41,15 +44,27 @@
       return []
     }
   })
+
+  // Lifecycle -----------------------------------------------------------------
+  $effect(() => {
+    if (!editable) editingLink = false
+  })
 </script>
 
 <NodeViewWrapper class="link-preview relative my-4" data-type={type} contenteditable={false}>
   {#if type === 'bookmark'}
     <a
+      data-bookmark-edit
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      class="flex overflow-hidden rounded-lg border border-border/70 bg-muted/40 transition-colors hover:bg-muted bookmark-card-edit"
+      onclick={(event) => {
+        event.preventDefault()
+        if (editable) {
+          editingLink = true
+        }
+      }}
+      class="flex overflow-hidden rounded-lg border border-border/70 bg-muted/40 transition-colors hover:bg-muted [[data-pm-modal-node-selection]_&]:bg-transparent bookmark-card-edit"
       style="text-decoration: none !important; color: inherit;"
     >
       <div class="flex-1 min-w-0 flex flex-col justify-between px-3 py-2.5">
@@ -86,6 +101,23 @@
         </div>
       {/if}
     </a>
+    {#if editable && editingLink}
+      <LinkEditPopover
+        {editor}
+        initialUrl={url}
+        onSave={(nextUrl) => {
+          updateAttributes({
+            url: nextUrl,
+            ...(title === url || !title ? { title: nextUrl } : {}),
+          })
+        }}
+        onRemove={deleteNode}
+        onClose={() => {
+          editingLink = false
+          editor.commands.focus()
+        }}
+      />
+    {/if}
   {:else if type === 'embed'}
     <div data-modal-ignore-pointer="true">
       <YouTube {url} class={youtubeSurface}>

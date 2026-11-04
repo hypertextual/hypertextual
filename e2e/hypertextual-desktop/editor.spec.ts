@@ -108,11 +108,14 @@ test.describe(
       await expect(page.locator('.ProseMirror h1')).toHaveText('HTMD')
     })
 
-    test('User can inspect unparsed source and images without rewriting files', async ({
+    test('User can inspect unparsed source, images, and unsupported files without rewriting files', async ({
       page,
       workspace,
     }) => {
       // Arrange: each case starts with its own seeded workspace.
+      await writeFile(join(workspace.root, 'manual.pdf'), '%PDF-1.4\n')
+      await page.reload()
+
       // Act
       await page.locator('[role="treeitem"][data-value$="rich.htmd"]').click()
       // Assert
@@ -124,6 +127,10 @@ test.describe(
       await expect(page.locator('.ProseMirror a')).toHaveAttribute('title', 'Preserve this title')
       await page.locator('[role="treeitem"][data-value$="image.png"]').click()
       await expect(page.locator('.image-preview img')).toBeVisible()
+      await page.locator('[role="treeitem"][data-value$="manual.pdf"]').click()
+      await expect(page.getByRole('heading', { name: 'Unsupported file type' })).toBeVisible()
+      await page.getByRole('button', { name: 'Open In Default App' }).click()
+      expect(workspace.openedExternal).toEqual(['manual.pdf'])
       expect(workspace.writes).toEqual([])
     })
 

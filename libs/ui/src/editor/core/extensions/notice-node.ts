@@ -90,7 +90,9 @@ export const NoticeNode = Node.create<NodeViewOptions>({
               const dom = view.nodeDOM($from.before(noticeDepth))
               if (!(dom instanceof HTMLElement)) return false
               const target = event.shiftKey
-                ? dom.querySelector<HTMLElement>('[aria-label="Notice type"]')
+                ? dom.querySelector<HTMLElement>(
+                    '[aria-label="Notice type"][data-part="trigger"], [data-part="trigger"]',
+                  )
                 : dom.querySelector<HTMLElement>('input[aria-label="Notice title"]')
               if (!target) return false
               event.preventDefault()
