@@ -84,6 +84,7 @@ Package integration suites exercise the format and filesystem APIs. App integrat
 
 - [hyped-fs workspace persistence](hyped-fs.md)
 - [htmd-ts format SDK](htmd-ts.md)
+- [Keybindings](../keybindings/index.md)
 - [UI library components](ui/index.md)
 - [Svelte web app components](svelte-web-app/index.md)
 - [Development commands](../development.md)

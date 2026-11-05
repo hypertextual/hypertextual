@@ -5,6 +5,7 @@ import { Extension } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
 import Suggestion, { type SuggestionOptions } from '@tiptap/suggestion'
 import type { SlashCommandItem } from '../types'
+import { isEditorInInsertMode } from './modal-keymap'
 
 export const SlashCommands = Extension.create<{
   suggestion: Omit<SuggestionOptions<SlashCommandItem>, 'editor'>
@@ -16,6 +17,8 @@ export const SlashCommands = Extension.create<{
       suggestion: {
         char: '/',
         pluginKey: new PluginKey('slashCommands'),
+        allow: ({ editor }: { editor: import('@tiptap/core').Editor }) =>
+          isEditorInInsertMode(editor),
         command: ({
           editor,
           range,

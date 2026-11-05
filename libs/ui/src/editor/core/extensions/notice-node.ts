@@ -29,6 +29,7 @@ export const NoticeNode = Node.create<NodeViewOptions>({
   group: 'block',
   content: 'block+',
   defining: true,
+  selectable: true,
 
   addAttributes() {
     return {
@@ -72,10 +73,9 @@ export const NoticeNode = Node.create<NodeViewOptions>({
       new Plugin({
         props: {
           handleKeyDown: (view, event) => {
-            if (event.key !== 'ArrowUp') return false
+            if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return false
             const { selection } = view.state
             const { $from } = selection
-            if (!selection.empty) return false
 
             let noticeDepth = -1
             for (let depth = $from.depth; depth > 0; depth -= 1) {
@@ -84,7 +84,25 @@ export const NoticeNode = Node.create<NodeViewOptions>({
                 break
               }
             }
-            if (noticeDepth < 0 || $from.index(noticeDepth) !== 0) return false
+            if (noticeDepth < 0) return false
+
+            if (event.key === 'Tab') {
+              const dom = view.nodeDOM($from.before(noticeDepth))
+              if (!(dom instanceof HTMLElement)) return false
+              const target = event.shiftKey
+                ? dom.querySelector<HTMLElement>(
+                    '[aria-label="Notice type"][data-part="trigger"], [data-part="trigger"]',
+                  )
+                : dom.querySelector<HTMLElement>('input[aria-label="Notice title"]')
+              if (!target) return false
+              event.preventDefault()
+              event.stopPropagation()
+              target.focus()
+              return true
+            }
+
+            if (event.key !== 'ArrowUp' || event.shiftKey || !selection.empty) return false
+            if ($from.index(noticeDepth) !== 0) return false
 
             const cursorCoords = view.coordsAtPos(selection.from)
             const firstLineCoords = view.coordsAtPos($from.start())

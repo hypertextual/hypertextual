@@ -51,6 +51,7 @@ pub fn commands(invoke: tauri::ipc::Invoke) -> bool {
         workspace::workspace_create_file,
         workspace::workspace_rename,
         workspace::workspace_delete,
+        workspace::workspace_open_default_app,
         workspace::workspace_write,
         workspace::workspace_save_article,
         workspace::workspace_import_image,

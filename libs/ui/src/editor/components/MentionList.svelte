@@ -53,12 +53,16 @@
   // Methods -------------------------------------------------------------------
   function onKeyDown(event: KeyboardEvent) {
     if (!items.length) return false
-    if (event.key === 'ArrowUp') listbox().highlightPrevious()
-    else if (event.key === 'ArrowDown') listbox().highlightNext()
+    if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey))
+      listbox().highlightPrevious()
+    else if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey))
+      listbox().highlightNext()
     else if (event.key === 'Enter') {
       const value = listbox().highlightedValue
       if (value) listbox().selectValue(value)
     } else return false
+    event.preventDefault()
+    event.stopPropagation()
     return true
   }
 
@@ -74,7 +78,11 @@
         <div class="p-3 text-center text-sm text-muted-foreground">No results</div>
       {:else}
         {#each items as item (item.id)}
-          <Listbox.Item {item} class={suggestionItem}>
+          <Listbox.Item
+            {item}
+            class={suggestionItem}
+            data-slash-selected={listbox().highlightedValue === item.id ? '' : undefined}
+          >
             <Listbox.ItemText class="min-w-0 flex-1 truncate text-sm">{item.label}</Listbox.ItemText
             >
             <span class="text-xs italic text-muted-foreground">{item.type}</span>

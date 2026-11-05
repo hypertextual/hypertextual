@@ -32,6 +32,7 @@ export interface WorkspaceClient {
   create(): Promise<WorkspaceNode>
   createFile(name: string, parentPath?: string): Promise<WorkspaceNode>
   delete(path: string): Promise<void>
+  openDefaultApp(path: string): Promise<void>
   rename(path: string, name: string): Promise<WorkspaceNode>
   createFolder(name: string, parentPath?: string): Promise<WorkspaceNode>
   read(path: string): Promise<ArticleContent>
@@ -52,6 +53,7 @@ export const workspaceClient: WorkspaceClient = {
   create: () => invoke('workspace_create'),
   createFile: (name, parentPath = '') => invoke('workspace_create_file', { name, parentPath }),
   delete: (relativePath) => invoke('workspace_delete', { relativePath }),
+  openDefaultApp: (relativePath) => invoke('workspace_open_default_app', { relativePath }),
   rename: (relativePath, name) => invoke('workspace_rename', { relativePath, name }),
   createFolder: (name, parentPath = '') => invoke('workspace_create_folder', { name, parentPath }),
   list: (relativePath) => invoke('workspace_list', { relativePath }),

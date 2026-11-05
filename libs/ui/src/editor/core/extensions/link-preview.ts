@@ -4,7 +4,13 @@
 // renderHTML — both the `bookmark` card and the 16:9 `embed` iframe — are carried over verbatim.
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { DOMOutputSpec } from '@tiptap/pm/model'
-import type { LinkPreviewAttributes, NodeViewOptions } from '../types'
+import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+import type { LinkPreviewAttributes, LinkPreviewFetcher, NodeViewOptions } from '../types'
+import { isEditorInInsertMode } from './modal-keymap'
+
+export interface LinkPreviewOptions extends NodeViewOptions {
+  fetchLinkPreview?: LinkPreviewFetcher
+}
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -58,9 +64,15 @@ function safeEmbedUrl(value: unknown): string {
 const LINK_ICON_PATH =
   'M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l-3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z'
 
-export const LinkPreview = Node.create<NodeViewOptions>({
+export const LinkPreview = Node.create<LinkPreviewOptions>({
   addOptions() {
-    return { nodeView: undefined }
+    return { nodeView: undefined, fetchLinkPreview: undefined }
+  },
+
+  addStorage() {
+    return {
+      fetchLinkPreview: this.options.fetchLinkPreview,
+    }
   },
 
   name: 'linkPreview',
@@ -205,6 +217,79 @@ export const LinkPreview = Node.create<NodeViewOptions>({
 
   addNodeView() {
     return this.options.nodeView?.() ?? null
+  },
+
+  addProseMirrorPlugins() {
+    const editor = this.editor
+    let lastArrowKey: 'ArrowDown' | 'ArrowUp' | null = null
+
+    return [
+      new Plugin({
+        key: new PluginKey('linkPreviewUrlFocus'),
+        props: {
+          handleKeyDown(_view, event) {
+            if (!isEditorInInsertMode(editor)) {
+              lastArrowKey = null
+              return false
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              lastArrowKey = event.key
+            } else {
+              lastArrowKey = null
+            }
+            return false
+          },
+        },
+        view() {
+          return {
+            update(view, prevState) {
+              if (!isEditorInInsertMode(editor)) {
+                lastArrowKey = null
+                return
+              }
+              const { selection } = view.state
+              const { selection: prevSelection } = prevState
+
+              const movedOntoLinkPreview =
+                lastArrowKey !== null &&
+                selection instanceof NodeSelection &&
+                selection.node.type.name === 'linkPreview' &&
+                !(prevSelection instanceof NodeSelection && prevSelection.from === selection.from)
+
+              const arrowDir = lastArrowKey
+              lastArrowKey = null
+
+              if (movedOntoLinkPreview) {
+                const pos = selection.from
+                const nodeSize = selection.node.nodeSize
+                const dom = view.nodeDOM(pos)
+                const input =
+                  dom instanceof HTMLElement
+                    ? dom.querySelector<HTMLInputElement>(
+                        'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
+                      )
+                    : null
+
+                if (input) {
+                  const { tr, doc } = view.state
+                  const targetPos =
+                    arrowDir === 'ArrowUp'
+                      ? Math.max(0, pos)
+                      : Math.min(pos + nodeSize, doc.content.size)
+                  const $resolved = doc.resolve(targetPos)
+                  view.dispatch(
+                    tr.setSelection(
+                      TextSelection.near($resolved, arrowDir === 'ArrowUp' ? -1 : 1),
+                    ),
+                  )
+                  input.focus({ preventScroll: true })
+                }
+              }
+            },
+          }
+        },
+      }),
+    ]
   },
 
   addCommands() {

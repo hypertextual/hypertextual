@@ -7,6 +7,7 @@
 // The schema/attribute wiring and the insert command are carried over verbatim.
 import { Mention, type MentionOptions } from '@tiptap/extension-mention'
 import type { EditorSeams, MentionItem } from '../types'
+import { isEditorInInsertMode } from './modal-keymap'
 
 interface InternalMentionOptions extends MentionOptions<MentionItem> {
   hrefBuilder?: EditorSeams['hrefBuilder']
@@ -95,6 +96,7 @@ export const InternalMention = Mention.extend<InternalMentionOptions>({
   suggestion: {
     char: '@',
     allowSpaces: true,
+    allow: ({ editor }) => isEditorInInsertMode(editor),
     command: ({ editor, range, props }) => {
       // Insert mention without trailing space
       editor

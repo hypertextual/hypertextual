@@ -2,13 +2,13 @@
 
 ## Overview
 
-The content pane presents the selected document, image, or empty workspace preview. It shows the current article title and save status.
+The content pane presents the selected document, image, or empty workspace preview as the `article` spatial pane (`paneId="article"`). Its footer shows the article breadcrumb, live `WhichKeyMode` badge (`helix · normal`, `helix · select`, `helix · insert`, or `helix · jump`), and save status.
 
 ## Design
 
 ### Public API
 
-`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives native document JSON and emits JSON changes. The app editor service passes those changes through `ArticleViewModel` and `htmd-ts`. Unsupported nodes stay editable in the document as raw-source wrappers. This pane renders source read-only only after an unrecoverable parser failure.
+`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives native document JSON and emits JSON changes. The app editor service passes those changes through `ArticleViewModel` and `htmd-ts`. Unsupported nodes stay editable in the document as raw-source wrappers. `ContentFallback` renders loading, opening errors, unsupported file types (such as PDFs with an `Open In Default App` button), image previews, read-only source previews after an unrecoverable parser failure, and the unselected workspace state.
 
 ```svelte
 <ContentPane {workspace} />
@@ -44,8 +44,6 @@ Article selected:
 
 ```text
 +------------------------------------------------------------------------+
-|  A saved article                                                   MD  |
-+------------------------------------------------------------------------+
 |                                                                        |
 |                                                                        |
 |       A saved article                                                  |
@@ -62,15 +60,13 @@ Article selected:
 |                                                                        |
 |                                                                        |
 +------------------------------------------------------------------------+
-|  A saved article                                                Saved  |
+|  Local workspace > Drafts > A saved article               View  Saved  |
 +------------------------------------------------------------------------+
 ```
 
 Unsupported source, rendered by this app pane:
 
 ```text
-+------------------------------------------------------------------------+
-|  Imported article                                                  MD  |
 +------------------------------------------------------------------------+
 |                                                                        |
 |  This article contains syntax the editor cannot preserve.              |
@@ -81,11 +77,11 @@ Unsupported source, rendered by this app pane:
 |  :::                                                                   |
 |                                                                        |
 +------------------------------------------------------------------------+
-|  Imported article                                           Read-only  |
+|  Local workspace > Imported article                         Read-only  |
 +------------------------------------------------------------------------+
 ```
 
-The selected article has a 40 px heading bar. Only the document body scrolls. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
+The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. DocumentEditor owns scroll-region focus and keyboard reactions. ContentPane passes the editor service’s `editable` flag and accepts editability requests through that service. Arrow keys use native browser scrolling while editing is disabled. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
 
 ### State and Data Flow
 
@@ -96,10 +92,12 @@ stateDiagram-v2
     Opening --> Editing: SDK parses source into document JSON
     Opening --> ReadOnly: unrecoverable parser or schema failure
     Opening --> Image: image loads
+    Opening --> Unsupported: non-article file type (e.g. PDF)
     Opening --> Failed: file cannot open
     Failed --> Opening: Retry opening
     ReadOnly --> Opening: choose another entry
     Image --> Opening: choose another entry
+    Unsupported --> Opening: choose another entry
     Editing --> Opening: save and choose another entry
 
     state Editing {

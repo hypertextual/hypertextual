@@ -20,7 +20,9 @@ export interface EditorObserver {
 export class EditorService {
   selected = $state<WorkspaceNode | null>(null)
   document = $state.raw<ArticleViewModel | null>(null)
+  editable = $state(false)
   image = $state<string | null>(null)
+  unsupported = $state(false)
   loading = $state(false)
   openingError = $state<string | null>(null)
   codecError = $state<string | null>(null)
@@ -30,7 +32,6 @@ export class EditorService {
   recoveryOpen = $state(false)
   copyStatus = $state('')
   version = $state(0)
-  focusRequest = $state(0)
   private saver: Autosave | undefined
   private readonly media: MediaService
   private requestId = 0
@@ -55,7 +56,13 @@ export class EditorService {
           ? 'Saving…'
           : 'Changes pending…'
     }
+    if (this.unsupported) return 'Unsupported'
     return this.image ? 'Image' : this.document ? 'Read-only' : 'Local files'
+  }
+
+  setEditable(editable: boolean): boolean {
+    this.editable = editable && Boolean(this.document?.editable) && !this.busy && !this.closing
+    return this.editable
   }
 
   async flush(): Promise<boolean> {
@@ -93,8 +100,10 @@ export class EditorService {
     this.saver?.dispose()
     this.saver = undefined
     this.selected = entry
+    this.editable = false
     this.document = null
     this.image = null
+    this.unsupported = false
     this.codecError = null
     this.openingError = null
     this.copyStatus = ''
@@ -106,6 +115,10 @@ export class EditorService {
       if (/\.(png|jpe?g|gif|webp)$/i.test(entry.name)) {
         const asset = await this.media.get('', entry.path)
         if (this.isCurrent(id)) this.image = asset.url
+        return
+      }
+      if (!/\.(md|htmd)$/i.test(entry.name)) {
+        if (this.isCurrent(id)) this.unsupported = true
         return
       }
       const read = await this.client.read(entry.path)
@@ -154,9 +167,29 @@ export class EditorService {
       )
       if (synchronizeFilename) await this.saver.requestSave()
     } catch (error) {
-      if (this.isCurrent(id)) this.openingError = errorMessage(error)
+      if (this.isCurrent(id)) {
+        const message = errorMessage(error)
+        if (
+          /Only \.md and \.htmd articles can be edited\.|not UTF-8 text|contains binary data/i.test(
+            message,
+          )
+        ) {
+          this.unsupported = true
+        } else {
+          this.openingError = message
+        }
+      }
     } finally {
       if (this.isCurrent(id)) this.loading = false
+    }
+  }
+
+  async openInDefaultApp() {
+    if (!this.selected) return
+    try {
+      await this.client.openDefaultApp(this.selected.path)
+    } catch (error) {
+      this.openingError = errorMessage(error)
     }
   }
 
@@ -228,8 +261,10 @@ export class EditorService {
     this.saver?.dispose()
     this.saver = undefined
     this.selected = null
+    this.editable = false
     this.document = null
     this.image = null
+    this.unsupported = false
     this.codecError = null
     this.save = { status: 'saved', error: null }
   }

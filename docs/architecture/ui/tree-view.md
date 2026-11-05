@@ -68,7 +68,8 @@ stateDiagram-v2
     Invalid --> Label: Escape cancels
 ```
 
-- Arrow keys move focus through the hierarchy. Selecting a leaf reports its value to the caller.
+- Arrow keys and `WhichKey` normal-mode motions (`j`, `k`, `h`, `l`, `gg`, `ge`, `G`) move focus through the hierarchy. Selecting a leaf (`Enter` or click) reports its value to the caller.
+- Focused `[role="treeitem"]` rows expose `data-which-key-target=""` and `data-pane-focus-target` (when selected), and support normal-mode tree actions (`a` for new article, `A` for new folder, `r`/`F2` for inline rename, and `d`/`Delete` for deletion).
 
 ## Implementation
 

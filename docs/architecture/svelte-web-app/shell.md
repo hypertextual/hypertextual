@@ -2,7 +2,7 @@
 
 ## Overview
 
-The shell is the desktop workspace frame. It composes navigation, file actions, the workspace explorer, the content pane, and draft recovery.
+The shell is the desktop workspace frame. It composes navigation, file actions, the workspace explorer, the content pane, draft recovery, and global `WhichKeyProvider` / `WhichKey` modal keybinding orchestration (ordering `<leader>` with `?` keybind help, `e` toggle explorer, `n` new article, `N` new folder, `f` file operations, and `/` search before `g` goto, `j` jump, `w` window, `v` view, `t` toggles, and `k` preset).
 
 ## Design
 
@@ -20,16 +20,14 @@ Sidebar expanded:
 
 ```text
 +----------------------------------------------------------------------------------------------+
-| [=]  hypertextual    [Local workspace v]                                                     |
+| [o o o] [=] [Local workspace v]                                                              |
 +--------------------+-------------------------------------------------------------------------+
-| Workspace [+] [+d] |  A saved article                                                    MD  |
-|                    +-------------------------------------------------------------------------+
-| Drafts/            |                                                                         |
+| Workspace [+] [+d] |                                                                         |
+|                    |                                                                         |
+| Drafts/            |       A saved article                                                   |
 | | First article    |                                                                         |
-| | Research/        |       A saved article                                                   |
-| Archive/           |                                                                         |
-|                    |                                                                         |
-|                    |       Start writing your article here.                                  |
+| | Research/        |                                                                         |
+| Archive/           |       Start writing your article here.                                  |
 |                    |                                                                         |
 |                    |                                                                         |
 |                    |                                                                         |
@@ -39,11 +37,8 @@ Sidebar expanded:
 |                    |                                                                         |
 |                    |                                                                         |
 |                    |                                                                         |
-|                    |                                                                         |
-|                    |                                                                         |
-|                    |                                                                         |
-|                    +-------------------------------------------------------------------------+
-|                    |  A saved article                                                 Saved  |
+|                    |-------------------------------------------------------------------------|
+|                    | Local workspace > Drafts > A saved article                    View Saved|
 +--------------------+-------------------------------------------------------------------------+
 ```
 
@@ -51,14 +46,10 @@ Sidebar collapsed:
 
 ```text
 +----------------------------------------------------------------------------------------------+
-| [=]  hypertextual    [Local workspace v]                                                     |
+| [o o o] [=] [Local workspace v]                                                              |
 +----------------------------------------------------------------------------------------------+
-|  A saved article                                                                         MD  |
-+----------------------------------------------------------------------------------------------+
-|                                                                                              |
 |                                                                                              |
 |                 A saved article                                                              |
-|                                                                                              |
 |                                                                                              |
 |                 Start writing your article here.                                             |
 |                                                                                              |
@@ -70,15 +61,12 @@ Sidebar collapsed:
 |                                                                                              |
 |                                                                                              |
 |                                                                                              |
-|                                                                                              |
-|                                                                                              |
-|                                                                                              |
 +----------------------------------------------------------------------------------------------+
-|  A saved article                                                                      Saved  |
+| Local workspace > Drafts > A saved article                                         View Saved|
 +----------------------------------------------------------------------------------------------+
 ```
 
-The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer is empty. The content pane fills the remaining width, with its status bar at the bottom.
+The title bar contains the sidebar toggle and workspace selector. The macOS window buttons sit at the vertical center of the 36 px title bar. The sidebar occupies 236 px of the window, below the 36 px title bar. Its footer is empty. The content pane fills the remaining width, with its status bar at the bottom.
 
 ### State and Data Flow
 

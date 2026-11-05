@@ -459,7 +459,7 @@
       "type": "linkPreview",
       "attrs": {
         "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=90",
-        "title": "Embedded video",
+        "title": null,
         "description": "Embed description",
         "image": null,
         "favicon": null,

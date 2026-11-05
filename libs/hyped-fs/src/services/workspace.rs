@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::Read,
     path::{Component, Path, PathBuf},
 };
 
@@ -197,5 +198,49 @@ impl WorkspaceService {
             return Err(error("unsupported", "Linked entries cannot be deleted."));
         }
         trash::delete(path).map_err(|e| error("io", e.to_string()))
+    }
+
+    pub fn open_in_default_app(&self, relative: &str) -> Result<()> {
+        let path = self.resolve(relative)?;
+        let metadata = fs::metadata(&path)?;
+        if !metadata.is_file() {
+            return Err(error("unsupported", "Only workspace files can be opened."));
+        }
+        #[cfg(unix)]
+        let is_executable_mode = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        };
+        #[cfg(not(unix))]
+        let is_executable_mode = false;
+        let mut head = [0u8; 4];
+        let bytes_read = fs::File::open(&path)?.take(4).read(&mut head)?;
+        WorkspaceNode::validate_default_app_target(
+            relative,
+            &head[..bytes_read],
+            is_executable_mode,
+        )?;
+        #[cfg(target_os = "macos")]
+        let status = std::process::Command::new("open").arg(&path).status();
+        #[cfg(target_os = "linux")]
+        let status = std::process::Command::new("xdg-open").arg(&path).status();
+        #[cfg(windows)]
+        let status = std::process::Command::new("explorer").arg(&path).status();
+        #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+        return Err(error(
+            "unsupported",
+            "Opening files in the default application is not supported on this platform.",
+        ));
+        #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+        {
+            let status = status.map_err(|e| error("io", e.to_string()))?;
+            if !status.success() {
+                return Err(error(
+                    "io",
+                    "Could not open the file in the default application.",
+                ));
+            }
+            Ok(())
+        }
     }
 }

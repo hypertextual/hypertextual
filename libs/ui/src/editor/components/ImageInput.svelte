@@ -7,9 +7,12 @@
   import ImageFileUpload from './ImageFileUpload.svelte'
 
   // Props ---------------------------------------------------------------------
-  let { editor, position, onClose, onUpload }: ImageInputProps = $props()
+  let { editor, position, data, onClose, onUpload }: ImageInputProps = $props()
 
   // State ---------------------------------------------------------------------
+  const replaceData = $derived(
+    data && typeof data === 'object' ? (data as { replace?: boolean; src?: string }) : undefined,
+  )
   let active = true
 
   let activeTab = $state<'upload' | 'url'>('upload')
@@ -39,6 +42,19 @@
 
   // Methods -------------------------------------------------------------------
   function insertImage(src: string, srcset?: string) {
+    if (replaceData?.replace) {
+      const existing = editor.state.doc.nodeAt(position)
+      if (existing && (existing.type.name === 'image' || existing.type.name === 'imageNode')) {
+        const tr = editor.state.tr.setNodeMarkup(position, undefined, {
+          ...existing.attrs,
+          src,
+          srcset: srcset ?? null,
+        })
+        editor.view.dispatch(tr)
+        onClose()
+        return
+      }
+    }
     editor
       .chain()
       .focus()

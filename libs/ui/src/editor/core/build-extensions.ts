@@ -39,6 +39,7 @@ import { NoticeNode } from './extensions/notice-node'
 import { CurrentEmptyBlock } from './extensions/current-empty-block'
 import { PasteUrl } from './extensions/paste-url'
 import { EditorOverlays } from './extensions/editor-overlays'
+import { ModalKeymap } from './extensions/modal-keymap'
 import type { BuildExtensionsOptions } from './types'
 
 export function buildExtensions(options: BuildExtensionsOptions): Extensions {
@@ -110,9 +111,13 @@ export function buildExtensions(options: BuildExtensionsOptions): Extensions {
         render: mentionRender ?? (() => ({})),
       },
     }),
-    LinkPreview.configure({ nodeView: nodeViews.linkPreview }),
+    LinkPreview.configure({
+      nodeView: nodeViews.linkPreview,
+      fetchLinkPreview: options.fetchLinkPreview,
+    }),
     ImageNode.configure({ nodeView: nodeViews.image }),
     UrlMention.configure({ nodeView: nodeViews.urlMention }),
     SlashCommands.configure({ suggestion: { render: slashRender ?? (() => ({})) } }),
+    ModalKeymap.configure({ enforceTitle }),
   ] as Extensions
 }

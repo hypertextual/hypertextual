@@ -127,10 +127,10 @@ Some <u>underlined text</u>, <mark style="background-color:var(--chart-3)">highl
 
 :::bookmark {url="https://example.com" title="Example" description="A saved link"} :::
 
-:::youtube {url="https://www.youtube.com/watch?v=example&amp;t=90" title="Video"} :::
+:::youtube {url="https://www.youtube.com/watch?v=example&amp;t=90"} :::
 ```
 
-Custom mention and card syntax retains component data. YouTube URLs retain timestamps. The format and editor omit text alignment. Responsive image source sets remain frontend presentation state.
+Custom mention and card syntax retains component data. YouTube URLs retain timestamps. YouTube embeds omit titles and ignore extra title attributes when parsing noisy input. The format and editor omit text alignment. Responsive image source sets remain frontend presentation state.
 
 Empty paragraphs use `<p></p>`. Formatted boundary whitespace uses inline HTML. Plain-text boundary whitespace and unfinished block prefixes use numeric character references. Adjacent lists use alternating standard markers so parsing preserves separate list nodes.
 

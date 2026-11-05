@@ -39,8 +39,10 @@
     // Tiptap keeps text focus; forward only suggestion keys to Ark's selection state.
     const handleKey = (event: KeyboardEvent) => {
       if (!items.length || event.isComposing) return
-      if (event.key === 'ArrowUp') listbox().highlightPrevious()
-      else if (event.key === 'ArrowDown') listbox().highlightNext()
+      if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey))
+        listbox().highlightPrevious()
+      else if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey))
+        listbox().highlightNext()
       else if (event.key === 'Enter') {
         const value = listbox().highlightedValue
         if (value) listbox().selectValue(value)

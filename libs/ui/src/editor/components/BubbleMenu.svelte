@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Popover } from '@ark-ui/svelte/popover'
+  import { NodeSelection } from '@tiptap/pm/state'
   import type { BubbleMenuProps } from './types'
   import { onMount } from 'svelte'
+  import { isEditorInInsertMode } from '../core'
   import FontColorPicker from './FontColorPicker.svelte'
   import LinkEditPopover from './LinkEditPopover.svelte'
   import { Link2 } from 'lucide-svelte'
@@ -78,7 +80,11 @@
   }
 
   function updateVisibility() {
-    if (!props.editor) return
+    if (!props.editor || !isEditorInInsertMode(props.editor)) {
+      isVisible = false
+      showLinkInput = false
+      return
+    }
 
     const { from, to, empty } = props.editor.state.selection
     const selectionKey = `${from}:${to}`
@@ -89,8 +95,13 @@
     }
     if (dismissedSelection && dismissedSelection !== selectionKey) dismissedSelection = null
 
-    // Image node selections use their own controls; the text bubble menu must stay hidden.
-    if (props.editor.isActive('imageNode')) {
+    // Non-text block selections use their own controls; the text bubble menu must stay hidden.
+    if (
+      props.editor.state.selection instanceof NodeSelection ||
+      props.editor.isActive('imageNode') ||
+      props.editor.isActive('image') ||
+      props.editor.isActive('linkPreview')
+    ) {
       isVisible = false
       showLinkInput = false
       return
@@ -152,6 +163,7 @@
   }}
 >
   <Popover.Content
+    data-editor-controls
     bind:ref={menu}
     onmousedown={(event) => {
       const target = event.target

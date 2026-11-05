@@ -158,8 +158,8 @@ The renderer destroys its binding on unmount. Editor destruction also releases e
 ### Source Baseline
 
 - Source repository: `cloudvoyant/helical-ui`, local reference `~/Projects/helical-ui`.
-- Source revision: `ee355e8c8624f2446645a2804a2094fadc324438`.
-- Source package manifests: `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`, both version `0.19.0` with `license: MIT`.
+- Source revision: `5085f0d`.
+- Source package manifests: `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`, both version `0.21.1-rc.202611031218.5085f0d` with `license: MIT`.
 - Both editor source directories were unchanged relative to that revision when inspected. The checkout contained unrelated edits; they are outside this copy.
 - No standalone LICENSE or NOTICE file was present in the inspected checkout. Preserve notices present in copied source and the MIT package provenance; do not invent a copyright holder or claim a notice file was copied.
 
@@ -182,15 +182,15 @@ Editor-specific imports in the mounted editor point to the local core. Format de
 
 Direct runtime dependencies belong to `libs/ui/package.json`; exact resolutions belong to `bun.lock`. Keep Tiptap core and ProseMirror aligned with root overrides. Published Helical packages supply generic controls, `cn`, and theme/style contracts. Svelte, Ark, `svelte-tiptap`, Lucide, Tiptap extensions/suggestions, and lowlight remain npm dependencies.
 
-| Package group                 | Pinned version |
-| ----------------------------- | -------------- |
-| `@cloudvoyant/helical-svelte` | `0.19.0`       |
-| `@cloudvoyant/helical-ui`     | `0.19.0`       |
-| `@ark-ui/svelte`              | `5.24.3`       |
-| `@tiptap/core`                | `3.31.4`       |
-| `svelte-tiptap`               | `3.0.1`        |
-| `lowlight`                    | `3.3.0`        |
-| `lucide-svelte`               | `0.577.0`      |
+| Package group                 | Pinned version                    |
+| ----------------------------- | --------------------------------- |
+| `@cloudvoyant/helical-svelte` | `0.21.1-rc.202611031218.5085f0d`  |
+| `@cloudvoyant/helical-ui`     | `0.21.1-rc.202611031218.5085f0d`  |
+| `@ark-ui/svelte`              | `5.24.3`                          |
+| `@tiptap/core`                | `3.31.4`                          |
+| `svelte-tiptap`               | `3.0.1`                           |
+| `lowlight`                    | `3.3.0`                           |
+| `lucide-svelte`               | `0.577.0`                         |
 
 All directly used Tiptap extensions and suggestions are pinned to `3.31.4`. Tiptap Markdown and Marked dependencies belong to `htmd-ts`. Markdown parsing and writing stay outside the UI library.
 

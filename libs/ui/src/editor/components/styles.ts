@@ -5,7 +5,7 @@ export const suggestionSurface =
   'w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-lg'
 export const suggestionContent = 'max-h-80 overflow-y-auto p-1 outline-none'
 export const suggestionItem =
-  'flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-popover-foreground outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground'
+  'flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-popover-foreground outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[slash-selected]:bg-accent data-[slash-selected]:text-accent-foreground'
 
 export const editorTypography = cn(
   proseVariants({ size: 'base' }),
@@ -18,6 +18,9 @@ export const editorSurface = cva(
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
+export const youtubeSurface = 'my-0 [&>button]:block [&>iframe]:block [&>button>img]:my-0'
+export const noticeBody =
+  "min-h-6 [&_p]:m-0 data-[empty=true]:before:pointer-events-none data-[empty=true]:before:float-left data-[empty=true]:before:h-0 data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:content-['Add_the_notice_body_here.']"
 export const imageSurface =
   'image-node-view relative my-6 group [.image-node-pending-delete_&]:bg-accent'
 export const captionInput =

@@ -29,6 +29,7 @@ export interface SlashMenuProps {
 export interface EditorOverlayInputProps {
   editor: Editor
   position: number
+  data?: unknown
   onClose: () => void
 }
 
@@ -54,6 +55,9 @@ export type YouTubeInputProps = EditorOverlayInputProps
 export interface EditorProps {
   content?: JSONContent
   editable?: boolean
+  clickToEdit?: boolean
+  onedit?: () => boolean
+  onexit?: () => void
   /** Keep the required first H1 title. Disable for compact inputs such as mentions. */
   enforceTitle?: boolean
   onchange?: (document: JSONContent) => void
@@ -72,6 +76,8 @@ export type ImageNodeViewProps = NodeViewProps
 export interface LinkEditPopoverProps {
   editor: Editor
   initialUrl?: string
+  onSave?: (url: string) => void | Promise<void>
+  onRemove?: () => void
   onClose: () => void
 }
 
