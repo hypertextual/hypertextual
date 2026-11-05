@@ -195,15 +195,6 @@ export interface HtmdOverlaysOptions {
   onChange?: (overlay: HtmdOverlayState | null) => void
 }
 
-export type EditorOverlayDefinition = HtmdOverlayDefinition
-export type EditorOverlayRect = HtmdOverlayRect
-export type EditorOverlaySurfaceOptions = HtmdOverlaySurfaceOptions
-export type EditorOverlayBinding = HtmdOverlayBinding
-export type EditorOverlaysController = HtmdOverlaysController
-export type EditorOverlayOpenOptions = HtmdOverlayOpenOptions
-export type EditorOverlayState = HtmdOverlayState
-export type EditorOverlaysOptions = HtmdOverlaysOptions
-
 export interface HtmdSuggestionMenuProps<TItem> {
   items: TItem[]
   query: string

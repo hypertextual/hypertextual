@@ -121,79 +121,6 @@
         tree().startRenaming(value)
       })
   })
-  function resolveTreeItemTarget(
-    event: KeyboardEvent,
-  ): { nodeValue: string; isBranch: boolean } | null {
-    const target = event.target
-    if (!(target instanceof HTMLElement) || !rootEl?.contains(target)) return null
-    if (
-      target.closest('[data-part="node-rename-input"]') ||
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target.isContentEditable
-    ) {
-      return null
-    }
-    const itemEl = target.closest<HTMLElement>('[data-tree-node-value]')
-    if (!itemEl) return null
-    const nodeValue = itemEl.dataset.treeNodeValue
-    if (!nodeValue) return null
-    return {
-      nodeValue,
-      isBranch: itemEl.dataset.treeNodeBranch === 'true',
-    }
-  }
-
-  function isNormalTreeReady(): boolean {
-    if (!rootEl) return false
-    const controller = getDocumentWhichKeyController(rootEl.ownerDocument)
-    if (!controller) return true
-    const state = controller.getState()
-    return (
-      state.mode === 'normal' &&
-      state.activePath.length === 0 &&
-      !state.explorerOpen &&
-      state.countBuffer.length === 0
-    )
-  }
-
-  function moveFocusDelta(nodeValue: string, delta: 1 | -1): boolean {
-    const visible = tree()
-      .getVisibleNodes()
-      .map((v) => v.node)
-    const idx = visible.findIndex((n) => n.value === nodeValue)
-    if (idx === -1) return false
-    const next = visible[Math.max(0, Math.min(visible.length - 1, idx + delta))]
-    if (next) tree().focus(next.value)
-    return true
-  }
-
-  function expandOrFocusChild(nodeValue: string, isBranch: boolean): boolean {
-    if (!isBranch) return false
-    if (!tree().expandedValue.includes(nodeValue)) {
-      tree().expand([nodeValue])
-    } else {
-      const visible = tree()
-        .getVisibleNodes()
-        .map((v) => v.node)
-      const idx = visible.findIndex((n) => n.value === nodeValue)
-      const child = visible[idx + 1]
-      if (child && child.value.startsWith(`${nodeValue}/`)) {
-        tree().focus(child.value)
-      }
-    }
-    return true
-  }
-
-  function collapseOrFocusParent(nodeValue: string, isBranch: boolean): boolean {
-    if (isBranch && tree().expandedValue.includes(nodeValue)) {
-      tree().collapse([nodeValue])
-    } else if (nodeValue.includes('/')) {
-      const parent = nodeValue.slice(0, nodeValue.lastIndexOf('/'))
-      tree().focus(parent)
-    }
-    return true
-  }
 
   useKeyScope({
     id: `pane:tree-view:${id}`,
@@ -417,6 +344,80 @@
   })
 
   // Methods -------------------------------------------------------------------
+  function resolveTreeItemTarget(
+    event: KeyboardEvent,
+  ): { nodeValue: string; isBranch: boolean } | null {
+    const target = event.target
+    if (!(target instanceof HTMLElement) || !rootEl?.contains(target)) return null
+    if (
+      target.closest('[data-part="node-rename-input"]') ||
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target.isContentEditable
+    ) {
+      return null
+    }
+    const itemEl = target.closest<HTMLElement>('[data-tree-node-value]')
+    if (!itemEl) return null
+    const nodeValue = itemEl.dataset.treeNodeValue
+    if (!nodeValue) return null
+    return {
+      nodeValue,
+      isBranch: itemEl.dataset.treeNodeBranch === 'true',
+    }
+  }
+
+  function isNormalTreeReady(): boolean {
+    if (!rootEl) return false
+    const controller = getDocumentWhichKeyController(rootEl.ownerDocument)
+    if (!controller) return true
+    const state = controller.getState()
+    return (
+      state.mode === 'normal' &&
+      state.activePath.length === 0 &&
+      !state.explorerOpen &&
+      state.countBuffer.length === 0
+    )
+  }
+
+  function moveFocusDelta(nodeValue: string, delta: 1 | -1): boolean {
+    const visible = tree()
+      .getVisibleNodes()
+      .map((v) => v.node)
+    const idx = visible.findIndex((n) => n.value === nodeValue)
+    if (idx === -1) return false
+    const next = visible[Math.max(0, Math.min(visible.length - 1, idx + delta))]
+    if (next) tree().focus(next.value)
+    return true
+  }
+
+  function expandOrFocusChild(nodeValue: string, isBranch: boolean): boolean {
+    if (!isBranch) return false
+    if (!tree().expandedValue.includes(nodeValue)) {
+      tree().expand([nodeValue])
+    } else {
+      const visible = tree()
+        .getVisibleNodes()
+        .map((v) => v.node)
+      const idx = visible.findIndex((n) => n.value === nodeValue)
+      const child = visible[idx + 1]
+      if (child && child.value.startsWith(`${nodeValue}/`)) {
+        tree().focus(child.value)
+      }
+    }
+    return true
+  }
+
+  function collapseOrFocusParent(nodeValue: string, isBranch: boolean): boolean {
+    if (isBranch && tree().expandedValue.includes(nodeValue)) {
+      tree().collapse([nodeValue])
+    } else if (nodeValue.includes('/')) {
+      const parent = nodeValue.slice(0, nodeValue.lastIndexOf('/'))
+      tree().focus(parent)
+    }
+    return true
+  }
+
   function clearRename(value: string) {
     delete renameErrors[value]
     delete attempts[value]

@@ -19,6 +19,3 @@ export interface HtmdEditorProps {
   onUpload?: (file: File) => Promise<EditorImageUploadResult>
   services?: EditorHostServices
 }
-
-/** @deprecated Use `HtmdEditorProps`. */
-export type DocumentEditorProps = HtmdEditorProps
