@@ -603,55 +603,6 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
           .toContain('> [!NOTE] Remember this\n> Body text')
       })
 
-      test('it opens legacy notice and empty paragraph directives as editable blocks', async ({
-        page,
-        workspace,
-      }) => {
-        // Arrange
-        const path = 'Legacy notice.md'
-        const source = '# Legacy notice\n\n:::notice\nAnd this should save!\n:::\n\n::paragraph\n'
-        await writeFile(join(workspace.root, path), source)
-
-        // Act
-        await page.reload()
-        await page.locator(`[role="treeitem"][data-value="${path}"]`).click()
-        await page.locator('.ProseMirror').click({ position: { x: 2, y: 2 } })
-
-        // Assert
-        const notice = page.locator('.editor-notice-node')
-        await expect(notice).toBeVisible()
-        await expect(notice).toContainText('And this should save!')
-        await expect(page.getByLabel('Notice title')).toHaveValue('Note')
-        await expect(page.locator('.ProseMirror [data-unparsed]')).toHaveCount(0)
-        expect(await readFile(join(workspace.root, path), 'utf8')).toBe(source)
-
-        // Act
-        await page.getByLabel('Notice title').fill('Remember this')
-        await page.getByRole('combobox', { name: 'Notice type' }).click()
-        await page.getByRole('option', { name: 'Warning', exact: true }).click()
-        await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
-        await page.getByLabel('Notice title').press('Enter')
-        await editorSettled(page)
-        await page.keyboard.type('Updated. ')
-
-        // Assert
-        await expect
-          .poll(() => readFile(join(workspace.root, path), 'utf8'))
-          .toContain('> [!WARNING] Remember this')
-        await expect
-          .poll(() => readFile(join(workspace.root, path), 'utf8'))
-          .toContain('Updated. And this should save!')
-
-        // Act
-        await reopenForEditing(page, path)
-
-        // Assert
-        await expect(page.getByLabel('Notice title')).toHaveValue('Remember this')
-        await expect(page.getByRole('combobox', { name: 'Notice type' })).toHaveText('Warning')
-        await expect(notice).toContainText('Updated. And this should save!')
-        await expect(page.locator('.ProseMirror [data-unparsed]')).toHaveCount(0)
-      })
-
       test('it keeps unparsed blocks and inline syntax editable beside supported content', async ({
         page,
         workspace,

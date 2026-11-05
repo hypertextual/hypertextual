@@ -9,6 +9,7 @@ import {
   type ArticleMetadata,
 } from '../clients/workspaceClient'
 import { EditorService } from './editorService.svelte'
+import { HotkeyService } from './hotkeyService.svelte'
 import { SettingsService } from './settingsService.svelte'
 
 export interface FolderRefresh {
@@ -33,12 +34,14 @@ export class WorkspaceService {
   private active = true
   readonly editor: EditorService
   readonly settings = new SettingsService()
+  readonly hotkeys: HotkeyService
 
   constructor(private client: WorkspaceClient) {
     this.editor = new EditorService(client, {
       titleChanged: (path, title) => this.updateTitle(path, title),
       saved: (path, saved, title) => this.saved(path, saved, title),
     })
+    this.hotkeys = new HotkeyService(this)
   }
 
   get blocked() {

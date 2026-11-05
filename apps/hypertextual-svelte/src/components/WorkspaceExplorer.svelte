@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getDocumentWhichKeyController } from '@cloudvoyant/helical-ui'
   import { TreeView } from '@hypertextual/ui'
   import { Folder, FolderOpen, FileText, Image } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
@@ -9,6 +8,19 @@
     workspace: WorkspaceService
   }
   let { workspace }: WorkspaceExplorerProps = $props()
+
+  // Methods -------------------------------------------------------------------
+  function handleCancel(value: string): void {
+    if (value === workspace.pendingEntry?.path) workspace.pendingEntry = null
+  }
+
+  function handleSelect(path: string): void {
+    if (workspace.editor.selected?.path === path) {
+      workspace.hotkeys.focusArticlePane()
+      return
+    }
+    void workspace.select(path)
+  }
 </script>
 
 <TreeView
@@ -21,22 +33,10 @@
   onaction={(path, action) => void workspace.contextAction(path, action)}
   contextItems={(node) => workspace.contextItems(node)}
   onrename={(path, name) => workspace.commitEntry(path, name)}
-  oncancel={(value) => {
-    if (value === workspace.pendingEntry?.path) workspace.pendingEntry = null
-  }}
+  oncancel={handleCancel}
   getLabel={(node) => workspace.titles[node.value] ?? node.label}
   selected={workspace.editor.selected?.path ?? null}
-  onselect={(path) => {
-    if (workspace.editor.selected?.path === path) {
-      if (!getDocumentWhichKeyController(document)?.focusPane('article')) {
-        document
-          .querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')
-          ?.focus()
-      }
-      return
-    }
-    void workspace.select(path)
-  }}
+  onselect={handleSelect}
   loadChildren={(node) => workspace.loadChildren(node)}
 >
   {#snippet icon(node, expanded)}

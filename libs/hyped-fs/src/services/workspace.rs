@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::Read,
     path::{Component, Path, PathBuf},
 };
 
@@ -201,9 +202,24 @@ impl WorkspaceService {
 
     pub fn open_in_default_app(&self, relative: &str) -> Result<()> {
         let path = self.resolve(relative)?;
-        if !fs::metadata(&path)?.is_file() {
+        let metadata = fs::metadata(&path)?;
+        if !metadata.is_file() {
             return Err(error("unsupported", "Only workspace files can be opened."));
         }
+        #[cfg(unix)]
+        let is_executable_mode = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        };
+        #[cfg(not(unix))]
+        let is_executable_mode = false;
+        let mut head = [0u8; 4];
+        let bytes_read = fs::File::open(&path)?.take(4).read(&mut head)?;
+        WorkspaceNode::validate_default_app_target(
+            relative,
+            &head[..bytes_read],
+            is_executable_mode,
+        )?;
         #[cfg(target_os = "macos")]
         let status = std::process::Command::new("open").arg(&path).status();
         #[cfg(target_os = "linux")]

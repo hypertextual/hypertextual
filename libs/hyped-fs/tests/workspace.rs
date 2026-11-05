@@ -296,6 +296,56 @@ mod tests {
         }
     }
 
+    mod when_opening_in_default_app {
+        use super::*;
+
+        #[test]
+        fn it_rejects_executable_binaries_and_scripts() {
+            // Given
+            let fixture = WorkspaceFixture::new();
+            fs::create_dir_all(fixture.root()).unwrap();
+            fs::write(fixture.root().join("elf.dat"), b"\x7FELFbinary").unwrap();
+            fs::write(fixture.root().join("macho.dat"), [0xCF, 0xFA, 0xED, 0xFE]).unwrap();
+            fs::write(fixture.root().join("win.dat"), b"MZ\x90\x00").unwrap();
+            fs::write(fixture.root().join("script.txt"), b"#!/bin/sh\necho hi\n").unwrap();
+            fs::write(fixture.root().join("installer.exe"), b"not-pe").unwrap();
+
+            for name in [
+                "elf.dat",
+                "macho.dat",
+                "win.dat",
+                "script.txt",
+                "installer.exe",
+            ] {
+                // When
+                let result = fixture.workspace.open_in_default_app(name);
+
+                // Then
+                assert_eq!(result.unwrap_err().code, "unsupported", "{name}");
+            }
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn it_rejects_files_with_executable_permissions() {
+            use std::os::unix::fs::PermissionsExt;
+
+            // Given
+            let fixture = WorkspaceFixture::new();
+            fixture.write_file("run.pdf", "%PDF-1.7");
+            let file_path = fixture.root().join("run.pdf");
+            let mut perms = fs::metadata(&file_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&file_path, perms).unwrap();
+
+            // When
+            let result = fixture.workspace.open_in_default_app("run.pdf");
+
+            // Then
+            assert_eq!(result.unwrap_err().code, "unsupported");
+        }
+    }
+
     #[cfg(unix)]
     mod given_a_symlink_outside_the_workspace {
         use super::*;
