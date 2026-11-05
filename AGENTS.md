@@ -71,7 +71,8 @@ let { ... }: ComponentProps = $props()
 - Delegate behavior, accessibility, keyboard navigation, and interaction state to Ark UI and Helical controllers rather than custom DOM handlers.
 - Define framework-neutral base classes and CVA variants in `styles.ts`, derive variant types with `VariantProps`, and merge caller classes with Helical `cn`.
 - Use semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark data-attribute states. Avoid component-specific global CSS and hard-coded palette colors.
-- Keep `Shell.svelte` focused strictly on UI orchestration and lifecycle; place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`.
+- Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`.
+- Keep theme state and toggle controls (`ThemeService`, `ThemeToggle`) in `libs/ui`, with `SettingsService` only syncing persisted preferences when needed.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
 - Exchange native Tiptap `JSONContent` with `libs/ui`. Keep Markdown parsing, serialization, and format SDK dependencies inside `libs/htmd-ts`.

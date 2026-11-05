@@ -46,7 +46,9 @@ test.describe(
           await expect(prose).toHaveAttribute('contenteditable', 'false')
           await expect(prose).toHaveAttribute('data-modal-mode', 'normal')
           await expect(prose.locator('[data-pm-modal-cursor="normal"]')).toHaveCount(1)
-          await expect(page.getByTestId('which-key-mode-badge')).toHaveText('helix · normal')
+          await expect(
+            page.locator('.document-status').getByTestId('which-key-mode-badge'),
+          ).toHaveText('helix · normal')
           await expect(article.getByRole('combobox')).toHaveCount(0)
           await expect(prose.locator('input')).toHaveCount(0)
           await expect(page.locator('.editor-notice-node')).toContainText('Remember')
@@ -192,7 +194,7 @@ test.describe(
         async ({ page, workspace }) => {
           // Arrange
           const prose = page.locator('.ProseMirror')
-          const badge = page.getByTestId('which-key-mode-badge')
+          const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
           await page.keyboard.press('j')
           await page.keyboard.press('j')
           await page.keyboard.press('v')
@@ -232,7 +234,7 @@ test.describe(
       }) => {
         // Arrange
         const prose = page.locator('.ProseMirror')
-        const badge = page.getByTestId('which-key-mode-badge')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
 
         // Act
         await page.keyboard.press('o')
@@ -256,7 +258,7 @@ test.describe(
         page,
       }) => {
         // Arrange
-        const badge = page.getByTestId('which-key-mode-badge')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
         const popup = page.locator('[data-which-key-root]')
         await page.keyboard.press(' ')
         await expect(popup).toBeVisible()
@@ -330,7 +332,9 @@ test.describe(
           await expect(page.locator('.ProseMirror h1')).toHaveText('One')
           const renameInput = page.getByRole('textbox', { name: 'Name', exact: true })
           await expect(renameInput).toBeFocused()
-          await expect(page.getByTestId('which-key-mode-badge')).toHaveText('helix · insert')
+          await expect(
+            page.locator('.document-status').getByTestId('which-key-mode-badge'),
+          ).toHaveText('helix · insert')
         },
       )
     })
@@ -480,7 +484,9 @@ test.describe(
         // Assert
         await expect(shell).toHaveAttribute('data-pane-outline', 'false')
         await expect(prose).toHaveAttribute('contenteditable', 'false')
-        await expect(page.getByTestId('which-key-mode-badge')).toHaveText('helix · normal')
+        await expect(
+          page.locator('.document-status').getByTestId('which-key-mode-badge'),
+        ).toHaveText('helix · normal')
       })
     })
 

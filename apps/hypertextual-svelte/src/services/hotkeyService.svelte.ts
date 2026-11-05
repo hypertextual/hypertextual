@@ -5,6 +5,7 @@ import {
   type KeymapMode,
 } from '@cloudvoyant/helical-ui'
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
+import { themeService } from '@hypertextual/ui'
 import type { WorkspaceService } from './workspaceService.svelte'
 
 /** Application keyboard shortcuts, leader menu, and pane focus navigation. */
@@ -218,7 +219,7 @@ export class HotkeyService {
       return true
     },
     'settings.cycleThemeMode': () => {
-      this.workspace.settings.cycleThemeMode()
+      themeService.cycleThemeMode()
       return true
     },
     'workspace.newArticle': () => {

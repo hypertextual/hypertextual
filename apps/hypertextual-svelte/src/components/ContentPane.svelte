@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { WhichKeyMode, useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
-  import { Breadcrumb, DocumentEditor } from '@hypertextual/ui'
+  import { useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
+  import { DocumentEditor } from '@hypertextual/ui'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
   import ContentFallback from './ContentFallback.svelte'
 
@@ -24,15 +24,6 @@
 
   // Derived -------------------------------------------------------------------
   const editor = $derived(workspace.editor)
-  const crumbs = $derived(
-    editor.selected
-      ? [
-          'Local workspace',
-          ...editor.selected.path.split('/').slice(0, -1),
-          workspace.selectedTitle,
-        ]
-      : ['Local workspace'],
-  )
 </script>
 
 <main
@@ -58,14 +49,4 @@
   {:else}
     <ContentFallback {editor} />
   {/if}
-  <footer class="document-status" role="status" aria-live="polite">
-    {#if editor.selected}
-      <Breadcrumb items={crumbs} label="Article path" title={editor.selected.path} />
-    {:else}<span>No article selected</span>{/if}
-    <div class="document-state">
-      <WhichKeyMode showPreset aria-label="Editor mode" />
-      <span class={{ error: Boolean(editor.codecError || editor.save.error) }}>{editor.status}</span
-      >
-    </div>
-  </footer>
 </main>

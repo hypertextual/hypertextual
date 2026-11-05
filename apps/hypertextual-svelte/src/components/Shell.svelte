@@ -5,28 +5,22 @@
     Button,
     Row,
     SidebarProvider,
-    SidebarTrigger,
     Sidebar,
     SidebarHeader,
     SidebarContent,
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectIndicator,
-    SelectContent,
-    SelectItem,
-    SelectItemText,
     WhichKeyProvider,
     WhichKey,
   } from '@cloudvoyant/helical-svelte'
-  import { FilePlus2, FolderPlus, PanelLeft, ChevronDown, Sun, Moon, Monitor } from 'lucide-svelte'
+  import { FilePlus2, FolderPlus } from 'lucide-svelte'
   import { invoke, isTauri } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import { errorMessage } from '../clients/workspaceClient'
   import { WorkspaceService } from '../services/workspaceService.svelte'
+  import TitleBar from './TitleBar.svelte'
   import WorkspaceExplorer from './WorkspaceExplorer.svelte'
   import ContentPane from './ContentPane.svelte'
+  import StatusBar from './StatusBar.svelte'
   import DraftRecoveryDialog from './DraftRecoveryDialog.svelte'
   import type { WorkspaceClient } from '../clients/workspaceClient'
 
@@ -111,41 +105,7 @@
     style="--sidebar-width: 236px"
     data-pane-outline={settings.paneOutline ? 'true' : 'false'}
   >
-    <header class="titlebar" data-tauri-drag-region>
-      <SidebarTrigger title="Toggle sidebar" aria-controls="workspace-sidebar"
-        ><PanelLeft size={14} strokeWidth={1.5} /></SidebarTrigger
-      >
-      <div class="workspace-chooser">
-        <Select items={workspace.items} value={[workspace.root]} size="sm">
-          <SelectTrigger aria-label="Workspace selector" title={workspace.root} size="sm"
-            ><SelectValue /><SelectIndicator
-              ><ChevronDown size={12} strokeWidth={1.5} /></SelectIndicator
-            ></SelectTrigger
-          >
-          <SelectContent
-            >{#each workspace.items as item (item.value)}<SelectItem {item}
-                ><SelectItemText>{item.label}</SelectItemText></SelectItem
-              >{/each}</SelectContent
-          >
-        </Select>
-      </div>
-      <Button
-        variant="text"
-        size="sm"
-        class="theme-toggle"
-        aria-label={`Theme: ${settings.themeMode}`}
-        title={`Theme: ${settings.themeMode}`}
-        onclick={() => settings.cycleThemeMode()}
-      >
-        {#if settings.themeMode === 'light'}
-          <Sun size={14} strokeWidth={1.5} />
-        {:else if settings.themeMode === 'dark'}
-          <Moon size={14} strokeWidth={1.5} />
-        {:else}
-          <Monitor size={14} strokeWidth={1.5} />
-        {/if}
-      </Button>
-    </header>
+    <TitleBar {workspace} />
     <Row class="workspace-body">
       <Sidebar
         id="workspace-sidebar"
@@ -204,6 +164,7 @@
       </Sidebar>
       <ContentPane {workspace} />
     </Row>
+    <StatusBar {workspace} />
   </SidebarProvider>
 
   <WhichKey />
