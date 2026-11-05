@@ -1,15 +1,8 @@
-<!-- libs/helical-svelte/src/editor/NoticeNodeView.svelte -->
 <script lang="ts">
   import type { NoticeNodeViewProps } from './types'
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
-  import { NodeViewContent, NodeViewWrapper } from 'svelte-tiptap'
-  import { Selection } from '@tiptap/pm/state'
-  import {
-    isEditorInInsertMode,
-    modalKeymapPluginKey,
-    subscribeToEditorTransactions,
-  } from '../core'
   import { noticeBody } from './styles'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { createSubscriber } from 'svelte/reactivity'
   import {
     Notice,
@@ -29,7 +22,8 @@
   let { node, editor, getPos, updateAttributes }: NoticeNodeViewProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
+  const subscribe = createSubscriber((update) => editor.subscribe(update))
+  let headerEl = $state<HTMLDivElement | null>(null)
   const variants = [
     { value: 'info', label: 'Info', icon: Info },
     { value: 'success', label: 'Success', icon: CircleCheck },
@@ -40,7 +34,7 @@
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable && isEditorInInsertMode(editor)
+    return editor.isEditable && editor.isInsertMode
   })
   const variant = $derived((node.attrs.variant as NoticeType | undefined) ?? 'info')
 
@@ -48,7 +42,7 @@
 
   const modalSubtext = $derived.by(() => {
     subscribe()
-    const st = modalKeymapPluginKey.getState(editor.state)?.subtextCursor
+    const st = editor.getSubtextCursor()
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (!st || st.kind !== 'noticeTitle' || st.pos !== pos) return null
     return st
@@ -70,6 +64,108 @@
       node.firstChild.content.size === 0,
   )
 
+  // Lifecycle -----------------------------------------------------------------
+  useKeyScope({
+    id: 'widget:notice',
+    priority: 'widget',
+    element: () => headerEl,
+    enabled: () => editable && Boolean(headerEl),
+    hotkeys: () => editor.services.hotkeys,
+    getContext: () => null,
+    keymap: {
+      Tab: {
+        id: 'notice.tabNext',
+        key: 'Tab',
+        label: 'Next Notice Control',
+        run: (_ctx, event) => {
+          const target = event.target as HTMLElement | null
+          if (!target || !headerEl) return false
+          if (target.matches('input[aria-label="Notice title"]')) {
+            const trigger = headerEl.querySelector<HTMLElement>(
+              'button[data-part="trigger"], [aria-label="Notice type"][data-part="trigger"]',
+            )
+            if (trigger) {
+              trigger.focus()
+              return true
+            }
+            return false
+          }
+          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+            focusBody()
+            return true
+          }
+          return false
+        },
+      },
+      'Shift+Tab': {
+        id: 'notice.tabPrev',
+        key: 'Shift+Tab',
+        label: 'Previous Notice Control',
+        run: (_ctx, event) => {
+          const target = event.target as HTMLElement | null
+          if (!target || !headerEl) return false
+          if (target.matches('input[aria-label="Notice title"]')) {
+            focusBody()
+            return true
+          }
+          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+            const titleInput = headerEl.querySelector<HTMLInputElement>(
+              'input[aria-label="Notice title"]',
+            )
+            if (titleInput) {
+              titleInput.focus()
+              return true
+            }
+          }
+          return false
+        },
+      },
+      ArrowUp: {
+        id: 'notice.focusBefore',
+        key: 'ArrowUp',
+        label: 'Focus Above Notice',
+        run: (_ctx, event) => {
+          const target = event.target as HTMLElement | null
+          if (!target?.matches('input[aria-label="Notice title"]')) return false
+          focusBefore()
+          return true
+        },
+      },
+      ArrowDown: {
+        id: 'notice.focusBodyDown',
+        key: 'ArrowDown',
+        label: 'Focus Notice Body',
+        run: (_ctx, event) => {
+          const target = event.target as HTMLElement | null
+          if (!target) return false
+          if (target.matches('input[aria-label="Notice title"]')) {
+            focusBody()
+            return true
+          }
+          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+            focusBody()
+            return true
+          }
+          return false
+        },
+      },
+      Enter: {
+        id: 'notice.focusBodyEnter',
+        key: 'Enter',
+        label: 'Focus Notice Body',
+        run: (_ctx, event) => {
+          const target = event.target as HTMLElement | null
+          if (!target?.matches('input[aria-label="Notice title"]')) return false
+          focusBody()
+          return true
+        },
+      },
+    },
+  })
+
   // Methods -------------------------------------------------------------------
   function bodyStart(): number | null {
     const nodePosition = typeof getPos === 'function' ? getPos() : undefined
@@ -79,84 +175,19 @@
   function focusBody() {
     const position = bodyStart()
     if (position === null) return
-    editor.commands.setTextSelection(position)
-    // Focus synchronously so the next keystroke reaches the body rather than the title.
-    editor.view.focus()
+    editor.focusPosition(position)
   }
 
   function focusBefore() {
     const position = getPos()
     if (typeof position !== 'number') return
-    const selection = Selection.findFrom(editor.state.doc.resolve(position), -1, true)
-    if (!selection) return
-    editor.commands.setTextSelection(selection.from)
-    editor.view.focus()
-  }
-
-  function handleHeaderKeydownCapture(event: KeyboardEvent) {
-    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-    const target = event.target as HTMLElement | null
-    if (!target) return
-    const header = event.currentTarget as HTMLElement
-
-    if (target.matches('input[aria-label="Notice title"]')) {
-      if (event.key === 'Tab' && !event.shiftKey) {
-        const trigger = header.querySelector<HTMLElement>(
-          'button[data-part="trigger"], [aria-label="Notice type"][data-part="trigger"]',
-        )
-        if (trigger) {
-          event.preventDefault()
-          event.stopPropagation()
-          trigger.focus()
-        }
-        return
-      }
-      if (event.key === 'Tab' && event.shiftKey) {
-        event.preventDefault()
-        event.stopPropagation()
-        focusBody()
-        return
-      }
-      if (event.shiftKey) return
-      if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        event.stopPropagation()
-        focusBefore()
-      } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
-        event.preventDefault()
-        event.stopPropagation()
-        focusBody()
-      }
-      return
-    }
-
-    const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
-    if (trigger) {
-      if (trigger.getAttribute('aria-expanded') === 'true') return
-      if ((event.key === 'Tab' && !event.shiftKey) || event.key === 'ArrowDown') {
-        event.preventDefault()
-        event.stopPropagation()
-        focusBody()
-      } else if (event.key === 'Tab' && event.shiftKey) {
-        const titleInput = header.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-        if (titleInput) {
-          event.preventDefault()
-          event.stopPropagation()
-          titleInput.focus()
-        }
-      }
-    }
+    editor.focusBeforePosition(position)
   }
 </script>
 
-<NodeViewWrapper>
+<div data-node-view-wrapper="" role="none" style="white-space: normal;">
   <Notice {variant} class="editor-notice-node relative my-1 px-2 py-1">
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="flex items-center gap-2"
-      contenteditable={false}
-      onkeydowncapture={handleHeaderKeydownCapture}
-    >
+    <div bind:this={headerEl} class="flex items-center gap-2" contenteditable={false}>
       {#if editable}
         <input
           aria-label="Notice title"
@@ -203,6 +234,11 @@
         <span data-notice-title-text class="font-semibold tracking-tight">{title}</span>
       {/if}
     </div>
-    <NodeViewContent data-empty={empty && editable} class={noticeBody} />
+    <div
+      data-node-view-content=""
+      style="white-space: pre-wrap;"
+      data-empty={empty && editable}
+      class={noticeBody}
+    ></div>
   </Notice>
-</NodeViewWrapper>
+</div>

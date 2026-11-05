@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HtmdEditor Standalone E2E</title>
+  </head>
+  <body>
+    <main>
+      <div role="toolbar" aria-label="Harness controls">
+        <button id="btn-serialize" type="button">Serialize</button>
+        <button id="btn-load-sample" type="button">Load Sample</button>
+        <button id="btn-insert-notice" type="button">Insert Notice</button>
+        <button id="btn-insert-media" type="button">Insert Media</button>
+        <button id="btn-open-overlay" type="button">Open Image Overlay</button>
+        <button id="btn-mount-embed" type="button">Mount Embedded Editor</button>
+      </div>
+      <div id="editor-surface" role="region" aria-label="Standalone HTMD surface" tabindex="0">
+        <div id="editor-host"></div>
+      </div>
+      <div id="embed-container" aria-label="Embedded editor container"></div>
+      <output id="mode-indicator" aria-label="Editor mode">edit</output>
+      <output id="overlay-indicator" aria-label="Active overlay">none</output>
+      <output id="embed-indicator" aria-label="Embedded state">idle</output>
+      <pre id="serialized-output" aria-label="Serialized markdown"></pre>
+      <ul id="notifications" aria-label="Editor notifications"></ul>
+    </main>
+    <script type="module" src="/e2e/htmd-ts/fixture.ts"></script>
+  </body>
+</html>

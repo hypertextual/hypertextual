@@ -1,12 +1,7 @@
 <script lang="ts">
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
-  import {
-    isEditorInInsertMode,
-    modalKeymapPluginKey,
-    subscribeToEditorTransactions,
-  } from '../core'
-  import { NodeViewWrapper } from 'svelte-tiptap'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { ImagePlus, X } from 'lucide-svelte'
   import { createSubscriber } from 'svelte/reactivity'
 
@@ -14,7 +9,8 @@
   let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
+  const subscribe = createSubscriber((update) => editor.subscribe(update))
+  let wrapperEl = $state<HTMLDivElement | null>(null)
   let captionFocused = $state(false)
 
   let captionInputEl = $state<HTMLInputElement>()
@@ -26,15 +22,17 @@
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
     subscribe()
-    return editor.isEditable && isEditorInInsertMode(editor)
+    return editor.isEditable && editor.isInsertMode
   })
-  const { src, srcset, alt } = $derived(node.attrs)
+  const src = $derived(node.attrs.src as string | undefined)
+  const srcset = $derived(node.attrs.srcset as string | undefined)
+  const alt = $derived(node.attrs.alt as string | undefined)
 
-  let caption = $derived(node.attrs.caption || '')
+  let caption = $derived((node.attrs.caption as string | undefined) || '')
 
   const modalSubtext = $derived.by(() => {
     subscribe()
-    const st = modalKeymapPluginKey.getState(editor.state)?.subtextCursor
+    const st = editor.getSubtextCursor()
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (!st || st.kind !== 'imageCaption' || st.pos !== pos) return null
     return st
@@ -50,11 +48,125 @@
     return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
   })
 
+  // Lifecycle -----------------------------------------------------------------
+  useKeyScope({
+    id: 'widget:image',
+    priority: 'widget',
+    element: () => wrapperEl,
+    enabled: () => editable && Boolean(wrapperEl),
+    hotkeys: () => editor.services.hotkeys,
+    getContext: () => null,
+    keymap: {
+      Tab: {
+        id: 'image.tabNext',
+        key: 'Tab',
+        label: 'Next Image Control',
+        run: (_ctx, event) => {
+          const target = event.target
+          if (target === captionInputEl && replaceBtnEl) {
+            replaceBtnEl.focus()
+            return true
+          }
+          if (target === replaceBtnEl && removeBtnEl) {
+            removeBtnEl.focus()
+            return true
+          }
+          if (target === removeBtnEl && captionInputEl) {
+            captionInputEl.focus()
+            return true
+          }
+          return false
+        },
+      },
+      'Shift+Tab': {
+        id: 'image.tabPrev',
+        key: 'Shift+Tab',
+        label: 'Previous Image Control',
+        run: (_ctx, event) => {
+          const target = event.target
+          if (target === captionInputEl && removeBtnEl) {
+            removeBtnEl.focus()
+            return true
+          }
+          if (target === replaceBtnEl && captionInputEl) {
+            captionInputEl.focus()
+            return true
+          }
+          if (target === removeBtnEl && replaceBtnEl) {
+            replaceBtnEl.focus()
+            return true
+          }
+          return false
+        },
+      },
+      ArrowUp: {
+        id: 'image.focusBefore',
+        key: 'ArrowUp',
+        label: 'Focus Above Image',
+        run: (_ctx, event) => {
+          const target = event.target
+          const pos = getPos()
+          if (typeof pos !== 'number') return false
+          if (target === captionInputEl) {
+            updateAttributes({ caption })
+            editor.focusPosition(Math.max(pos - 1, 0))
+            return true
+          }
+          if (target === replaceBtnEl || target === removeBtnEl) {
+            editor.focusPosition(Math.max(pos - 1, 0))
+            return true
+          }
+          return false
+        },
+      },
+      ArrowDown: {
+        id: 'image.focusAfter',
+        key: 'ArrowDown',
+        label: 'Focus Below Image',
+        run: (_ctx, event) => {
+          const target = event.target
+          const pos = getPos()
+          if (typeof pos !== 'number') return false
+          if (target === captionInputEl) {
+            updateAttributes({ caption })
+            editor.focusPosition(pos + node.nodeSize)
+            return true
+          }
+          if (target === replaceBtnEl || target === removeBtnEl) {
+            captionInputEl?.focus()
+            return true
+          }
+          return false
+        },
+      },
+      Enter: {
+        id: 'image.splitCaption',
+        key: 'Enter',
+        label: 'Split Caption to Paragraph',
+        run: (_ctx, event) => {
+          if (event.target !== captionInputEl || !captionInputEl) return false
+          const pos = getPos()
+          if (typeof pos !== 'number') return false
+          const cursorIdx = captionInputEl.selectionStart ?? caption.length
+          const leftText = caption.slice(0, cursorIdx)
+          const rightText = caption.slice(cursorIdx)
+
+          caption = leftText
+          updateAttributes({ caption: leftText })
+
+          const posAfter = pos + node.nodeSize
+          editor.splitImageCaptionToParagraph(posAfter, rightText)
+          return true
+        },
+      },
+    },
+  })
+
   // Methods -------------------------------------------------------------------
   function handleReplaceImage() {
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (typeof pos === 'number') {
-      editor.commands.openOverlay('image', {
+      editor.openOverlay('image', {
         position: pos,
         data: { replace: true, src: String(src ?? '') },
       })
@@ -65,56 +177,16 @@
     captionFocused = false
     updateAttributes({ caption })
   }
-
-  function handleCaptionKeydown(event: KeyboardEvent) {
-    if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      const targetBtn = event.shiftKey ? removeBtnEl : replaceBtnEl
-      if (targetBtn) {
-        event.preventDefault()
-        event.stopPropagation()
-        targetBtn.focus()
-        return
-      }
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      updateAttributes({ caption })
-      const pos = (getPos as () => number)()
-      editor
-        .chain()
-        .focus()
-        .setTextSelection(Math.max(pos - 1, 0))
-        .run()
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      updateAttributes({ caption })
-      const posAfter = (getPos as () => number)() + node.nodeSize
-      editor.chain().focus().setTextSelection(posAfter).run()
-    } else if (event.key === 'Enter') {
-      event.preventDefault()
-      const input = event.currentTarget as HTMLInputElement
-      const cursorIdx = input.selectionStart ?? caption.length
-      const leftText = caption.slice(0, cursorIdx)
-      const rightText = caption.slice(cursorIdx)
-
-      caption = leftText
-      updateAttributes({ caption: leftText })
-
-      const posAfter = (getPos as () => number)() + node.nodeSize
-      editor
-        .chain()
-        .focus()
-        .insertContentAt(posAfter, {
-          type: 'paragraph',
-          content: rightText ? [{ type: 'text', text: rightText }] : [],
-        })
-        .setTextSelection(posAfter + 1)
-        .run()
-    }
-  }
 </script>
 
-<NodeViewWrapper class={imageSurface} contenteditable={false}>
+<div
+  bind:this={wrapperEl}
+  data-node-view-wrapper=""
+  role="none"
+  style="white-space: normal;"
+  class={imageSurface}
+  contenteditable={false}
+>
   <figure class="m-0">
     <div class="relative">
       <img
@@ -131,25 +203,6 @@
           type="button"
           class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-background/90 border border-border px-3 py-1.5 text-xs font-medium text-foreground shadow-sm flex items-center gap-1.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
           onclick={handleReplaceImage}
-          onkeydown={(event) => {
-            if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-              const nextEl = event.shiftKey ? captionInputEl : removeBtnEl
-              if (nextEl) {
-                event.preventDefault()
-                event.stopPropagation()
-                nextEl.focus()
-              }
-            } else if (event.key === 'ArrowDown') {
-              event.preventDefault()
-              event.stopPropagation()
-              captionInputEl?.focus()
-            } else if (event.key === 'ArrowUp') {
-              event.preventDefault()
-              event.stopPropagation()
-              const pos = (getPos as () => number)()
-              editor.chain().focus().setTextSelection(Math.max(pos - 1, 0)).run()
-            }
-          }}
           aria-label="Replace image"
         >
           <ImagePlus class="size-3.5" aria-hidden="true" />
@@ -160,25 +213,6 @@
           type="button"
           class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border text-foreground shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
           onclick={deleteNode}
-          onkeydown={(event) => {
-            if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-              const nextEl = event.shiftKey ? replaceBtnEl : captionInputEl
-              if (nextEl) {
-                event.preventDefault()
-                event.stopPropagation()
-                nextEl.focus()
-              }
-            } else if (event.key === 'ArrowDown') {
-              event.preventDefault()
-              event.stopPropagation()
-              captionInputEl?.focus()
-            } else if (event.key === 'ArrowUp') {
-              event.preventDefault()
-              event.stopPropagation()
-              const pos = (getPos as () => number)()
-              editor.chain().focus().setTextSelection(Math.max(pos - 1, 0)).run()
-            }
-          }}
           aria-label="Remove image"
         >
           <X class="size-3.5" aria-hidden="true" />
@@ -197,7 +231,6 @@
               captionFocused = true
             }}
             onblur={handleCaptionBlur}
-            onkeydown={handleCaptionKeydown}
             placeholder={captionFocused ? '' : 'Add a caption…'}
             style="background: transparent; box-shadow: none; outline: none;"
             class={captionInput}
@@ -216,4 +249,4 @@
       </figcaption>
     {/if}
   </figure>
-</NodeViewWrapper>
+</div>

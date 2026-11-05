@@ -1,6 +1,5 @@
-<!-- libs/helical-svelte/src/editor/CursorOverlay.svelte -->
 <script lang="ts">
-  import type { EditorOverlayBinding } from '../core'
+  import type { HtmdOverlayBinding } from 'htmd-ts'
   import type { CursorOverlayProps } from './types'
 
   // Props ---------------------------------------------------------------------
@@ -20,12 +19,12 @@
   // State ---------------------------------------------------------------------
   let surface = $state<HTMLDivElement | null>(null)
 
-  let binding: EditorOverlayBinding | undefined
+  let binding: HtmdOverlayBinding | undefined
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
     if (!surface) return
-    const attached = editor.storage.editorOverlays.attach(surface, {
+    const attached = editor.attachOverlaySurface(surface, {
       anchor: () => position,
       width,
       height,
@@ -43,7 +42,7 @@
   })
 
   $effect(() => {
-    position
+    void position
     binding?.update()
   })
 </script>

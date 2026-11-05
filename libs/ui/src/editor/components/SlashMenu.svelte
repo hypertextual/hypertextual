@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
-  import { onMount } from 'svelte'
   import * as LucideIcons from 'lucide-svelte'
   import type { Component } from 'svelte'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import type { SlashMenuProps } from './types'
   import { suggestionSurface, suggestionContent, suggestionItem } from './styles'
 
@@ -35,23 +35,64 @@
       listbox().highlightFirst()
   })
 
-  onMount(() => {
-    // Tiptap keeps text focus; forward only suggestion keys to Ark's selection state.
-    const handleKey = (event: KeyboardEvent) => {
-      if (!items.length || event.isComposing) return
-      if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey))
-        listbox().highlightPrevious()
-      else if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey))
-        listbox().highlightNext()
-      else if (event.key === 'Enter') {
-        const value = listbox().highlightedValue
-        if (value) listbox().selectValue(value)
-      } else return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
+  useKeyScope({
+    id: 'overlay:slash-menu',
+    priority: 'overlay',
+    enabled: () => items.length > 0,
+    getContext: () => null,
+    keymap: () => ({
+      ArrowUp: {
+        id: 'slashMenu.previous',
+        key: 'ArrowUp',
+        label: 'Previous Command',
+        run: (_ctx, event) => {
+          if (!items.length || event.isComposing) return false
+          listbox().highlightPrevious()
+          return true
+        },
+      },
+      'Shift-Tab': {
+        id: 'slashMenu.previousTab',
+        key: 'Shift-Tab',
+        label: 'Previous Command',
+        run: (_ctx, event) => {
+          if (!items.length || event.isComposing) return false
+          listbox().highlightPrevious()
+          return true
+        },
+      },
+      ArrowDown: {
+        id: 'slashMenu.next',
+        key: 'ArrowDown',
+        label: 'Next Command',
+        run: (_ctx, event) => {
+          if (!items.length || event.isComposing) return false
+          listbox().highlightNext()
+          return true
+        },
+      },
+      Tab: {
+        id: 'slashMenu.nextTab',
+        key: 'Tab',
+        label: 'Next Command',
+        run: (_ctx, event) => {
+          if (!items.length || event.isComposing) return false
+          listbox().highlightNext()
+          return true
+        },
+      },
+      Enter: {
+        id: 'slashMenu.select',
+        key: 'Enter',
+        label: 'Select Command',
+        run: (_ctx, event) => {
+          if (!items.length || event.isComposing) return false
+          const value = listbox().highlightedValue
+          if (value) listbox().selectValue(value)
+          return true
+        },
+      },
+    }),
   })
 
   // Methods -------------------------------------------------------------------

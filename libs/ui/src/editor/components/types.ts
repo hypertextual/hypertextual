@@ -1,22 +1,25 @@
-import type { Editor, JSONContent, NodeViewProps } from '@tiptap/core'
-import type { Snippet } from 'svelte'
+import type { EditorHostServices } from 'core-ts'
 import type {
-  MentionItem,
-  SlashCommandItem,
+  HtmdEditor,
+  HtmdNodeViewContext,
+  HtmdOverlayDefinition,
   ImageUploadResult,
+  JSONContent,
   LinkPreviewAttributes,
   LinkPreviewFetcher,
-  EditorOverlayDefinition,
-} from '../core'
+  MentionItem,
+  SlashCommandItem,
+} from 'htmd-ts'
+import type { Snippet } from 'svelte'
 
-export type UrlMentionPillProps = NodeViewProps
+export type UrlMentionPillProps = HtmdNodeViewContext<HtmdEditor>
 
 export interface BubbleMenuProps {
-  editor: Editor
+  editor: HtmdEditor
 }
 
-export interface CursorOverlayProps extends EditorOverlayDefinition {
-  editor: Editor
+export interface CursorOverlayProps extends HtmdOverlayDefinition {
+  editor: HtmdEditor
   position: number
   children: Snippet
 }
@@ -27,7 +30,7 @@ export interface SlashMenuProps {
 }
 
 export interface EditorOverlayInputProps {
-  editor: Editor
+  editor: HtmdEditor
   position: number
   data?: unknown
   onClose: () => void
@@ -45,7 +48,7 @@ export interface BookmarkInputProps extends EditorOverlayInputProps {
 }
 
 export interface FontColorPickerProps {
-  editor: Editor
+  editor: HtmdEditor
   visible?: boolean
   mode?: 'color' | 'highlight'
 }
@@ -69,27 +72,28 @@ export interface EditorProps {
   onUpload?: (file: File) => Promise<ImageUploadResult>
   /** Resolve Open Graph or SEO metadata for bookmark cards. */
   fetchLinkPreview?: (url: string) => Promise<Omit<LinkPreviewAttributes, 'url' | 'type'>>
+  services?: EditorHostServices
 }
 
-export type ImageNodeViewProps = NodeViewProps
+export type ImageNodeViewProps = HtmdNodeViewContext<HtmdEditor>
 
 export interface LinkEditPopoverProps {
-  editor: Editor
+  editor: HtmdEditor
   initialUrl?: string
   onSave?: (url: string) => void | Promise<void>
   onRemove?: () => void
   onClose: () => void
 }
 
-export type LinkPreviewCardProps = NodeViewProps
+export type LinkPreviewCardProps = HtmdNodeViewContext<HtmdEditor>
 
-export type CodeBlockComponentProps = NodeViewProps
+export type CodeBlockComponentProps = HtmdNodeViewContext<HtmdEditor>
 
 export interface ImageInputProps extends EditorOverlayInputProps {
   onUpload?: (file: File) => Promise<ImageUploadResult>
 }
 
-export type NoticeNodeViewProps = NodeViewProps
+export type NoticeNodeViewProps = HtmdNodeViewContext<HtmdEditor>
 
 export interface MentionListProps {
   items: MentionItem[]
@@ -99,6 +103,6 @@ export interface MentionListProps {
 
 export interface ImageFileUploadProps {
   file: File | null
-  onFileChange: (file: File | null) => void
   disabled?: boolean
+  onFileChange: (file: File | null) => void
 }

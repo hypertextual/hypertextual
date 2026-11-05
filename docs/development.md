@@ -29,6 +29,10 @@ mise run //apps/hypertextual-svelte:build
 mise run //apps/hypertextual-svelte:test
 mise run //libs/ui:lint
 mise run //libs/ui:build
+mise run //libs/core-ts:build
+mise run //libs/core-ts:lint
+mise run //libs/core-ts:test
+mise run //libs/core-ts:format:check
 mise run //libs/htmd-ts:build
 mise run //libs/htmd-ts:lint
 mise run //libs/htmd-ts:test
@@ -52,6 +56,8 @@ To run a task across projects, use `mise run --jobs 1 '//...:lint'` or replace `
 ## Browser tests
 
 ```sh
+mise run //e2e/htmd-ts:test
+mise run //e2e/htmd-ts:lint
 mise run //e2e/hypertextual-desktop:install
 mise run //e2e/hypertextual-desktop:smoke
 mise run //e2e/hypertextual-desktop:test -- workspace-file-tree.spec.ts --project chromium

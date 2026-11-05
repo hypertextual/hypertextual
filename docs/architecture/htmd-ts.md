@@ -2,28 +2,27 @@
 
 ## Overview
 
-`htmd-ts` owns the HTMD Markdown format and synchronous conversion between UTF-8 file contents and native ProseMirror JSON. The app passes complete source strings or JSON documents to the SDK, a package with a public conversion API. The app owns filesystem access, media loading, editor instances, drafts, autosave, and recovery controls.
+`htmd-ts` owns the HTMD document editor (`HtmdEditor`), the in-memory HTMD document model (`HtmdDocument`), and the Markdown codec (`htmdCodec`). It converts between `.htmd` or `.md` text and validated document JSON, and it mounts the rich-text editor in the browser. All Tiptap, ProseMirror, Marked, and syntax-highlighting engines stay private inside the library.
 
-Tiptap Markdown and Marked are private implementation dependencies. The public boundary supports a later Rust implementation without exposing these engines. Rust conversion, source positions, an LSP, and collaborative storage remain future work.
+The host application owns filesystem access, media storage, autosave scheduling, and recovery dialogs. The host passes keyboard, notification, media, and embedded-editor services to `HtmdEditor`. Rust conversion, source positions, a language server, and collaborative storage remain future work in `htmd-rs`.
 
 ## Requirement
 
 ### Functional
 
-- Parse supported Markdown into native ProseMirror JSON with schema defaults.
-- Write every supported node, mark, and persisted attribute without losing content when the file reopens.
-- Use CommonMark and GFM for standard elements and established syntax for notices.
-- Preserve custom component data for mentions, bookmarks, and YouTube embeds.
-- Retain unsupported or malformed fragments as editable raw-source nodes with diagnostic metadata.
-- Return recoverable issues so each client controls warning and rejection behavior.
-- Preserve unchanged source bytes and retain source conventions after edits.
+- Read and write `.htmd` and `.md` files without losing supported blocks, marks, or persisted attributes when a file reopens.
+- Convert between Markdown text and validated document JSON so local files and remote JSON services use the same document model.
+- Keep unsupported or malformed Markdown fragments editable as raw-source blocks or inline spans with diagnostic messages.
+- Preserve unchanged source bytes, byte-order marks (BOM, a Unicode file header), line endings, and final newlines after edits.
+- Extract the document title and map image references between portable storage paths and runtime display URLs.
+- Edit HTMD documents with modal keyboard navigation, formatting commands, slash and mention menus, media overlays, and custom block views.
+- Route editor and extension shortcuts, user notifications, media writes, and embedded child editors through host services.
 
 ### Non-Functional
 
-- Keep conversion synchronous and independent of Svelte, Tauri, filesystems, and network requests.
-- Exchange complete source strings, ProseMirror JSON, and plain issue records through the public API.
-- Keep parser instances, extension definitions, and engine schemas private.
-- Demonstrate syntax and full save/reopen behavior through public BDD integration examples.
+- Run format conversion synchronously without UI frameworks, Tauri, filesystem access, or network calls.
+- Keep Tiptap, ProseMirror, Marked, and `lowlight` types private inside the package.
+- Run in standard web browsers both inside the Hypertextual desktop app and as a standalone library.
 
 ## Design
 
@@ -31,142 +30,157 @@ Tiptap Markdown and Marked are private implementation dependencies. The public b
 
 ```mermaid
 flowchart TD
-    App[App editor service] --> Model[ArticleViewModel]
-    Model --> API[Public format API]
-    subgraph Format[htmd-ts]
-        API --> Core[lib.ts conversion and validation]
-        Core --> Nodes[nodes.ts]
-        Core --> Marks[marks.ts]
-        Core --> Syntax[syntax.ts recovery and attributes]
-        Core --> Engine[Tiptap MarkdownManager and isolated Marked]
-        Nodes --> Engine
-        Marks --> Engine
-        Syntax --> Engine
-        API --> Contracts[types.ts and errors.ts]
+    App["App EditorService & WorkspaceService"] --> EditorAPI["Public Editor Plugin API: HtmdEditor + HtmdDocument"]
+    UI["libs/ui HtmdEditor.svelte & Svelte NodeViews"] --> EditorAPI
+    CoreTS["core-ts: Editor, EditorFormatAdapter, EditorDocument, defineEditorExtension, KeyScope, EditorHostServices"] -.->|"implemented by"| EditorAPI
+
+    subgraph HTMD["libs/htmd-ts"]
+        EditorAPI --> HE["editor/htmd-editor.ts<br/>kind='htmd', formats: htmd, md, scopeId='editor:htmd'"]
+        EditorAPI --> HD["editor/htmd-document.ts<br/>HtmdDocument implements EditorDocument"]
+        HD --> Core["lib.ts internal conversion & schema validation"]
+        HE --> Core
+        Core --> Nodes["nodes.ts"]
+        Core --> Marks["marks.ts"]
+        Core --> Syntax["syntax.ts recovery & attributes"]
+        Core --> MdEngine["Private Tiptap MarkdownManager & isolated Marked"]
+
+        HE --> DEF["editor/define-htmd-extension.ts"]
+        HE --> EXT["editor/extensions/*<br/>17 extensions via defineHtmdExtension"]
+        HE --> BE["editor/build-extensions.ts<br/>Sole Tiptap/ProseMirror compiler"]
+        EXT --> DEF
+        BE --> EXT
+        BE --> PmEngine["Private Tiptap Editor & ProseMirror View"]
     end
-    Model -->|ProseMirror JSON| Editor[Reusable editor]
-    Editor -->|JSON changes| App
 ```
 
-`index.ts` exports the format API and its contracts. `lib.ts` composes a private schema and Markdown engine, validates documents, collects issues, and guards writes. `nodes.ts` and `marks.ts` reuse Tiptap definitions and specialize format behavior. `syntax.ts` supplies attribute handling, unsupported-token recovery, and internal rendering helpers.
-
-The reusable editor has no SDK dependency. The app connects both packages and validates parsed JSON against the editor schema. The app also restores portable image references before serialization.
+- `index.ts` exports `HtmdEditor`, `HtmdDocument`, `htmdCodec`, `defineHtmdExtension`, `createHtmdEditorKeymap`, editor types, and error classes.
+- `editor/htmd-document.ts` implements `HtmdDocument` (`EditorDocument<JSONContent>` from `core-ts`). It parses and serializes Markdown, extracts the first level-1 heading as the title, and maps `imageNode` URLs between portable paths and display URLs.
+- `lib.ts`, `nodes.ts`, `marks.ts`, and `syntax.ts` compose the private Markdown engine, validate documents against the HTMD schema, collect recoverable issues, and guard serialization.
+- `editor/htmd-editor.ts` implements `HtmdEditor` (`Editor<JSONContent, HtmdCommandMap>` and `EditorFormatAdapter<JSONContent>` for `htmd` and `md`). It manages the private Tiptap and ProseMirror instance, registers the `editor:htmd` and extension key scopes, forwards notifications and media writes to host services, and exposes engine-free methods to UI wrappers.
+- `editor/define-htmd-extension.ts` specializes `defineEditorExtension` from `core-ts` for HTMD nodes, marks, commands, keymaps, and ProseMirror plugins.
+- `editor/build-extensions.ts` translates `HtmdExtension` definitions and `HtmdNodeViews` into private Tiptap `Node`, `Mark`, and `Extension` instances.
 
 ### Data and Control Flow
 
+#### Format Deserialization, Editing, and Serialization Lifecycle
+
 ```mermaid
 sequenceDiagram
-    participant App as App service and view model
-    participant API as htmd-ts
-    participant Engine as Private Markdown engine
-    participant UI as Editor
-    App->>API: parse(source)
-    API->>Engine: Tokenize and parse each fragment
-    Engine-->>API: Nodes or raw-source wrappers
-    API->>API: Validate JSON and collect issues
-    API-->>App: content and issues
-    App->>UI: Validated JSON with display image URLs
-    UI-->>App: Edited JSON
-    App->>App: Restore portable image references
-    App->>API: serialize(content, originalSource)
-    API->>API: Validate and retry raw fragments
-    API->>Engine: Render Markdown
-    Engine-->>API: Candidate source
-    API->>API: Reparse and compare persisted JSON
-    API-->>App: Source or a named error
+    participant App as Host App (EditorService)
+    participant HE as HtmdEditor (formats: htmd/md, scopeId: editor:htmd)
+    participant HD as HtmdDocument (EditorDocument)
+    participant Codec as Internal lib.ts (parse / serialize / validateDocument)
+    participant Hotkeys as EditorHotkeyService (core-ts / HotkeyService)
+    participant UI as HtmdEditor.svelte & NodeViews
+
+    App->>HE: HtmdEditor.supportsFile(entry.name)
+    HE-->>App: true (.md / .htmd)
+    App->>HE: HtmdEditor.deserialize(source)
+    HE->>Codec: parse(source) + validateDocument(content)
+    Codec-->>HE: { content, issues }
+    HE-->>App: HtmdDocument { content, title, imageSources, issues }
+    App->>HD: document.displayImages(resolveAssetUrl)
+    App->>UI: mount with document.content + EditorHostServices
+    UI->>HE: new HtmdEditor({ content, editable, services, nodeViews, ... })
+    HE->>Hotkeys: registerKeyScope({ id: 'editor:htmd', priority: 'editor', ... })
+    HE->>Hotkeys: registerKeyScope({ id: 'ext:*', priority: 'extension', ... })
+    HE->>Hotkeys: registerModalTarget(element, modalTarget)
+    UI->>Hotkeys: useKeyScope({ id: 'widget:*', priority: 'widget', ... })
+    HE-->>UI: onchange(updated content)
+    UI-->>App: onchange(updated content)
+    App->>HD: document.transformImages(content, toPortablePath)
+    App->>HD: document.update(portableContent)
+    HD->>Codec: serialize(portableContent, { originalSource })
+    Codec-->>HD: UTF-8 Markdown string
+    HD-->>App: { source, title }
 ```
-
-The SDK keeps its schema and engine at module scope. It retains no per-article document session. The caller supplies `originalSource` when it needs byte preservation.
-
-If the document is unchanged, serialization returns the original source exactly. After edits, serialization retains its byte-order mark, line-ending convention, and final-newline convention. A byte-order mark is an optional marker at the start of a UTF-8 file.
 
 ### Interfaces and Contracts
 
+#### 1. `HtmdEditor` Format Codec and `HtmdDocument` API
+
 | Public API | Input | Output |
 | --- | --- | --- |
-| `parse` | Complete source string | `ParseResult { content, issues }` |
-| `validateDocument` | Native ProseMirror JSON | Validated JSON with defaults |
-| `serialize` | Native ProseMirror JSON and optional `{ originalSource }` | Complete Markdown string |
+| `HtmdEditor.formats` | None | `readonly ['htmd', 'md']` |
+| `HtmdEditor.supportsFile` | `filename: string` | `boolean` (`.htmd` or `.md`) |
+| `HtmdEditor.deserialize` | `source: string` | `HtmdDocument` (`EditorDocument<JSONContent>`) |
+| `HtmdEditor.serialize` | `JSONContent` and optional `{ originalSource }` | Complete Markdown string |
+| `HtmdEditor.extractTitle` | `source: string` | Extracted H1 title string |
 
 ```ts
-import { parse, serialize, validateDocument } from 'htmd-ts'
+import { HtmdEditor } from 'htmd-ts'
 
 const originalSource = '# Article\n\nSome *italic* text.\n'
-const { content, issues } = parse(originalSource)
-const checked = validateDocument(content)
-const savedSource = serialize(checked, { originalSource })
+const document = HtmdEditor.deserialize(originalSource)
+const title = document.title // 'Article'
+const savedSource = document.serialize()
 ```
 
-`JSONContent` defines `type`, `attrs`, `content`, `marks`, and `text` as structural JSON fields. Callers do not need Tiptap imports. Each `ParseIssue` carries `code`, syntax `kind`, `message`, and the preserved `source` fragment. Its code is `unsupported-syntax` or `invalid-syntax`.
+#### 2. `HtmdEditor` Plugin and `defineHtmdExtension` API
 
-Validation rejects unknown nodes, marks, attributes, invalid values, and invalid nesting. It removes display-only image `srcset` and ordered-list presentation type. The app owns display image URLs and restores portable references before writing.
+```ts
+import {
+  HtmdEditor,
+  defineHtmdExtension,
+  type HtmdEditorOptions,
+  type HtmdNodeViewFactory,
+} from 'htmd-ts'
 
-#### Markdown syntax
+const editor = new HtmdEditor({
+  content: checked,
+  editable: false,
+  enforceTitle: false,
+  services: { hotkeys, notifications, media, embedRegistry },
+  nodeViews: {
+    notice: noticeNodeViewFactory,
+    codeBlock: codeBlockNodeViewFactory,
+    image: imageNodeViewFactory,
+    linkPreview: linkPreviewNodeViewFactory,
+    urlMention: urlMentionNodeViewFactory,
+  },
+  onchange: (doc) => onDocumentChange(doc),
+})
 
-Headings, paragraphs, lists, task items, quotes, code, links, and images use CommonMark or GFM. Notices use GitHub blockquote markers. Underline, text color, highlight, and additional link metadata use CommonMark inline HTML.
-
-<!-- prettier-ignore -->
-```md
-# Article
-
-Some **bold**, *italic*, ~~struck~~, and `code` text.
-
-Some <u>underlined text</u>, <mark style="background-color:var(--chart-3)">highlighted text</mark>, and <span style="color:var(--danger)">colored text</span>.
-
-- [x] Completed task
-- [ ] Pending task
-
-![Photo](.images/photo.png "A caption")
-
-> [!WARNING] Take care
-> Notice body with **formatting**.
-
-[mention id="post-1" label="An article" type="post"]
-
-[url-mention url="https://example.com" title="Example"]
-
-:::bookmark {url="https://example.com" title="Example" description="A saved link"} :::
-
-:::youtube {url="https://www.youtube.com/watch?v=example&amp;t=90"} :::
+editor.mount(containerElement)
 ```
 
-Custom mention and card syntax retains component data. YouTube URLs retain timestamps. YouTube embeds omit titles and ignore extra title attributes when parsing noisy input. The format and editor omit text alignment. Responsive image source sets remain frontend presentation state.
+- `HtmdEditor` registers its `editor:htmd` keymap (`createHtmdEditorKeymap`) at `editor` priority. In normal mode, `Enter` enters a compound block such as a notice, code block, image, or link preview. In insert mode, `Escape` returns to normal mode when no inner overlay or widget consumes the key.
+- Extensions built with `defineHtmdExtension` declare shortcuts using `Keymap<HtmdCommandContext>` at `extension` priority.
+- Custom block views use `HtmdNodeViewFactory`. Each factory receives `HtmdNodeViewContext` (`editor`, `node`, `getPos`, `updateAttributes`, `deleteNode`, `subscribe`) and returns `{ dom, contentDOM?, update?, destroy? }`.
+- Modal yank actions and editor errors send messages to `services.notifications`. Image uploads and replacements write files through `services.media`.
 
-Empty paragraphs use `<p></p>`. Formatted boundary whitespace uses inline HTML. Plain-text boundary whitespace and unfinished block prefixes use numeric character references. Adjacent lists use alternating standard markers so parsing preserves separate list nodes.
+#### 3. Markdown Syntax and Recovery
 
-#### Recovery and errors
+Headings, paragraphs, lists, task items, quotes, code, links, and images use CommonMark or GitHub Flavored Markdown (GFM). Notices use GitHub blockquote markers (`> [!NOTE] Title`). Underline, text color, highlight, and link metadata use CommonMark inline HTML. Mentions, bookmarks, and YouTube embeds use directive or shortcode syntax (`[mention ...]`, `[url-mention ...]`, `:::bookmark {...} :::`, `:::youtube {...} :::`).
 
-Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` nodes. Their content retains raw text. Their `kind` and `reason` attributes describe the failure. Supported siblings remain editable, and clients can style or hide wrappers without dropping their saved source.
-
-Serialization emits raw fragments directly and retries parsing after edits. A repaired fragment can become a recognized node. Unreferenced link definitions remain raw blocks while Marked resolves references.
+Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` nodes with `kind` and `reason` attributes. Serialization writes raw fragments directly and parses them again after edits so fixed fragments become standard nodes.
 
 | Result or error | Exact purpose |
 | --- | --- |
-| `issues` | Recoverable unsupported or invalid source with preserved fragments. The client chooses warning or rejection behavior. |
+| `issues` | Recoverable unsupported or invalid source with preserved fragments. |
 | `InvalidDocumentError` | Supplied JSON has unknown nodes, marks, attributes, invalid values, or invalid structure. |
 | `MarkdownParseError` | A fatal engine failure prevents valid JSON after local recovery. |
 | `MarkdownSerializationError` | Rendering fails, raw inline source escapes its paragraph, or reopening changes persisted content or attributes. |
 
-The app retains failed drafts and owns save recovery. A whole-source read-only preview is an app response to a fatal parsing failure.
-
 ## Implementation
 
-### Engine adapters and extension points
+### Engine Adapters and Extension System
 
-Standard definitions come from Tiptap StarterKit and task-list extensions. The SDK uses native Markdown parsing and rendering hooks. Custom atomic elements use Tiptap's inline and block Markdown-spec helpers.
+- `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own Markdown parsing, serialization, and schema validation.
+- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` on top of `defineEditorExtension` from `core-ts`.
+- `src/editor/extensions/*` contains the 17 HTMD editor extensions. None of these files import `@tiptap/core`.
+- `src/editor/build-extensions.ts` is the only editor module that imports `@tiptap/core` and `@tiptap/extension-*` to compile `HtmdExtension` definitions into Tiptap extensions.
+- `src/editor/htmd-editor.ts` owns `HtmdEditor` and wraps the private Tiptap `Editor` and ProseMirror `EditorView`.
 
-An isolated Marked instance prevents tokenizer changes from reaching other consumers. Numbered lists use Marked's CommonMark tokenization to retain list boundaries. Their inline tokens pass through normal paragraph parsing. Render-only attributes choose list markers and preserve whitespace without changing the public JSON schema.
+### Testing
 
-`nodes.ts` groups node definitions. `marks.ts` groups mark families and the supported inline HTML subset. New format elements belong in those modules with explicit parsing, writing, and recovery examples. Svelte components render the resulting JSON separately.
-
-### Integration examples and fixtures
-
-Colocated `nodes.test.ts`, `marks.test.ts`, and `lib.test.ts` exercise the public API. Nested BDD groups cover elements and variants with literal source, expected JSON, and full write/reopen behavior. The complete Markdown fixture pairs with explicit expected JSON under `libs/htmd-ts/fixtures`.
-
-App compatibility cases live in `editorService.test.ts`. The shared browser suite covers editing through rendered controls and reopening persisted files. The SDK has no separate browser runner. Test commands and setup belong in the development guide.
+- `src/nodes.test.ts`, `src/marks.test.ts`, and `src/lib.test.ts` test every block, inline node, mark, whitespace rule, and recovery path against `fixtures/editor-roundtrip.md` and `fixtures/editor-roundtrip.json`.
+- `src/editor/htmd-editor.test.ts` tests `HtmdEditor` lifecycle, `HtmdDocument`, `defineHtmdExtension` compilation, modal block operations, and host services.
+- `e2e/htmd-ts/` runs Playwright in Chromium and WebKit against a standalone `HtmdEditor` browser fixture without the desktop app. It tests DOM rendering, key scope priority, notifications, media writes, embedded child editor focus handoff, and Markdown round-trips.
 
 ## References
 
+- [core-ts editor plugin architecture](core-ts.md)
 - [Library entry point](../../libs/htmd-ts/README.md)
 - [Public API exports](../../libs/htmd-ts/src/index.ts)
 - [Public types](../../libs/htmd-ts/src/types.ts)
@@ -176,6 +190,6 @@ App compatibility cases live in `editorService.test.ts`. The shared browser suit
 - [Complete Markdown fixture](../../libs/htmd-ts/fixtures/editor-roundtrip.md)
 - [Expected fixture JSON](../../libs/htmd-ts/fixtures/editor-roundtrip.json)
 - [System architecture](index.md)
-- [Workspace persistence](hyped-fs.md)
-- [Editor contract](ui/document-editor.md)
+- [HtmdEditor Svelte component](ui/htmd-editor.md)
+- [Editor source ownership](ui/editor-source.md)
 - [Development commands](../development.md)

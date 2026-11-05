@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
-  import type { MentionListElement } from '../core'
+  import type { MentionListElement } from 'htmd-ts'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import type { MentionListProps } from './types'
   import { suggestionSurface, suggestionContent, suggestionItem } from './styles'
 
@@ -48,6 +49,45 @@
   $effect(() => {
     if (items.length && !items.some((item) => item.id === listbox().highlightedValue))
       listbox().highlightFirst()
+  })
+
+  useKeyScope({
+    id: 'overlay:mention-list',
+    priority: 'overlay',
+    enabled: () => items.length > 0,
+    getContext: () => null,
+    keymap: () => ({
+      ArrowUp: {
+        id: 'mentionList.previous',
+        key: 'ArrowUp',
+        label: 'Previous Mention',
+        run: (_ctx, event) => onKeyDown(event),
+      },
+      'Shift-Tab': {
+        id: 'mentionList.previousTab',
+        key: 'Shift-Tab',
+        label: 'Previous Mention',
+        run: (_ctx, event) => onKeyDown(event),
+      },
+      ArrowDown: {
+        id: 'mentionList.next',
+        key: 'ArrowDown',
+        label: 'Next Mention',
+        run: (_ctx, event) => onKeyDown(event),
+      },
+      Tab: {
+        id: 'mentionList.nextTab',
+        key: 'Tab',
+        label: 'Next Mention',
+        run: (_ctx, event) => onKeyDown(event),
+      },
+      Enter: {
+        id: 'mentionList.select',
+        key: 'Enter',
+        label: 'Select Mention',
+        run: (_ctx, event) => onKeyDown(event),
+      },
+    }),
   })
 
   // Methods -------------------------------------------------------------------

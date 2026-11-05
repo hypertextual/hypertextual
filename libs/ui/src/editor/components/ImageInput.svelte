@@ -2,7 +2,8 @@
   import { onDestroy } from 'svelte'
   import { Tabs } from '@ark-ui/svelte/tabs'
   import type { ImageInputProps } from './types'
-  import type { ImageUploadResult } from '../core'
+  import type { ImageUploadResult } from 'htmd-ts'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { X } from 'lucide-svelte'
   import ImageFileUpload from './ImageFileUpload.svelte'
 
@@ -14,6 +15,8 @@
     data && typeof data === 'object' ? (data as { replace?: boolean; src?: string }) : undefined,
   )
   let active = true
+
+  let dialogElement = $state<HTMLDivElement | null>(null)
 
   let activeTab = $state<'upload' | 'url'>('upload')
 
@@ -40,27 +43,44 @@
     }
   })
 
+  useKeyScope({
+    id: 'overlay:image-input',
+    priority: 'overlay',
+    element: () => dialogElement,
+    enabled: () => Boolean(dialogElement),
+    hotkeys: () => editor.services.hotkeys,
+    getContext: () => null,
+    keymap: {
+      Enter: {
+        id: 'imageInput.submitUrl',
+        key: 'Enter',
+        label: 'Insert Image URL',
+        when: (_ctx, event) => Boolean(urlInputEl && event.target === urlInputEl),
+        run: () => {
+          handleUrlSubmit()
+          return true
+        },
+      },
+      Escape: {
+        id: 'imageInput.close',
+        key: 'Escape',
+        label: 'Close Image Dialog',
+        run: () => {
+          onClose()
+          editor.execCommand('exitToNormal')
+          return true
+        },
+      },
+    },
+  })
+
   // Methods -------------------------------------------------------------------
   function insertImage(src: string, srcset?: string) {
-    if (replaceData?.replace) {
-      const existing = editor.state.doc.nodeAt(position)
-      if (existing && (existing.type.name === 'image' || existing.type.name === 'imageNode')) {
-        const tr = editor.state.tr.setNodeMarkup(position, undefined, {
-          ...existing.attrs,
-          src,
-          srcset: srcset ?? null,
-        })
-        editor.view.dispatch(tr)
-        onClose()
-        return
-      }
-    }
-    editor
-      .chain()
-      .focus()
-      .setTextSelection(position)
-      .insertImage({ src, srcset, alt: '', caption: '' })
-      .run()
+    editor.insertOrReplaceImage(
+      position,
+      { src, srcset, alt: '', caption: '' },
+      Boolean(replaceData?.replace),
+    )
     onClose()
   }
 
@@ -87,7 +107,11 @@
     try {
       const result: ImageUploadResult = onUpload
         ? await onUpload(selectedFile)
-        : { src: await fileToDataUrl(selectedFile) }
+        : editor.services.media
+          ? await editor.services.media
+              .write(selectedFile)
+              .then((asset) => ({ src: asset.url, srcset: asset.srcset }))
+          : { src: await fileToDataUrl(selectedFile) }
       if (!active) return
       insertImage(result.src, result.srcset)
     } catch {
@@ -111,23 +135,14 @@
     }
     insertImage(trimmed)
   }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') onClose()
-  }
-
-  function handleUrlKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') handleUrlSubmit()
-  }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
+  bind:this={dialogElement}
   class="max-h-[calc(100vh-2rem)] w-80 overflow-y-auto rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-xl"
   role="dialog"
   aria-label="Insert image"
   tabindex="-1"
-  onkeydown={handleKeydown}
 >
   <div class="space-y-3">
     <div class="flex items-center justify-between">
@@ -184,7 +199,6 @@
             type="url"
             bind:this={urlInputEl}
             bind:value={urlValue}
-            onkeydown={handleUrlKeydown}
             oninput={() => {
               urlError = ''
             }}
@@ -209,7 +223,7 @@
       </button>
       <button
         type="button"
-        onclick={activeTab === 'upload' ? handleUpload : handleUrlSubmit}
+        onclick={() => (activeTab === 'upload' ? void handleUpload() : handleUrlSubmit())}
         disabled={uploading || (activeTab === 'upload' && !selectedFile)}
         class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
       >

@@ -3,7 +3,7 @@
 ## Hard Rules
 
 - Use the published npm packages `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`. Reference `~/Projects/helical-ui` for composition and style; never replace npm dependencies with local paths.
-- Develop the Svelte editor and framework-neutral core in `libs/ui/src/editor`. Record upstream provenance in [the editor source guide](docs/architecture/ui/editor-source.md).
+- Define engine-neutral editor and keyscope contracts in `libs/core-ts`, develop the HTMD editor core and extensions in `libs/htmd-ts/src/editor`, and keep Svelte editor presentation (`HtmdEditor.svelte` and NodeViews) in `libs/ui/src/editor`. Record upstream provenance in [the editor source guide](docs/architecture/ui/editor-source.md).
 - Prefer existing [Mise tasks](mise.toml). See [development commands](docs/development.md).
 - Commit or publish only when requested.
 - Fill every section of `~/.difflab/templates/pull-request-description.md` with actual changes and verified evidence.
@@ -26,12 +26,14 @@ hypertextual/
 │           ├── models/         # Stateful view models and document transforms
 │           └── services/       # Stateful application services (workspace, editor, hotkeys, settings, media)
 ├── libs/
-│   ├── htmd-ts/                # Markdown <-> ProseMirror JSON codec and validation
+│   ├── core-ts/                # Engine- and framework-neutral editor and keyscope contracts
+│   ├── htmd-ts/                # Markdown <-> HTMD JSON codec, validation, and HtmdEditor core
 │   ├── htmd-rs/                # Deferred Rust Markdown codec
 │   ├── hyped-fs/               # Rust workspace, article, and media domain models and services
-│   └── ui/                     # Private reusable Svelte components and editor core
+│   └── ui/                     # Private reusable Svelte components and HtmdEditor wrapper
 ├── docs/                       # Architecture, UI component, and keybinding docs
 └── e2e/
+    ├── htmd-ts/                # Standalone Playwright integration suite for HtmdEditor
     └── hypertextual-desktop/   # Playwright end-to-end suite and fixtures
 ```
 
@@ -71,12 +73,12 @@ let { ... }: ComponentProps = $props()
 - Delegate behavior, accessibility, keyboard navigation, and interaction state to Ark UI and Helical controllers rather than custom DOM handlers.
 - Define framework-neutral base classes and CVA variants in `styles.ts`, derive variant types with `VariantProps`, and merge caller classes with Helical `cn`.
 - Use semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark data-attribute states. Avoid component-specific global CSS and hard-coded palette colors.
-- Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`.
+- Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`, and register scoped widget, extension, and editor keymaps through `KeyScopeDispatcher` (`useKeyScope` in Svelte components).
 - Keep theme state and toggle controls (`ThemeService`, `ThemeToggle`) in `libs/ui`, with `SettingsService` only syncing persisted preferences when needed.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
-- Exchange native Tiptap `JSONContent` with `libs/ui`. Keep Markdown parsing, serialization, and format SDK dependencies inside `libs/htmd-ts`.
-- Keep HTMD node definitions in `nodes.ts` and mark definitions in `marks.ts`. Do not add legacy format shims; keep parsing fault-tolerant by recovering unsupported or malformed fragments as editable `unparsedBlock` / `unparsedInline` wrappers.
+- Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
+- Keep HTMD node definitions in `nodes.ts`, mark definitions in `marks.ts`, and editor extensions in `libs/htmd-ts/src/editor/extensions` authored via `defineHtmdExtension`. Do not add legacy format shims; keep parsing fault-tolerant by recovering unsupported or malformed fragments as editable `unparsedBlock` / `unparsedInline` wrappers.
 
 ### Documentation
 
@@ -90,7 +92,7 @@ let { ... }: ComponentProps = $props()
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
-- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`). Do not place tests inside `libs/ui/src/editor/core/extensions`.
+- Keep Playwright E2E tests in `e2e/htmd-ts/` (`htmd-editor.spec.ts`) and `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`). Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:
 
 ```ts

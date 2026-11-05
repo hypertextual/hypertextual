@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
-  import { DocumentEditor } from '@hypertextual/ui'
+  import { HtmdEditor } from '@hypertextual/ui'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
   import ContentFallback from './ContentFallback.svelte'
 
@@ -35,7 +35,7 @@
 >
   {#if !editor.loading && !editor.openingError && !editor.unsupported && !editor.image && editor.document?.content && editor.selected}
     {#key editor.version}
-      <DocumentEditor
+      <HtmdEditor
         document={editor.document.content}
         editable={editor.editable && !workspace.blocked}
         clickToEdit={workspace.settings.clickToInsert}
@@ -44,6 +44,7 @@
         contentClass="article-editor"
         onchange={(document) => editor.change(document)}
         onUpload={(file) => editor.upload(file)}
+        services={workspace.editorServices}
       />
     {/key}
   {:else}
