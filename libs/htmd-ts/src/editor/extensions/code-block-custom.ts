@@ -1,5 +1,13 @@
 import { NodeSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension, type HtmdInternalEditor } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  findNextBlockPos,
+  findPrevBlockPos,
+  focusBlockAtPos,
+  isAtFirstVisualLine,
+  isAtLastVisualLine,
+  type HtmdInternalEditor,
+} from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory } from '../types.js'
 
 export interface CodeBlockCustomOptions {
@@ -10,17 +18,7 @@ export interface CodeBlockCustomOptions {
 }
 
 function focusLanguageSelectorAt(editor: HtmdInternalEditor, pos: number): boolean {
-  const dom = editor.view.nodeDOM(pos)
-  if (dom instanceof HTMLElement) {
-    const trigger = dom.querySelector<HTMLElement>(
-      '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-    )
-    if (trigger) {
-      trigger.focus()
-      return true
-    }
-  }
-  return false
+  return focusBlockAtPos(editor, pos, 'down')
 }
 
 function focusLanguageSelector(editor: HtmdInternalEditor): boolean {
@@ -116,7 +114,7 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
           }
           return true
         },
-        run: ({ editor, state }) => {
+        run: ({ editor, state, view }) => {
           const { selection } = state
           if (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock') {
             return focusLanguageSelectorAt(editor, selection.from)
@@ -127,6 +125,51 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
             const textBefore = $from.parent.textBetween(0, $from.parentOffset)
             if (!textBefore.includes('\n')) {
               return focusLanguageSelector(editor)
+            }
+            return false
+          }
+          if (isAtFirstVisualLine(view, state)) {
+            const prevPos = findPrevBlockPos(state)
+            if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'codeBlock') {
+              return focusBlockAtPos(editor, prevPos, 'up')
+            }
+          }
+          return false
+        },
+      },
+      ArrowDown: {
+        id: 'codeBlock.arrowDownToLanguageOrExit',
+        key: 'ArrowDown',
+        label: 'Enter Code Language Selector or Exit Code Block',
+        mode: 'insert',
+        when: (_, event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest('[contenteditable="false"]')
+          ) {
+            return false
+          }
+          return true
+        },
+        run: ({ editor, state, view }) => {
+          const { selection } = state
+          if (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock') {
+            return focusLanguageSelectorAt(editor, selection.from)
+          }
+          if (editor.isActive('codeBlock')) {
+            if (!isAtLastVisualLine(view, state)) return false
+            const { $from } = selection
+            for (let depth = $from.depth; depth > 0; depth -= 1) {
+              if ($from.node(depth).type.name === 'codeBlock') {
+                return focusBlockAtPos(editor, $from.after(depth), 'down', true)
+              }
+            }
+            return false
+          }
+          if (isAtLastVisualLine(view, state)) {
+            const nextPos = findNextBlockPos(state)
+            if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'codeBlock') {
+              return focusLanguageSelectorAt(editor, nextPos)
             }
           }
           return false

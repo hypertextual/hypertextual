@@ -128,9 +128,17 @@
         label: 'Focus Above Notice',
         run: (_ctx, event) => {
           const target = event.target as HTMLElement | null
-          if (!target?.matches('input[aria-label="Notice title"]')) return false
-          focusBefore()
-          return true
+          if (!target) return false
+          if (target.matches('input[aria-label="Notice title"]')) {
+            focusBefore()
+            return true
+          }
+          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+            focusBefore()
+            return true
+          }
+          return false
         },
       },
       ArrowDown: {

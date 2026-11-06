@@ -132,9 +132,12 @@
         key: 'ArrowUp',
         label: 'Focus Above Link Preview',
         run: (_ctx, event) => {
-          if (event.target !== urlInputEl) return false
-          if (type === 'bookmark') commitBookmarkUrl()
-          else commitYouTubeUrl()
+          const target = event.target
+          if (target !== urlInputEl && target !== removeBtnEl) return false
+          if (target === urlInputEl) {
+            if (type === 'bookmark') commitBookmarkUrl()
+            else commitYouTubeUrl()
+          }
           focusBefore()
           return true
         },
@@ -144,9 +147,12 @@
         key: 'ArrowDown',
         label: 'Focus Below Link Preview',
         run: (_ctx, event) => {
-          if (event.target !== urlInputEl) return false
-          if (type === 'bookmark') commitBookmarkUrl()
-          else commitYouTubeUrl()
+          const target = event.target
+          if (target !== urlInputEl && target !== removeBtnEl) return false
+          if (target === urlInputEl) {
+            if (type === 'bookmark') commitBookmarkUrl()
+            else commitYouTubeUrl()
+          }
           focusAfter()
           return true
         },
@@ -182,13 +188,13 @@
   function focusBefore() {
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (typeof pos !== 'number') return
-    editor.focusPosition(Math.max(0, pos - 1))
+    editor.focusBeforePosition(pos)
   }
 
   function focusAfter() {
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (typeof pos !== 'number') return
-    editor.focusPosition(pos + node.nodeSize)
+    editor.focusAfterPosition(pos + node.nodeSize)
   }
 
   function commitBookmarkUrl() {

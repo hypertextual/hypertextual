@@ -1,4 +1,12 @@
-import { defineHtmdExtension, mergeHtmlAttributes } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  findNextBlockPos,
+  findPrevBlockPos,
+  focusBlockAtPos,
+  isAtFirstVisualLine,
+  isAtLastVisualLine,
+  mergeHtmlAttributes,
+} from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory, NoticeAttributes, NoticeVariant } from '../types.js'
 
 export type { NoticeAttributes, NoticeVariant }
@@ -120,31 +128,69 @@ export const NoticeNode = defineHtmdExtension<
         key: 'ArrowUp',
         label: 'Move to Notice Title',
         mode: 'insert',
-        when: ({ state }, event) => {
+        when: (_, event) => {
           if (
             event.target instanceof HTMLElement &&
             event.target.closest('[contenteditable="false"]')
           ) {
             return false
           }
-          const depth = findNoticeDepth(state)
-          if (depth < 0 || !state.selection.empty) return false
-          return state.selection.$from.index(depth) === 0
-        },
-        run: ({ state, view }) => {
-          const depth = findNoticeDepth(state)
-          if (depth < 0 || !state.selection.empty) return false
-          const { $from } = state.selection
-          if ($from.index(depth) !== 0) return false
-          const cursorCoords = view.coordsAtPos(state.selection.from)
-          const firstLineCoords = view.coordsAtPos($from.start())
-          if (cursorCoords.top > firstLineCoords.top + 2) return false
-          const dom = view.nodeDOM($from.before(depth))
-          if (!(dom instanceof HTMLElement)) return false
-          const titleInput = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-          if (!titleInput) return false
-          titleInput.focus()
           return true
+        },
+        run: ({ editor, state, view }) => {
+          const depth = findNoticeDepth(state)
+          if (depth > 0) {
+            if (!state.selection.empty) return false
+            const { $from } = state.selection
+            if ($from.index(depth) !== 0) return false
+            if (!isAtFirstVisualLine(view, state)) return false
+            const dom = view.nodeDOM($from.before(depth))
+            if (!(dom instanceof HTMLElement)) return false
+            const titleInput = dom.querySelector<HTMLInputElement>(
+              'input[aria-label="Notice title"]',
+            )
+            if (!titleInput) return false
+            titleInput.focus()
+            return true
+          }
+          if (isAtFirstVisualLine(view, state)) {
+            const prevPos = findPrevBlockPos(state)
+            if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'notice') {
+              return focusBlockAtPos(editor, prevPos, 'up')
+            }
+          }
+          return false
+        },
+      },
+      ArrowDown: {
+        id: 'notice.arrowDownToTitleOrExit',
+        key: 'ArrowDown',
+        label: 'Move to Notice Title or Exit Notice',
+        mode: 'insert',
+        when: (_, event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest('[contenteditable="false"]')
+          ) {
+            return false
+          }
+          return true
+        },
+        run: ({ editor, state, view }) => {
+          if (!isAtLastVisualLine(view, state)) return false
+          const depth = findNoticeDepth(state)
+          if (depth > 0) {
+            const { $from } = state.selection
+            if ($from.index(depth) === $from.node(depth).childCount - 1) {
+              return focusBlockAtPos(editor, $from.after(depth), 'down', true)
+            }
+            return false
+          }
+          const nextPos = findNextBlockPos(state)
+          if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'notice') {
+            return focusBlockAtPos(editor, nextPos, 'down')
+          }
+          return false
         },
       },
     }

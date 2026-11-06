@@ -1,6 +1,13 @@
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { defineHtmdExtension } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  findNextBlockPos,
+  findPrevBlockPos,
+  focusBlockAtPos,
+  isAtFirstVisualLine,
+  isAtLastVisualLine,
+} from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory } from '../types.js'
 import { isEditorInInsertMode } from './modal-keymap.js'
 
@@ -64,6 +71,54 @@ export const ImageNode = defineHtmdExtension<
           attrs,
         }),
   }),
+  keymap: () => ({
+    ArrowDown: {
+      id: 'image.arrowDownToCaption',
+      key: 'ArrowDown',
+      label: 'Focus Image Caption',
+      mode: 'insert',
+      when: (_, event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[contenteditable="false"]')
+        ) {
+          return false
+        }
+        return true
+      },
+      run: ({ editor, state, view }) => {
+        if (!isAtLastVisualLine(view, state)) return false
+        const nextPos = findNextBlockPos(state)
+        if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'imageNode') {
+          return focusBlockAtPos(editor, nextPos, 'down')
+        }
+        return false
+      },
+    },
+    ArrowUp: {
+      id: 'image.arrowUpToCaption',
+      key: 'ArrowUp',
+      label: 'Focus Image Caption',
+      mode: 'insert',
+      when: (_, event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[contenteditable="false"]')
+        ) {
+          return false
+        }
+        return true
+      },
+      run: ({ editor, state, view }) => {
+        if (!isAtFirstVisualLine(view, state)) return false
+        const prevPos = findPrevBlockPos(state)
+        if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'imageNode') {
+          return focusBlockAtPos(editor, prevPos, 'up')
+        }
+        return false
+      },
+    },
+  }),
   pmPlugins({ editor }) {
     let arrowKeyPressed = false
 
@@ -108,6 +163,11 @@ export const ImageNode = defineHtmdExtension<
                 : null
 
               if (input) {
+                const modalStorage = (
+                  editor.storage as
+                    { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+                )?.modalKeymap
+                if (modalStorage) modalStorage.activeCompoundBlockPos = pos
                 const { tr, doc } = view.state
                 const $after = doc.resolve(Math.min(pos + nodeSize, doc.content.size))
                 view.dispatch(tr.setSelection(TextSelection.near($after)))

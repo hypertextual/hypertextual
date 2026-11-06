@@ -5,7 +5,13 @@ import {
   type Keymap,
 } from 'core-ts'
 import type { DOMOutputSpec, Node as PMNode, ParseRule, Schema } from '@tiptap/pm/model'
-import type { EditorState, Plugin, Transaction } from '@tiptap/pm/state'
+import {
+  NodeSelection,
+  Selection,
+  type EditorState,
+  type Plugin,
+  type Transaction,
+} from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 
 import type { LinkPreviewAttributes, NoticeAttributes, UrlMentionAttributes } from './types.js'
@@ -214,4 +220,204 @@ export function mergeHtmlAttributes(
     }
   }
   return merged
+}
+
+export function isAtFirstVisualLine(view: EditorView, state: EditorState): boolean {
+  const { selection } = state
+  if (!selection.empty || !selection.$from.parent.isTextblock) return false
+  const { $from } = selection
+  const textBefore = $from.parent.textBetween(0, $from.parentOffset)
+  if (textBefore.includes('\n')) return false
+  let hasHardBreakBefore = false
+  $from.parent.nodesBetween(0, $from.parentOffset, (node) => {
+    if (node.type.name === 'hardBreak') hasHardBreakBefore = true
+  })
+  if (hasHardBreakBefore) return false
+  try {
+    const cursorCoords = view.coordsAtPos(selection.from)
+    const startCoords = view.coordsAtPos($from.start())
+    if (cursorCoords.top > startCoords.top + 2) return false
+  } catch {
+    // Headless environment without layout coordinates
+  }
+  return true
+}
+
+export function isAtLastVisualLine(view: EditorView, state: EditorState): boolean {
+  const { selection } = state
+  if (!selection.empty || !selection.$from.parent.isTextblock) return false
+  const { $from } = selection
+  const textAfter = $from.parent.textBetween($from.parentOffset, $from.parent.content.size)
+  if (textAfter.includes('\n')) return false
+  let hasHardBreakAfter = false
+  $from.parent.nodesBetween($from.parentOffset, $from.parent.content.size, (node) => {
+    if (node.type.name === 'hardBreak') hasHardBreakAfter = true
+  })
+  if (hasHardBreakAfter) return false
+  try {
+    const cursorCoords = view.coordsAtPos(selection.from)
+    const endCoords = view.coordsAtPos($from.end())
+    if (cursorCoords.top < endCoords.top - 2) return false
+  } catch {
+    // Headless environment without layout coordinates
+  }
+  return true
+}
+
+export function findNextBlockPos(state: EditorState): number | null {
+  const { selection } = state
+  if (selection instanceof NodeSelection) {
+    return selection.to < state.doc.content.size ? selection.to : null
+  }
+  const { $from } = selection
+  for (let d = $from.depth; d >= 1; d -= 1) {
+    const afterPos = $from.after(d)
+    if (d === 1 || afterPos < $from.end(d - 1)) {
+      return afterPos < state.doc.content.size ? afterPos : null
+    }
+  }
+  return null
+}
+
+export function findPrevBlockPos(state: EditorState): number | null {
+  const { selection } = state
+  if (selection instanceof NodeSelection) {
+    if (selection.from <= 0) return null
+    const prev = state.doc.resolve(selection.from).nodeBefore
+    return prev ? selection.from - prev.nodeSize : null
+  }
+  const { $from } = selection
+  for (let d = $from.depth; d >= 1; d -= 1) {
+    const beforePos = $from.before(d)
+    if (d === 1 || beforePos > $from.start(d - 1)) {
+      if (beforePos <= 0) return null
+      const prev = state.doc.resolve(beforePos).nodeBefore
+      return prev ? beforePos - prev.nodeSize : null
+    }
+  }
+  return null
+}
+
+export function focusBlockAtPos(
+  editor: HtmdInternalEditor,
+  pos: number,
+  direction: 'down' | 'up',
+  allowTextblockFallback = false,
+): boolean {
+  const { doc } = editor.state
+  if (pos < 0 || pos >= doc.content.size) return false
+  const node = doc.nodeAt(pos)
+  if (!node) return false
+  const dom = editor.view?.nodeDOM(pos)
+  const modalStorage = (
+    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+  )?.modalKeymap
+
+  if (node.type.name === 'codeBlock') {
+    if (modalStorage) modalStorage.activeCompoundBlockPos = pos
+    if (direction === 'down') {
+      const targetPos = Math.min(pos + 1, doc.content.size)
+      if (editor.state.selection.from !== targetPos) {
+        editor.commands.setTextSelection(targetPos)
+      }
+      if (dom instanceof HTMLElement) {
+        const trigger = dom.querySelector<HTMLElement>(
+          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+        )
+        if (trigger) {
+          trigger.focus()
+          return true
+        }
+      }
+      editor.view?.focus()
+      return true
+    }
+    const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
+    editor.commands.setTextSelection(endPos)
+    editor.view?.focus()
+    return true
+  }
+
+  if (node.type.name === 'notice') {
+    if (modalStorage) modalStorage.activeCompoundBlockPos = pos
+    if (direction === 'down') {
+      const targetPos = Math.min(pos + 2, doc.content.size)
+      if (editor.state.selection.from !== targetPos) {
+        editor.commands.setTextSelection(targetPos)
+      }
+      if (dom instanceof HTMLElement) {
+        const titleInput = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+        if (titleInput) {
+          titleInput.focus()
+          return true
+        }
+      }
+      editor.view?.focus()
+      return true
+    }
+    const selection = Selection.findFrom(doc.resolve(pos + node.nodeSize - 1), -1, true)
+    if (selection) {
+      editor.commands.setTextSelection(selection.from)
+      editor.view?.focus()
+      return true
+    }
+    return false
+  }
+
+  if (node.type.name === 'imageNode' || node.type.name === 'image') {
+    if (dom instanceof HTMLElement) {
+      const input = dom.querySelector<HTMLInputElement>(
+        'input.caption-input, input[aria-label="Image caption"]',
+      )
+      if (input) {
+        if (modalStorage) modalStorage.activeCompoundBlockPos = pos
+        const nearPos =
+          direction === 'up' ? Math.max(0, pos) : Math.min(pos + node.nodeSize, doc.content.size)
+        const sel = Selection.findFrom(doc.resolve(nearPos), direction === 'up' ? -1 : 1, true)
+        if (sel) {
+          editor.commands.setTextSelection(sel.from)
+        }
+        input.focus({ preventScroll: true })
+        return true
+      }
+    }
+    return false
+  }
+
+  if (node.type.name === 'linkPreview') {
+    if (dom instanceof HTMLElement) {
+      const input = dom.querySelector<HTMLInputElement>(
+        'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
+      )
+      if (input) {
+        if (modalStorage) modalStorage.activeCompoundBlockPos = pos
+        const nearPos =
+          direction === 'up' ? Math.max(0, pos) : Math.min(pos + node.nodeSize, doc.content.size)
+        const sel = Selection.findFrom(doc.resolve(nearPos), direction === 'up' ? -1 : 1, true)
+        if (sel) {
+          editor.commands.setTextSelection(sel.from)
+        }
+        input.focus({ preventScroll: true })
+        return true
+      }
+    }
+    return false
+  }
+
+  if (allowTextblockFallback) {
+    const resolvedPos = direction === 'down' ? pos : Math.min(pos + node.nodeSize, doc.content.size)
+    const selection = Selection.findFrom(
+      doc.resolve(resolvedPos),
+      direction === 'down' ? 1 : -1,
+      true,
+    )
+    if (selection) {
+      if (modalStorage) modalStorage.activeCompoundBlockPos = null
+      editor.commands.setTextSelection(selection.from)
+      editor.view?.focus()
+      return true
+    }
+  }
+
+  return false
 }

@@ -85,7 +85,9 @@
         run: (_ctx, event) => {
           const target = event.target as HTMLElement | null
           if (!target) return false
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          const trigger = target.closest<HTMLElement>(
+            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
+          )
           if (trigger) {
             if (trigger.getAttribute('aria-expanded') === 'true') return false
             focusBody()
@@ -104,10 +106,20 @@
         label: 'Focus Above Code Block',
         run: (_ctx, event) => {
           const target = event.target as HTMLElement | null
-          const trigger = target?.closest<HTMLElement>('[data-part="trigger"]')
-          if (!trigger || trigger.getAttribute('aria-expanded') === 'true') return false
-          focusBefore()
-          return true
+          if (!target) return false
+          const trigger = target.closest<HTMLElement>(
+            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
+          )
+          if (trigger) {
+            if (trigger.getAttribute('aria-expanded') === 'true') return false
+            focusBefore()
+            return true
+          }
+          if (target.closest('button')) {
+            focusBefore()
+            return true
+          }
+          return false
         },
       },
       Tab: {
@@ -117,11 +129,13 @@
         run: (_ctx, event) => {
           const target = event.target as HTMLElement | null
           if (!target || !headerEl) return false
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          const trigger = target.closest<HTMLElement>(
+            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
+          )
           if (trigger) {
             if (trigger.getAttribute('aria-expanded') === 'true') return false
             const copyBtn = headerEl.querySelector<HTMLElement>(
-              'button[aria-label*="Copy"], button:not([data-part="trigger"])',
+              'button[aria-label*="Copy"], button:not([data-scope="select"])',
             )
             if (copyBtn) {
               copyBtn.focus()
@@ -144,14 +158,18 @@
         run: (_ctx, event) => {
           const target = event.target as HTMLElement | null
           if (!target || !headerEl) return false
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
+          const trigger = target.closest<HTMLElement>(
+            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
+          )
           if (trigger) {
             if (trigger.getAttribute('aria-expanded') === 'true') return false
             focusBody()
             return true
           }
           if (target.closest('button')) {
-            const langTrigger = headerEl.querySelector<HTMLElement>('[data-part="trigger"]')
+            const langTrigger = headerEl.querySelector<HTMLElement>(
+              '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
+            )
             if (langTrigger) {
               langTrigger.focus()
             } else {

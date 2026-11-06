@@ -1,6 +1,14 @@
 import type { DOMOutputSpec } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension, mergeHtmlAttributes } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  findNextBlockPos,
+  findPrevBlockPos,
+  focusBlockAtPos,
+  isAtFirstVisualLine,
+  isAtLastVisualLine,
+  mergeHtmlAttributes,
+} from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory, LinkPreviewAttributes, LinkPreviewFetcher } from '../types.js'
 import { isEditorInInsertMode } from './modal-keymap.js'
 
@@ -243,6 +251,11 @@ export const LinkPreview = defineHtmdExtension<
                     : null
 
                 if (input) {
+                  const modalStorage = (
+                    editor.storage as
+                      { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+                  )?.modalKeymap
+                  if (modalStorage) modalStorage.activeCompoundBlockPos = pos
                   const { tr, doc } = view.state
                   const targetPos =
                     arrowDir === 'ArrowUp'
@@ -269,5 +282,53 @@ export const LinkPreview = defineHtmdExtension<
           type: 'linkPreview',
           attrs: attributes,
         }),
+  }),
+  keymap: () => ({
+    ArrowDown: {
+      id: 'linkPreview.arrowDownToUrl',
+      key: 'ArrowDown',
+      label: 'Focus Link Preview URL',
+      mode: 'insert',
+      when: (_, event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[contenteditable="false"]')
+        ) {
+          return false
+        }
+        return true
+      },
+      run: ({ editor, state, view }) => {
+        if (!isAtLastVisualLine(view, state)) return false
+        const nextPos = findNextBlockPos(state)
+        if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'linkPreview') {
+          return focusBlockAtPos(editor, nextPos, 'down')
+        }
+        return false
+      },
+    },
+    ArrowUp: {
+      id: 'linkPreview.arrowUpToUrl',
+      key: 'ArrowUp',
+      label: 'Focus Link Preview URL',
+      mode: 'insert',
+      when: (_, event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[contenteditable="false"]')
+        ) {
+          return false
+        }
+        return true
+      },
+      run: ({ editor, state, view }) => {
+        if (!isAtFirstVisualLine(view, state)) return false
+        const prevPos = findPrevBlockPos(state)
+        if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'linkPreview') {
+          return focusBlockAtPos(editor, prevPos, 'up')
+        }
+        return false
+      },
+    },
   }),
 })

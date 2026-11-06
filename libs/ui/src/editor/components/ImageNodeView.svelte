@@ -109,11 +109,11 @@
           if (typeof pos !== 'number') return false
           if (target === captionInputEl) {
             updateAttributes({ caption })
-            editor.focusPosition(Math.max(pos - 1, 0))
+            editor.focusBeforePosition(pos)
             return true
           }
           if (target === replaceBtnEl || target === removeBtnEl) {
-            editor.focusPosition(Math.max(pos - 1, 0))
+            editor.focusBeforePosition(pos)
             return true
           }
           return false
@@ -129,7 +129,7 @@
           if (typeof pos !== 'number') return false
           if (target === captionInputEl) {
             updateAttributes({ caption })
-            editor.focusPosition(pos + node.nodeSize)
+            editor.focusAfterPosition(pos + node.nodeSize)
             return true
           }
           if (target === replaceBtnEl || target === removeBtnEl) {
@@ -201,7 +201,7 @@
         <button
           bind:this={replaceBtnEl}
           type="button"
-          class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-background/90 border border-border px-3 py-1.5 text-xs font-medium text-foreground shadow-sm flex items-center gap-1.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
+          class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-md bg-background/90 border border-border px-3 py-1.5 text-xs font-medium text-foreground shadow-sm flex items-center gap-1.5 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-colors cursor-pointer z-10"
           onclick={handleReplaceImage}
           aria-label="Replace image"
         >
@@ -211,7 +211,7 @@
         <button
           bind:this={removeBtnEl}
           type="button"
-          class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border text-foreground shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity cursor-pointer z-10"
+          class="absolute top-2 right-2 w-7 h-7 rounded-full bg-background border border-border text-foreground shadow-sm flex items-center justify-center hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-colors cursor-pointer z-10"
           onclick={deleteNode}
           aria-label="Remove image"
         >

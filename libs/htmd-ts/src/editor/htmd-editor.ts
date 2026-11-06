@@ -18,7 +18,11 @@ import type { SuggestionProps } from '@tiptap/suggestion'
 import { parse, serialize, validateDocument } from '../lib.js'
 import type { JSONContent } from '../types.js'
 import { buildExtensions, type CompiledExtensionKeymap } from './build-extensions.js'
-import type { HtmdCommandContext, HtmdInternalEditor } from './define-htmd-extension.js'
+import {
+  focusBlockAtPos,
+  type HtmdCommandContext,
+  type HtmdInternalEditor,
+} from './define-htmd-extension.js'
 import { editorOverlaysKey, type EditorOverlaysStorage } from './extensions/editor-overlays.js'
 import type { LinkPreviewStorage } from './extensions/link-preview.js'
 import {
@@ -821,9 +825,31 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   }
 
   focusBeforePosition(position: number): void {
-    const clamped = Math.max(0, Math.min(this.tiptap.state.doc.content.size, position))
-    const selection = Selection.findFrom(this.tiptap.state.doc.resolve(clamped), -1, true)
+    const { doc } = this.tiptap.state
+    const clamped = Math.max(0, Math.min(doc.content.size, position))
+    const $resolved = doc.resolve(clamped)
+    if ($resolved.nodeBefore) {
+      const prevPos = clamped - $resolved.nodeBefore.nodeSize
+      if (focusBlockAtPos(this.internalEditor, prevPos, 'up')) {
+        return
+      }
+    }
+    const selection = Selection.findFrom($resolved, -1, true)
     if (!selection) return
+    if (this.modalStorage) this.modalStorage.activeCompoundBlockPos = null
+    this.tiptap.commands.setTextSelection(selection.from)
+    this.tiptap.view.focus()
+  }
+
+  focusAfterPosition(position: number): void {
+    const { doc } = this.tiptap.state
+    const clamped = Math.max(0, Math.min(doc.content.size, position))
+    if (focusBlockAtPos(this.internalEditor, clamped, 'down', true)) {
+      return
+    }
+    const selection = Selection.findFrom(doc.resolve(clamped), 1, true)
+    if (!selection) return
+    if (this.modalStorage) this.modalStorage.activeCompoundBlockPos = null
     this.tiptap.commands.setTextSelection(selection.from)
     this.tiptap.view.focus()
   }
