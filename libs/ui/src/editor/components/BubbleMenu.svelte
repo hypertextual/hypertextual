@@ -1,9 +1,7 @@
 <script lang="ts">
   import { Popover } from '@ark-ui/svelte/popover'
-  import { NodeSelection } from '@tiptap/pm/state'
   import type { BubbleMenuProps } from './types'
   import { onMount } from 'svelte'
-  import { isEditorInInsertMode } from '../core'
   import FontColorPicker from './FontColorPicker.svelte'
   import LinkEditPopover from './LinkEditPopover.svelte'
   import { Link2 } from 'lucide-svelte'
@@ -42,7 +40,7 @@
 
   $effect(() => {
     if (!menu || !isVisible) return
-    const binding = props.editor.storage.editorOverlays.attach(menu, {
+    const binding = props.editor.attachOverlaySurface(menu, {
       anchor: () => 'selection',
       width: 480,
       height: 40,
@@ -58,35 +56,30 @@
   onMount(() => {
     if (!props.editor) return
 
-    // Update on selection change
-    props.editor.on('selectionUpdate', updateVisibility)
-    props.editor.on('transaction', updateVisibility)
-
-    // Initial update
+    const unsubscribe = props.editor.subscribe(updateVisibility)
     const initialFrame = requestAnimationFrame(updateVisibility)
 
     return () => {
       cancelAnimationFrame(initialFrame)
-      props.editor.off('selectionUpdate', updateVisibility)
-      props.editor.off('transaction', updateVisibility)
+      unsubscribe()
     }
   })
 
   // Methods -------------------------------------------------------------------
   function updateColors() {
     if (!props.editor) return
-    currentTextColor = props.editor.getAttributes('textStyle')?.color || null
-    currentHighlight = props.editor.getAttributes('highlight')?.color || null
+    currentTextColor = (props.editor.getAttributes('textStyle')?.color as string | undefined) || null
+    currentHighlight = (props.editor.getAttributes('highlight')?.color as string | undefined) || null
   }
 
   function updateVisibility() {
-    if (!props.editor || !isEditorInInsertMode(props.editor)) {
+    if (!props.editor || !props.editor.isInsertMode) {
       isVisible = false
       showLinkInput = false
       return
     }
 
-    const { from, to, empty } = props.editor.state.selection
+    const { from, to, empty, isNodeSelection, isFocused } = props.editor.getSelectionState()
     const selectionKey = `${from}:${to}`
 
     if (dismissedSelection === selectionKey) {
@@ -97,7 +90,7 @@
 
     // Non-text block selections use their own controls; the text bubble menu must stay hidden.
     if (
-      props.editor.state.selection instanceof NodeSelection ||
+      isNodeSelection ||
       props.editor.isActive('imageNode') ||
       props.editor.isActive('image') ||
       props.editor.isActive('linkPreview')
@@ -108,7 +101,7 @@
     }
 
     // Hide if the editor is blurred or there is no text selection.
-    if ((!props.editor.isFocused && !showLinkInput) || empty || from === to) {
+    if ((!isFocused && !showLinkInput) || empty || from === to) {
       isVisible = false
       showLinkInput = false
       return
@@ -124,31 +117,30 @@
     if (isLinkActive && !isInternalMentionActive) {
       showLinkInput = true
       const { href } = props.editor.getAttributes('link')
-      linkUrl = href || ''
+      linkUrl = (href as string | undefined) || ''
     }
   }
 
   function toggleBold() {
-    props.editor.chain().focus().toggleBold().run()
+    props.editor.execCommand('toggleBold')
   }
 
   function toggleItalic() {
-    props.editor.chain().focus().toggleItalic().run()
+    props.editor.execCommand('toggleItalic')
   }
 
   function toggleUnderline() {
-    props.editor.chain().focus().toggleUnderline().run()
+    props.editor.execCommand('toggleUnderline')
   }
 
   function toggleStrike() {
-    props.editor.chain().focus().toggleStrike().run()
+    props.editor.execCommand('toggleStrike')
   }
 
   function toggleLink() {
-    // Always show input to add or edit link
     showLinkInput = true
     const { href } = props.editor.getAttributes('link')
-    linkUrl = href || ''
+    linkUrl = (href as string | undefined) || ''
   }
 </script>
 
@@ -157,7 +149,8 @@
   autoFocus={false}
   onOpenChange={({ open }) => {
     if (!open) {
-      dismissedSelection = `${props.editor.state.selection.from}:${props.editor.state.selection.to}`
+      const sel = props.editor.getSelectionState()
+      dismissedSelection = `${sel.from}:${sel.to}`
       isVisible = false
     }
   }}
@@ -302,7 +295,6 @@
           initialUrl={linkUrl}
           onClose={() => {
             showLinkInput = false
-            linkUrl = ''
           }}
         />
       {/if}

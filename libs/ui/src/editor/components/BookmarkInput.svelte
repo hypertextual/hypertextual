@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BookmarkInputProps } from './types'
+  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { onMount, onDestroy } from 'svelte'
 
   // Props ---------------------------------------------------------------------
@@ -18,6 +19,8 @@
 
   let error = $state('')
 
+  let dialogElement = $state<HTMLDivElement | null>(null)
+
   let inputElement = $state<HTMLInputElement>()
 
   // Lifecycle -----------------------------------------------------------------
@@ -26,6 +29,37 @@
   })
 
   onMount(() => inputElement?.focus())
+
+  useKeyScope({
+    id: 'overlay:bookmark-input',
+    priority: 'overlay',
+    element: () => dialogElement,
+    enabled: () => Boolean(dialogElement),
+    hotkeys: () => editor.services.hotkeys,
+    getContext: () => null,
+    keymap: {
+      Enter: {
+        id: 'bookmarkInput.submit',
+        key: 'Enter',
+        label: 'Insert Bookmark',
+        when: (_ctx, event) => event.target === inputElement,
+        run: () => {
+          void submit()
+          return true
+        },
+      },
+      Escape: {
+        id: 'bookmarkInput.close',
+        key: 'Escape',
+        label: 'Close Bookmark Dialog',
+        run: () => {
+          onClose()
+          editor.execCommand('exitToNormal')
+          return true
+        },
+      },
+    },
+  })
 
   // Methods -------------------------------------------------------------------
   async function submit() {
@@ -57,26 +91,11 @@
             provider: '',
           }
       if (!active) return
-      if (replaceData?.replace) {
-        const existing = editor.state.doc.nodeAt(position)
-        if (existing && existing.type.name === 'linkPreview') {
-          const tr = editor.state.tr.setNodeMarkup(position, undefined, {
-            ...existing.attrs,
-            url: trimmed,
-            type: 'bookmark',
-            ...metadata,
-          })
-          editor.view.dispatch(tr)
-          onClose()
-          return
-        }
-      }
-      editor
-        .chain()
-        .focus()
-        .setTextSelection(position)
-        .insertLinkPreview({ url: trimmed, type: 'bookmark', ...metadata })
-        .run()
+      editor.insertOrReplaceBookmark(
+        position,
+        { url: trimmed, ...metadata },
+        Boolean(replaceData?.replace),
+      )
       onClose()
     } catch {
       if (active) error = 'Could not load link details. Please try again.'
@@ -87,12 +106,10 @@
 </script>
 
 <div
+  bind:this={dialogElement}
   role="dialog"
   aria-label="Insert bookmark"
   tabindex="-1"
-  onkeydown={(event) => {
-    if (event.key === 'Escape') onClose()
-  }}
   class="w-80 space-y-2 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-xl"
 >
   <p class="text-sm font-semibold">Insert Bookmark</p>
@@ -102,12 +119,6 @@
       type="url"
       bind:value={url}
       oninput={() => (error = '')}
-      onkeydown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          void submit()
-        }
-      }}
       placeholder="https://example.com"
       aria-invalid={Boolean(error)}
       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"

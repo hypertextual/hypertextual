@@ -69,8 +69,9 @@ Hypertextual defaults to the **Helix** preset (`storageKey="hypertextual"`) and 
 ## Pane Switching & Workspace Explorer Navigation
 
 Hypertextual registers two spatial panes:
+
 - **Workspace** (`paneId="workspace"`): The left sidebar containing the Workspace Explorer file tree.
-- **Article** (`paneId="article"`): The main content pane containing the `DocumentEditor`.
+- **Article** (`paneId="article"`): The main content pane containing the `HtmdEditor`.
 
 ### Cross-Pane Navigation
 

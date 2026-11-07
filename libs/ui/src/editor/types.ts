@@ -1,5 +1,5 @@
-import type { JSONContent } from '@tiptap/core'
-import type { ImageUploadResult } from './core'
+import type { EditorHostServices } from 'core-ts'
+import type { ImageUploadResult, JSONContent } from 'htmd-ts'
 
 export type EditorImageUploadResult = ImageUploadResult
 
@@ -8,7 +8,7 @@ export interface EditorHandle {
   enterCompoundBlock: () => boolean
 }
 
-export interface DocumentEditorProps {
+export interface HtmdEditorProps {
   document: JSONContent
   editable?: boolean
   clickToEdit?: boolean
@@ -17,4 +17,5 @@ export interface DocumentEditorProps {
   contentClass?: string
   onchange: (document: JSONContent) => void
   onUpload?: (file: File) => Promise<EditorImageUploadResult>
+  services?: EditorHostServices
 }

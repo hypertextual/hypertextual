@@ -1,36 +1,24 @@
 <script lang="ts">
   import type { LinkPreviewCardProps } from './types'
-  import {
-    isEditorInInsertMode,
-    modalKeymapPluginKey,
-    subscribeToEditorTransactions,
-    type LinkPreviewFetcher,
-  } from '../core'
-  import { NodeViewWrapper } from 'svelte-tiptap'
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
   import { Link, X } from 'lucide-svelte'
-  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, getPos, updateAttributes, deleteNode }: LinkPreviewCardProps = $props()
+  let { node, editable, subtextRange, editor, getPos, updateAttributes, deleteNode }: LinkPreviewCardProps =
+    $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => subscribeToEditorTransactions(editor, update))
   let imageError = $state(false)
-
   let faviconError = $state(false)
 
-  let urlInputEl = $state<HTMLInputElement>()
-
-  let removeBtnEl = $state<HTMLButtonElement>()
-
   // Derived -------------------------------------------------------------------
-  const editable = $derived.by(() => {
-    subscribe()
-    return editor.isEditable && isEditorInInsertMode(editor)
-  })
-  const { url, title, description, image, favicon, type } = $derived(node.attrs)
+  const url = $derived((node.attrs.url as string | undefined) ?? '')
+  const title = $derived((node.attrs.title as string | undefined) ?? '')
+  const description = $derived((node.attrs.description as string | undefined) ?? '')
+  const image = $derived(node.attrs.image as string | null | undefined)
+  const favicon = $derived(node.attrs.favicon as string | null | undefined)
+  const type = $derived((node.attrs.type as string | undefined) ?? 'bookmark')
 
   let draftUrl = $derived(String(url ?? ''))
 
@@ -40,24 +28,6 @@
     } catch {
       return String(url ?? '')
     }
-  })
-
-  const modalSubtext = $derived.by(() => {
-    subscribe()
-    const st = modalKeymapPluginKey.getState(editor.state)?.subtextCursor
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (!st || st.kind !== 'linkPreviewUrl' || st.pos !== pos) return null
-    return st
-  })
-
-  const modalCharRange = $derived.by(() => {
-    if (!modalSubtext) return null
-    if (typeof modalSubtext.anchorOffset === 'number') {
-      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
-      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
-      return { from, to: Math.max(from + 1, to) }
-    }
-    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
   })
 
   const chapters = $derived.by(() => {
@@ -86,28 +56,11 @@
     if (!editable) return
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (typeof pos === 'number') {
-      editor.commands.openOverlay('bookmark', {
+      editor.openOverlay('bookmark', {
         position: pos,
         data: { replace: true, url: String(url ?? '') },
       })
     }
-  }
-
-  function focusBefore() {
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof pos !== 'number') return
-    editor
-      .chain()
-      .focus()
-      .setTextSelection(Math.max(0, pos - 1))
-      .run()
-  }
-
-  function focusAfter() {
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof pos !== 'number') return
-    const posAfter = Math.min(editor.state.doc.content.size, pos + node.nodeSize)
-    editor.chain().focus().setTextSelection(posAfter).run()
   }
 
   function commitBookmarkUrl() {
@@ -131,18 +84,14 @@
       ...(title === url || !title ? { title: trimmed } : {}),
     })
 
-    const fetcher = (
-      editor.storage as unknown as {
-        linkPreview?: { fetchLinkPreview?: LinkPreviewFetcher }
-      }
-    ).linkPreview?.fetchLinkPreview
-    if (fetcher) {
-      void fetcher(trimmed)
-        .then((metadata) => {
+    void editor
+      .fetchLinkPreview(trimmed)
+      .then((metadata) => {
+        if (metadata) {
           updateAttributes({ url: trimmed, type: 'bookmark', ...metadata })
-        })
-        .catch(() => {})
-    }
+        }
+      })
+      .catch(() => {})
   }
 
   function commitYouTubeUrl() {
@@ -158,47 +107,16 @@
       draftUrl = String(url ?? '')
     }
   }
-
-  function handleBookmarkUrlKeydown(event: KeyboardEvent) {
-    if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      if (removeBtnEl) {
-        event.preventDefault()
-        event.stopPropagation()
-        commitBookmarkUrl()
-        removeBtnEl.focus()
-      }
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      commitBookmarkUrl()
-      focusBefore()
-    } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
-      event.preventDefault()
-      commitBookmarkUrl()
-      focusAfter()
-    }
-  }
-
-  function handleYouTubeUrlKeydown(event: KeyboardEvent) {
-    if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      if (removeBtnEl) {
-        event.preventDefault()
-        event.stopPropagation()
-        commitYouTubeUrl()
-        removeBtnEl.focus()
-      }
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      commitYouTubeUrl()
-      focusBefore()
-    } else if (event.key === 'ArrowDown' || event.key === 'Enter') {
-      event.preventDefault()
-      commitYouTubeUrl()
-      focusAfter()
-    }
-  }
 </script>
 
-<NodeViewWrapper class="link-preview group relative my-4" data-type={type} contenteditable={false}>
+<div
+  data-node-view-wrapper=""
+  role="none"
+  style="white-space: normal;"
+  class="link-preview group relative my-4"
+  data-type={type}
+  contenteditable={false}
+>
   {#if type === 'bookmark'}
     <a
       data-bookmark-edit
@@ -237,7 +155,6 @@
           {/if}
           {#if editable}
             <input
-              bind:this={urlInputEl}
               type="url"
               aria-label="Bookmark URL"
               bind:value={draftUrl}
@@ -246,16 +163,15 @@
                 event.stopPropagation()
               }}
               onblur={commitBookmarkUrl}
-              onkeydown={handleBookmarkUrlKeydown}
               class="w-full min-w-0 bg-transparent text-xs text-muted-foreground outline-none focus:text-foreground"
             />
-          {:else if modalCharRange}
+          {:else if subtextRange}
             <span data-bookmark-url-text class="truncate text-xs opacity-80"
-              >{draftUrl.slice(0, modalCharRange.from)}<span
+              >{draftUrl.slice(0, subtextRange.from)}<span
                 class="pm-modal-cursor"
                 data-pm-modal-cursor="normal"
-                >{draftUrl.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
-              >{draftUrl.slice(modalCharRange.to)}</span
+                >{draftUrl.slice(subtextRange.from, subtextRange.to) || '\u00a0'}</span
+              >{draftUrl.slice(subtextRange.to)}</span
             >
           {:else}
             <span data-bookmark-url-text class="truncate text-xs opacity-80">{hostname}</span>
@@ -280,17 +196,15 @@
       </YouTube>
       {#if editable}
         <div
-          class="absolute inset-x-3 bottom-3 z-10 flex items-center gap-2 rounded-md border border-border bg-background/95 px-3 py-1.5 text-xs shadow-md backdrop-blur-xs"
+          class="absolute top-2 left-2 right-11 z-10 flex items-center gap-2 rounded-md border border-border bg-background/95 px-3 py-1.5 text-xs shadow-md backdrop-blur-xs"
         >
           <Link class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
-            bind:this={urlInputEl}
             type="url"
             aria-label="YouTube URL"
             bind:value={draftUrl}
             placeholder="https://www.youtube.com/watch?v=..."
             onblur={commitYouTubeUrl}
-            onkeydown={handleYouTubeUrlKeydown}
             class="w-full min-w-0 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
           />
         </div>
@@ -299,21 +213,11 @@
   {/if}
 
   {#if editable}<button
-      bind:this={removeBtnEl}
       type="button"
       aria-label="Remove preview"
       class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-background border border-border text-foreground shadow-sm cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity z-10"
       onclick={deleteNode}
-      onkeydown={(event) => {
-        if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-          if (urlInputEl) {
-            event.preventDefault()
-            event.stopPropagation()
-            urlInputEl.focus()
-          }
-        }
-      }}
     >
       <X class="size-3.5" aria-hidden="true" />
     </button>{/if}
-</NodeViewWrapper>
+</div>

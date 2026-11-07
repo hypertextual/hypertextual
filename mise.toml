@@ -17,3 +17,11 @@ rust = { version = "1.88", components = "rustfmt,clippy,rust-analyzer" }
 [tasks.install]
 description = "Install shared Bun workspace dependencies"
 run = "bun install"
+
+[tasks.dev]
+description = "Run the Tauri desktop application in development mode"
+run = "mise run //apps/hypertextual-desktop:dev"
+
+[tasks.run]
+description = "Run the Tauri desktop application"
+run = "mise run //apps/hypertextual-desktop:run"

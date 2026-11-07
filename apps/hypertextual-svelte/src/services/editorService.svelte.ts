@@ -1,7 +1,6 @@
-import { parse, type JSONContent } from 'htmd-ts'
-import { editorSchema } from '@hypertextual/ui/editor-schema'
+import type { EditorDocument, EditorMediaService } from 'core-ts'
+import { HtmdEditor, type JSONContent } from 'htmd-ts'
 import type { EditorImageUploadResult } from '@hypertextual/ui'
-import { ArticleViewModel } from '../models/articleViewModel'
 import { MediaService } from './mediaService'
 import {
   errorMessage,
@@ -19,7 +18,7 @@ export interface EditorObserver {
 /** One selection and autosave lifecycle per workspace window. */
 export class EditorService {
   selected = $state<WorkspaceNode | null>(null)
-  document = $state.raw<ArticleViewModel | null>(null)
+  document = $state.raw<EditorDocument<JSONContent> | null>(null)
   editable = $state(false)
   image = $state<string | null>(null)
   unsupported = $state(false)
@@ -42,6 +41,18 @@ export class EditorService {
     private observer: EditorObserver,
   ) {
     this.media = new MediaService(client)
+  }
+
+  get mediaService(): EditorMediaService {
+    return this.media.forArticle(() => this.selected?.path ?? '')
+  }
+
+  supportsFile(filename: string): boolean {
+    return HtmdEditor.supportsFile(filename)
+  }
+
+  extractTitle(source: string): string {
+    return HtmdEditor.extractTitle(source)
   }
 
   get dirty() {
@@ -117,13 +128,13 @@ export class EditorService {
         if (this.isCurrent(id)) this.image = asset.url
         return
       }
-      if (!/\.(md|htmd)$/i.test(entry.name)) {
+      if (!HtmdEditor.supportsFile(entry.name)) {
         if (this.isCurrent(id)) this.unsupported = true
         return
       }
       const read = await this.client.read(entry.path)
       if (!this.isCurrent(id)) return
-      const document = this.parseDocument(read.content)
+      const document = HtmdEditor.deserialize(read.content)
       await this.resolveImages(entry.path, document)
       if (!this.isCurrent(id)) return
       this.document = document
@@ -133,15 +144,15 @@ export class EditorService {
       if (!document.editable) return
       let currentPath = entry.path
       const synchronizeFilename =
-        /^untitled(?:[ -]?\d+)?\.(md|htmd)$/i.test(entry.name) &&
+        HtmdEditor.isUntitledFile(entry.name) &&
         Boolean(document.title) &&
-        document.title !== entry.name.replace(/\.(md|htmd)$/i, '')
+        document.title !== HtmdEditor.stripExtension(entry.name)
       let persistedTitle = synchronizeFilename ? '' : document.title
       this.saver = new Autosave(
         read.content,
         read.revision,
         async (source, revision) => {
-          const title = this.parseDocument(source).title || document.title
+          const title = HtmdEditor.extractTitle(source) || document.title
           const saved = await this.client.saveArticle(
             currentPath,
             source,
@@ -169,11 +180,7 @@ export class EditorService {
     } catch (error) {
       if (this.isCurrent(id)) {
         const message = errorMessage(error)
-        if (
-          /Only \.md and \.htmd articles can be edited\.|not UTF-8 text|contains binary data/i.test(
-            message,
-          )
-        ) {
+        if (HtmdEditor.isUnsupportedFileError(message)) {
           this.unsupported = true
         } else {
           this.openingError = message
@@ -225,9 +232,7 @@ export class EditorService {
   }
 
   static validateDocument(content: JSONContent): JSONContent {
-    const document = editorSchema.nodeFromJSON(content)
-    document.check()
-    return document.toJSON()
+    return HtmdEditor.validateEditorDocument(content)
   }
 
   async copyDraft() {
@@ -281,22 +286,8 @@ export class EditorService {
     this.clear()
     this.media.dispose()
   }
-  private parseDocument(source: string): ArticleViewModel {
-    try {
-      const parsed = parse(source)
-      EditorService.validateDocument(parsed.content)
-      return new ArticleViewModel(source, parsed.content, parsed.issues)
-    } catch {
-      return new ArticleViewModel(
-        source,
-        null,
-        [],
-        'This article could not be opened. The original source is shown read-only.',
-      )
-    }
-  }
 
-  private async resolveImages(articlePath: string, document: ArticleViewModel) {
+  private async resolveImages(articlePath: string, document: EditorDocument<JSONContent>) {
     const assets = await this.media.batchGet(articlePath, document.imageSources)
     const displayUrls = new Map(assets.map((asset) => [asset.source, asset.url]))
     document.displayImages((source) => displayUrls.get(source) ?? source)

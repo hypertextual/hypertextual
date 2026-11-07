@@ -2,22 +2,23 @@
 
 ## Overview
 
-Hypertextual is a desktop workspace for local articles. Writers browse files, edit articles, and save changes without a separate save action. The current scope is one local workspace. Tabs, cloud synchronization, and multiple workspaces remain future work.
+Hypertextual is a desktop workspace for local documents across multiple rich-text and structured formats. It starts with `.htmd` and `.md` through `HtmdEditor` and expands to `.dbmd`, diagram, code, and media editors. Writers browse files, edit documents with keyboard-first modal editing, and save changes automatically. The current scope is one local workspace. Tabs, cloud synchronization, and multiple workspaces remain future work.
 
 ## Requirement
 
 ### Functional
 
 - Browse, create, rename, and delete articles and folders.
-- Edit supported articles and retain drafts when saving fails.
-- Store article images beside their articles and preserve portable references.
+- Edit supported document formats through format-owned editor plugins that can also embed one another.
+- Route keyboard shortcuts, user notifications, and media reads and writes uniformly through host services.
+- Retain drafts when saving or format serialization fails, and store article images beside their articles with portable references.
 
 ### Non-Functional
 
 - Support macOS, Linux, and Windows.
 - Keep filesystem access within the selected workspace.
-- Keep reusable UI independent of storage and application policy.
-- Preserve existing content when the editor cannot represent it.
+- Keep editor engines private inside their format packages so each editor can run inside Hypertextual or standalone in a web browser.
+- Preserve existing content as editable raw-source blocks or spans when a format editor cannot represent a fragment.
 
 ## Design
 
@@ -25,69 +26,75 @@ Hypertextual is a desktop workspace for local articles. Writers browse files, ed
 
 ```mermaid
 flowchart TD
-  Writer --> Shell[Workspace shell]
+  Writer --> Shell[Workspace shell & HotkeyService]
   Shell --> Workspace[App workspace service]
-  Shell --> Editor[App editor service]
-  Editor --> Document[App ArticleViewModel]
-  Document --> SDK[htmd-ts: synchronous format SDK]
-  SDK -->|PM JSON| Document
-  Shell --> UI[Reusable JSON editor, tree, menus]
-  UI -->|PM JSON changes| Editor
-  Document -->|PM JSON for display| UI
+  Shell --> EditorSvc[App editor service]
+  EditorSvc -->|deserialize / serialize / supportsFile| HTMD[htmd-ts: HtmdEditor plugin + HtmdDocument]
+  Shell --> UI[libs/ui: HtmdEditor.svelte, useKeyScope, TreeView, menus]
+  UI -->|mounts & binds| HTMD
+  HTMD -.->|implements| CoreTS[core-ts: Editor, EditorFormatAdapter, EditorDocument, EditorExtension, KeyScope, EditorHostServices]
+  DBMD[Future dbmd-ts: DbmdEditor plugin] -.->|implements| CoreTS
+  HTMD <-->|embeds child editors via| CoreTS
+  Shell -->|EditorHostServices: hotkeys, notifications, media, embedRegistry| UI
+  UI -->|document content changes| EditorSvc
   Workspace --> Client[Tauri clients]
-  Editor --> Client
+  EditorSvc --> Client
   Client --> Native[Desktop Tauri adapters]
   Native --> Filesystem[hyped-fs: Hypertextual workspace models and services]
   Filesystem --> Files[Workspace files]
 ```
 
-- The shell composes navigation, the article pane, and recovery controls.
-- App services own selection, autosave, source previews, drafts, and portable image references.
-- `htmd-ts` owns Markdown syntax, validation, and synchronous conversion to and from ProseMirror JSON.
-- The private UI library supplies the local editor, tree, and menus through published Helical and Ark controls.
+- `core-ts` defines the engine- and framework-neutral contracts for editor plugins (`Editor<TDoc, TCommandMap>`, `EditorFormatAdapter<TDoc>`, `EditorDocument<TDoc>`), extensions (`defineEditorExtension`), hierarchical key scopes (`KeyScopeDispatcher`), notifications (`EditorNotificationService`), media reading/writing (`EditorMediaService`), and recursive editor embedding (`EmbeddedEditorRegistry`).
+- Format packages (such as `htmd-ts` for `.htmd`/`.md` and a future `dbmd-ts` for `.dbmd`) own their supported format declarations (`formats: ['htmd', 'md']`), their concrete editor plugin (`HtmdEditor`, `DbmdEditor`), their `EditorDocument` implementation (`HtmdDocument`), and their internal format codec (`lib.ts`). Each format package encapsulates its internal editing and conversion engines (e.g. Tiptap/ProseMirror and Marked in `htmd-ts`), registers its own editor keyscope (`editor:htmd`, `editor:dbmd`) and extension keymaps, and owns a standalone Playwright browser integration suite (`e2e/htmd-ts/`).
+- `libs/ui` (`@hypertextual/ui`) supplies reusable Svelte components (`HtmdEditor.svelte`, `TreeView`, `Breadcrumb`, `ContextMenu`, `FontSelector`, `ThemeToggle`), Svelte NodeViews/overlays mounted into `HtmdEditor`, and the `useKeyScope` hook through published Helical and Ark controls without importing `@tiptap/*`.
+- App services (`WorkspaceService`, `EditorService`, `HotkeyService`, `SettingsService`, `MediaService`) own workspace selection, `EditorHostServices` injection (`hotkeys`, `notifications`, `media`, `embedRegistry`), autosave, source previews, and portable media asset storage (`hyped-fs`) without hardcoding file-format regexes or conversion logic.
 - Tauri clients exchange raw source and revisions through thin desktop command adapters.
 - Private `hyped-fs` owns the Hypertextual workspace models and services, including article, image, naming, revision, and file policy.
 
 ### Data and Control Flow
 
-Opening the workspace supplies entries for the tree. Selecting an article reads raw Markdown and its revision through the Tauri client. `EditorService` calls `htmd-ts` synchronously and asks its workspace-aware `MediaService` to resolve local and remote images for an `ArticleViewModel`. `ContentPane` supplies the resulting JSON to the editor. Unsupported nodes become editable raw-source wrappers alongside recognized content. Only an unrecoverable parser failure shows the whole source in an app-owned read-only preview.
+Opening the workspace supplies entries for the tree. Selecting an article reads raw source and its revision through the Tauri client. `EditorService` checks format support via the editor plugin (`HtmdEditor.supportsFile`), deserializes the source (`HtmdEditor.deserialize(source) -> HtmdDocument`), and asks its workspace-aware `MediaService` to resolve local and remote images (`document.displayImages`). `ContentPane` supplies the document content and `workspace.editorServices` (`EditorHostServices`) to `HtmdEditor.svelte`, which mounts the concrete `HtmdEditor` controller from `htmd-ts`. Unsupported nodes become editable raw-source wrappers alongside recognized content. Only an unrecoverable parser failure shows the whole source in an app-owned read-only preview.
 
-Editor changes return native JSON. The app retains the draft, restores portable image references, and calls the synchronous writer. Autosave sends raw source to the native article service. The article service in `hyped-fs` checks the revision, stages replacement bytes, rechecks the revision and destination, and commits the replacement. The app reflects any title-based filename change.
+Keystrokes flow through `HotkeyService` (`EditorHotkeyService`), which delegates scoped resolution to `KeyScopeDispatcher` from `core-ts` (`overlay` -> `widget` -> `extension` -> `editor` -> `pane` -> `global`, with innermost DOM containment winning when an embedded child editor is focused) before falling through to `WhichKeyController`. Editor and extension notifications (such as modal yank confirmations or errors) emit through `EditorNotificationService`.
+
+Editor changes return updated document content. `EditorService` restores portable image references via `document.transformImages` and updates the `EditorDocument` (`document.update(portable)`), which validates and serializes the draft inside `htmd-ts` while extracting the current title. Autosave sends raw source to the native article service. The article service in `hyped-fs` checks the revision, stages replacement bytes, rechecks the revision and destination, and commits the replacement. The app reflects any title-based filename change.
 
 A failed conversion or save retains the draft for recovery. Switching articles or closing the window requires pending writes to finish. Application state belongs to one window and resets on startup.
 
 ### Interfaces and Contracts
 
-The format SDK exposes `parse`, `serialize`, and `validateDocument` with SDK-owned ProseMirror JSON types. Parsing returns JSON plus plain issues and preserves failed nodes as raw-source wrappers. Tiptap Markdown, Marked, extension objects, and the engine schema stay private. Invalid editor JSON and unsafe writes return purpose-specific errors. App integration tests validate actual parsed JSON in the mounted editor schema.
-
-`DocumentEditor` receives document JSON and emits JSON changes. It has no format SDK or filesystem dependency. The app supplies image uploads. Source text, revisions, asset mappings, and recovery belong to app services.
-
-The workspace client retains its raw source-text read/write API. A revision identifies the content version that the caller expects to replace. `hyped-fs` exposes Hypertextual workspace, article, and media services with the existing models and error codes. Tauri adapts these APIs without duplicating their policy.
+- Each file-type or embeddable block editor implements `Editor<TDoc, TCommandMap>` and `EditorFormatAdapter<TDoc>` from `core-ts` and accepts `EditorHostServices` (`hotkeys`, `notifications`, `media`, `embedRegistry`). Extensions use `defineEditorExtension` and declare shortcuts with `Keymap<TCtx>`.
+- `htmd-ts` exposes `HtmdEditor` (`formats: ['htmd', 'md']`), `HtmdDocument` (`EditorDocument`), `defineHtmdExtension`, `createHtmdEditorKeymap`, and engine-free node-view, overlay, and suggestion contracts. Tiptap, ProseMirror, Marked, `lowlight`, and internal conversion helpers (`lib.ts`) stay private inside `htmd-ts`.
+- `HtmdEditor.svelte` in `@hypertextual/ui` receives document content, `editable`, `services?: EditorHostServices`, and `onchange` or `onUpload` callbacks. It mounts `HtmdEditor` from `htmd-ts` and Svelte 5 node views without engine dependencies. Components and node views register scoped keymaps with `useKeyScope`.
+- The workspace client retains its raw source-text read and write API. A revision identifies the content version that the caller expects to replace. `hyped-fs` exposes Hypertextual workspace, article, and media services with existing models and error codes.
 
 ## Implementation
 
-### Ownership boundaries
+### Ownership Boundaries
 
-`libs/htmd-ts` owns the current format implementation. It uses Tiptap Markdown and Marked with CommonMark and GFM. Custom syntax is limited to component data those formats cannot represent. Consolidated `nodes.ts` and `marks.ts` reuse upstream extension machinery and define custom parsing/rendering hooks. Public BDD parsing examples document the syntax and complete save/reopen contract. Svelte renders parsed nodes without defining the saved format.
+- `libs/core-ts` owns the abstract `Editor`, `EditorFormatAdapter`, `EditorDocument`, `EditorExtension` (`defineEditorExtension`), `KeyScopeDispatcher`, `EmbeddedEditorRegistry`, and `EditorHostServices` contracts.
+- `libs/htmd-ts` owns `HtmdEditor`, `HtmdDocument`, the internal HTMD Markdown codec (`src/lib.ts`, `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`), and the HTMD editor extensions (`src/editor/htmd-editor.ts`, `src/editor/htmd-document.ts`, `src/editor/define-htmd-extension.ts`, `src/editor/build-extensions.ts`, and `src/editor/extensions/*`).
+- `libs/ui` owns reusable Svelte UI primitives, `useKeyScope`, `HtmdEditor.svelte`, and Svelte NodeViews/overlays (`src/editor/components/*`).
+- `apps/hypertextual-svelte` owns app services (`HotkeyService`, `EditorService`, `WorkspaceService`, `MediaService`, `SettingsService`), `Autosave`, and shell composition without format-specific AST or conversion code.
+- `libs/hyped-fs` owns native workspace confinement, article validation, limits, image types and names, revisions, title-derived filenames, replacement, and Trash.
 
-`libs/ui` owns reusable UI and the local editor core. App compositions, `ArticleViewModel`, and autosave live under `apps/hypertextual-svelte/src`. Native models and services live under `libs/hyped-fs/src/models` and `src/services`. Models validate and map data without filesystem access.
+### Extension Points and Testing
 
-`libs/hyped-fs` owns the existing Hypertextual file operations and policy together: confinement, article validation, limits, image types and names, revisions, title-derived filenames, replacement, and Trash. The desktop owns Tauri command and lifecycle adapters and serializes service mutations.
+New document or block formats (such as `DbmdEditor`, Mermaid, Draw.io, or Manim) implement `Editor<TDoc, TCommandMap>` from `core-ts`, define their own `scopeId` (`editor:dbmd`, etc.) and extensions via `defineEditorExtension`, and register with `EmbeddedEditorRegistry` so they can run both as top-level pane editors and as embedded block editors inside `HtmdEditor` (or vice versa).
 
-### Extension points
-
-`htmd-rs` remains a private placeholder under its original name. Rust conversion, source-position APIs, and an LSP remain future work. Charts will use format-owned structured data and separate Svelte rendering. `hyped-fs` provides the boundary for future remote file sync, but no remote provider exists now.
-
-Package integration suites exercise the format and filesystem APIs. App integration tests cover document sessions and schema agreement. The existing Chromium/WebKit suite covers editor and workspace behavior through a filesystem-backed Tauri substitute. Lifted package integration tests cover native workspace policy.
+- `libs/core-ts/src/core.test.ts` tests `KeyScopeDispatcher` priority and nested DOM containment, `defineEditorExtension`, and `EmbeddedEditorRegistry`.
+- `libs/htmd-ts` owns unit/integration tests (`nodes.test.ts`, `marks.test.ts`, `lib.test.ts`, `editor/htmd-editor.test.ts`) and a standalone Playwright browser suite in `e2e/htmd-ts/` that verifies `HtmdEditor`'s public API boundary, key scopes, services, and embedded editor handoff without the desktop shell.
+- `e2e/hypertextual-desktop/` exercises the integrated desktop workspace, `HtmdEditor.svelte`, modal editing, and `HotkeyService` through a filesystem-backed Tauri substitute.
+- `libs/hyped-fs/tests` covers native Rust workspace and filesystem policy.
 
 ## References
 
+- [core-ts editor plugin architecture](core-ts.md)
+- [htmd-ts format and editor plugin architecture](htmd-ts/index.md)
 - [hyped-fs workspace persistence](hyped-fs.md)
-- [htmd-ts format SDK](htmd-ts.md)
 - [Keybindings](../keybindings/index.md)
 - [UI library components](ui/index.md)
 - [Svelte web app components](svelte-web-app/index.md)
 - [Development commands](../development.md)
 - [Product requirements](../../prd/0001-hypertextual-app/README.md)
-- [Helical editor service follow-up](https://linear.app/cloudvoyant/issue/CLO-197/provide-a-self-contained-editor-service-for-document-loading-and)
-- [Shared Rust filesystem follow-up](https://linear.app/cloudvoyant/issue/DIFF-244/extract-shared-rust-hyped-fs-library-for-desktop-and-cli-file)
+- [HYPE-169: Unify EditorExtension system and Svelte component keybindings](https://linear.app/cloudvoyant/issue/HYPE-169/refactorui-unify-editorextension-system-and-svelte-component)

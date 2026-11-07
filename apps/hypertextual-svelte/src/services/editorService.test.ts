@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { parse, serialize, type JSONContent, type ParseIssue } from 'htmd-ts'
+import { HtmdEditor, type JSONContent, type ParseIssue } from 'htmd-ts'
 import { EditorService } from './editorService.svelte'
 
 // integration -----------------------------------------------------------------
@@ -20,7 +20,7 @@ describe('When checking format and editor compatibility', () => {
     )
 
     // When
-    const parsed = parse(source).content
+    const parsed = HtmdEditor.deserialize(source).content!
     const mounted = EditorService.validateDocument(parsed)
 
     // Then
@@ -60,8 +60,8 @@ describe('When checking format and editor compatibility', () => {
 
     // When
     const mounted = EditorService.validateDocument(expected)
-    const source = serialize(mounted)
-    const reopened = parse(source)
+    const source = HtmdEditor.serialize(mounted)
+    const reopened = HtmdEditor.deserialize(source)
 
     // Then
     expect(mounted).toEqual(expected)
@@ -93,13 +93,19 @@ describe('When checking format and editor compatibility', () => {
     ]
 
     // When
-    const parsed = parse(source)
-    const mounted = EditorService.validateDocument(parsed.content)
-    const reopened = parse(serialize(mounted))
+    const parsed = HtmdEditor.deserialize(source)
+    const mounted = EditorService.validateDocument(parsed.content!)
+    const reopened = HtmdEditor.deserialize(HtmdEditor.serialize(mounted))
 
     // Then
-    expect(parsed).toEqual({ content: expected, issues: expectedIssues })
+    expect({ content: parsed.content, issues: parsed.issues }).toEqual({
+      content: expected,
+      issues: expectedIssues,
+    })
     expect(mounted).toEqual(expected)
-    expect(reopened).toEqual({ content: expected, issues: expectedIssues })
+    expect({ content: reopened.content, issues: reopened.issues }).toEqual({
+      content: expected,
+      issues: expectedIssues,
+    })
   })
 })

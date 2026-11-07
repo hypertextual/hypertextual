@@ -29,7 +29,7 @@
     "@cloudvoyant/helical-ui": "0.21.1-rc.202611031218.5085f0d",
     "@hypertextual/ui": "workspace:*",
     "@tauri-apps/api": "2.12.3",
-    "@tiptap/core": "3.31.4",
+    "core-ts": "workspace:*",
     "htmd-ts": "workspace:*",
     "lucide-svelte": "0.577.0",
     "manim-web": "0.3.24"

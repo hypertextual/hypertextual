@@ -35,6 +35,9 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
             app.manage(workspace::WorkspaceState(Arc::new(Mutex::new(
                 hyped_fs::WorkspaceService::from_home(home),
             ))));
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
             Ok(())
         })
         .invoke_handler(commands)
@@ -64,16 +67,26 @@ pub fn commands(invoke: tauri::ipc::Invoke) -> bool {
 
 /// User-requested quit waits for the frontend to drain its autosave queue.
 pub fn handle_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
-    if let tauri::RunEvent::ExitRequested {
-        code: None, api, ..
-    } = event
-    {
-        if app.state::<FrontendReady>().0.load(Ordering::Relaxed)
-            && !app.webview_windows().is_empty()
-        {
-            api.prevent_exit();
-            let _ = app.emit("workspace-quit-requested", ());
+    match event {
+        tauri::RunEvent::Ready => {
+            #[cfg(target_os = "macos")]
+            let _ = app.show();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
         }
+        tauri::RunEvent::ExitRequested {
+            code: None, api, ..
+        } => {
+            if app.state::<FrontendReady>().0.load(Ordering::Relaxed)
+                && !app.webview_windows().is_empty()
+            {
+                api.prevent_exit();
+                let _ = app.emit("workspace-quit-requested", ());
+            }
+        }
+        _ => {}
     }
 }
 
