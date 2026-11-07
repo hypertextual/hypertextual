@@ -110,12 +110,6 @@ export interface HtmdAttributeSpec {
   renderHTML?: (attributes: Record<string, unknown>) => Record<string, unknown>
 }
 
-export interface HtmdTextblockInputRuleSpec {
-  find: RegExp
-  getAttributes?:
-    Record<string, unknown> | ((match: RegExpExecArray) => Record<string, unknown> | null)
-}
-
 export interface HtmdExtensionSpec<
   TOptions = Record<string, never>,
   TStorage = Record<string, never>,
@@ -141,10 +135,6 @@ export interface HtmdExtensionSpec<
     HTMLAttributes: Record<string, unknown>
     options: TOptions
   }) => DOMOutputSpec
-  textblockInputRules?: (ctx: {
-    options: TOptions
-    storage: TStorage
-  }) => HtmdTextblockInputRuleSpec[]
   pmPlugins?: (ctx: {
     editor: HtmdInternalEditor
     options: TOptions
@@ -420,4 +410,66 @@ export function focusBlockAtPos(
   }
 
   return false
+}
+
+export function findNodeViewControl(
+  state: EditorState,
+  event: KeyboardEvent,
+  nodeTypeName: string,
+): { target: HTMLElement; wrapper: HTMLElement; pos: number; node: PMNode } | null {
+  if (!(event.target instanceof HTMLElement)) return null
+  const wrapper = event.target.closest<HTMLElement & { __htmdGetPos?: () => number | undefined }>(
+    `.node-${nodeTypeName}`,
+  )
+  if (!wrapper || !event.target.closest('[contenteditable="false"]')) return null
+  const pos = wrapper.__htmdGetPos?.()
+  if (typeof pos !== 'number') return null
+  const node = state.doc.nodeAt(pos)
+  if (!node || node.type.name !== nodeTypeName) return null
+  return { target: event.target, wrapper, pos, node }
+}
+
+export function focusTextPosition(editor: HtmdInternalEditor, position: number): boolean {
+  const clamped = Math.max(0, Math.min(editor.state.doc.content.size, position))
+  editor.commands.setTextSelection(clamped)
+  editor.view?.focus()
+  return true
+}
+
+export function focusBeforeBlock(editor: HtmdInternalEditor, position: number): boolean {
+  const { doc } = editor.state
+  const clamped = Math.max(0, Math.min(doc.content.size, position))
+  const $resolved = doc.resolve(clamped)
+  if ($resolved.nodeBefore) {
+    const prevPos = clamped - $resolved.nodeBefore.nodeSize
+    if (focusBlockAtPos(editor, prevPos, 'up')) {
+      return true
+    }
+  }
+  const selection = Selection.findFrom($resolved, -1, true)
+  if (!selection) return false
+  const modalStorage = (
+    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+  )?.modalKeymap
+  if (modalStorage) modalStorage.activeCompoundBlockPos = null
+  editor.commands.setTextSelection(selection.from)
+  editor.view?.focus()
+  return true
+}
+
+export function focusAfterBlock(editor: HtmdInternalEditor, position: number): boolean {
+  const { doc } = editor.state
+  const clamped = Math.max(0, Math.min(doc.content.size, position))
+  if (focusBlockAtPos(editor, clamped, 'down', true)) {
+    return true
+  }
+  const selection = Selection.findFrom(doc.resolve(clamped), 1, true)
+  if (!selection) return false
+  const modalStorage = (
+    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+  )?.modalKeymap
+  if (modalStorage) modalStorage.activeCompoundBlockPos = null
+  editor.commands.setTextSelection(selection.from)
+  editor.view?.focus()
+  return true
 }

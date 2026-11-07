@@ -1,9 +1,11 @@
-import type { DOMOutputSpec } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import {
   defineHtmdExtension,
   findNextBlockPos,
+  findNodeViewControl,
   findPrevBlockPos,
+  focusAfterBlock,
+  focusBeforeBlock,
   focusBlockAtPos,
   isAtFirstVisualLine,
   isAtLastVisualLine,
@@ -56,8 +58,7 @@ function safeEmbedUrl(value: unknown): string {
   }
 }
 
-const LINK_ICON_PATH =
-  'M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l-3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z'
+const URL_INPUT_SELECTOR = 'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]'
 
 export const LinkPreview = defineHtmdExtension<
   LinkPreviewOptions,
@@ -89,10 +90,7 @@ export const LinkPreview = defineHtmdExtension<
     return [{ tag: 'div[data-type="link-preview"]' }]
   },
   renderHTML({ HTMLAttributes }) {
-    const { url, title, description, image, favicon, type } = HTMLAttributes as Record<
-      string,
-      string | null | undefined
-    >
+    const { url, title, type } = HTMLAttributes as Record<string, string | null | undefined>
 
     if (type === 'embed') {
       return [
@@ -115,72 +113,6 @@ export const LinkPreview = defineHtmdExtension<
       ]
     }
 
-    const hostname = url
-      ? (() => {
-          try {
-            return new URL(url).hostname
-          } catch {
-            return url
-          }
-        })()
-      : ''
-
-    const faviconNode: DOMOutputSpec = favicon
-      ? [
-          'img',
-          {
-            src: favicon,
-            alt: '',
-            class: 'w-3.5 h-3.5 flex-shrink-0',
-            onerror: "this.style.display='none'",
-          },
-        ]
-      : [
-          'svg',
-          { class: 'w-3 h-3 flex-shrink-0', fill: 'currentColor', viewBox: '0 0 20 20' },
-          ['path', { d: LINK_ICON_PATH }],
-        ]
-
-    const textBlock: DOMOutputSpec[] = [
-      ['div', { class: 'text-base font-semibold mb-1 line-clamp-1' }, title || ''],
-    ]
-    if (description) {
-      textBlock.push([
-        'p',
-        { class: 'text-xs text-muted-foreground mb-2 line-clamp-2 leading-snug' },
-        description,
-      ])
-    }
-
-    const cardChildren: DOMOutputSpec[] = [
-      [
-        'div',
-        { class: 'flex-1 min-w-0 flex flex-col justify-between px-3 py-1.5' },
-        ['div', {}, ...textBlock],
-        [
-          'div',
-          { class: 'flex items-center gap-1.5 text-xs text-muted-foreground mt-auto' },
-          faviconNode,
-          ['span', { class: 'truncate opacity-80' }, hostname],
-        ],
-      ],
-    ]
-    if (image) {
-      cardChildren.push([
-        'div',
-        { class: 'flex-shrink-0 w-44 aspect-video bg-muted' },
-        [
-          'img',
-          {
-            src: image,
-            alt: title || '',
-            class: 'w-full h-full object-cover',
-            onerror: "this.parentElement.style.display='none'",
-          },
-        ],
-      ])
-    }
-
     return [
       'div',
       mergeHtmlAttributes(HTMLAttributes, {
@@ -193,10 +125,9 @@ export const LinkPreview = defineHtmdExtension<
           href: safeUrl(url),
           target: '_blank',
           rel: 'noopener noreferrer',
-          class: 'flex transition-colors overflow-hidden bookmark-link',
-          style: 'text-decoration: none !important; color: inherit;',
+          class: 'bookmark-link',
         },
-        ...cardChildren,
+        title || url || '',
       ],
     ]
   },
@@ -245,9 +176,7 @@ export const LinkPreview = defineHtmdExtension<
                 const dom = view.nodeDOM(pos)
                 const input =
                   dom instanceof HTMLElement
-                    ? dom.querySelector<HTMLInputElement>(
-                        'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
-                      )
+                    ? dom.querySelector<HTMLInputElement>(URL_INPUT_SELECTOR)
                     : null
 
                 if (input) {
@@ -284,21 +213,80 @@ export const LinkPreview = defineHtmdExtension<
         }),
   }),
   keymap: () => ({
+    Tab: {
+      id: 'linkPreview.tabNext',
+      key: 'Tab',
+      label: 'Next Link Preview Control',
+      mode: 'insert',
+      when: ({ state }, event) => Boolean(findNodeViewControl(state, event, 'linkPreview')),
+      run: ({ state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'linkPreview')
+        if (!ctrl) return false
+        const urlInput = ctrl.wrapper.querySelector<HTMLInputElement>(URL_INPUT_SELECTOR)
+        const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Remove preview"]',
+        )
+        if (ctrl.target === urlInput && removeBtn) {
+          removeBtn.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Remove preview"]') && urlInput) {
+          urlInput.focus()
+          return true
+        }
+        return false
+      },
+    },
+    'Shift-Tab': {
+      id: 'linkPreview.tabPrev',
+      key: 'Shift+Tab',
+      label: 'Previous Link Preview Control',
+      mode: 'insert',
+      when: ({ state }, event) => Boolean(findNodeViewControl(state, event, 'linkPreview')),
+      run: ({ state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'linkPreview')
+        if (!ctrl) return false
+        const urlInput = ctrl.wrapper.querySelector<HTMLInputElement>(URL_INPUT_SELECTOR)
+        const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Remove preview"]',
+        )
+        if (ctrl.target === urlInput && removeBtn) {
+          removeBtn.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Remove preview"]') && urlInput) {
+          urlInput.focus()
+          return true
+        }
+        return false
+      },
+    },
     ArrowDown: {
       id: 'linkPreview.arrowDownToUrl',
       key: 'ArrowDown',
-      label: 'Focus Link Preview URL',
+      label: 'Focus Link Preview URL or Below Link Preview',
       mode: 'insert',
-      when: (_, event) => {
+      when: ({ state }, event) => {
         if (
           event.target instanceof HTMLElement &&
           event.target.closest('[contenteditable="false"]')
         ) {
-          return false
+          return Boolean(findNodeViewControl(state, event, 'linkPreview'))
         }
         return true
       },
-      run: ({ editor, state, view }) => {
+      run: ({ editor, state, view }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'linkPreview')
+        if (ctrl) {
+          if (
+            ctrl.target.matches(URL_INPUT_SELECTOR) ||
+            ctrl.target.closest('button[aria-label="Remove preview"]')
+          ) {
+            ctrl.target.blur()
+            return focusAfterBlock(editor, ctrl.pos + ctrl.node.nodeSize)
+          }
+          return false
+        }
         if (!isAtLastVisualLine(view, state)) return false
         const nextPos = findNextBlockPos(state)
         if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'linkPreview') {
@@ -310,24 +298,51 @@ export const LinkPreview = defineHtmdExtension<
     ArrowUp: {
       id: 'linkPreview.arrowUpToUrl',
       key: 'ArrowUp',
-      label: 'Focus Link Preview URL',
+      label: 'Focus Link Preview URL or Above Link Preview',
       mode: 'insert',
-      when: (_, event) => {
+      when: ({ state }, event) => {
         if (
           event.target instanceof HTMLElement &&
           event.target.closest('[contenteditable="false"]')
         ) {
-          return false
+          return Boolean(findNodeViewControl(state, event, 'linkPreview'))
         }
         return true
       },
-      run: ({ editor, state, view }) => {
+      run: ({ editor, state, view }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'linkPreview')
+        if (ctrl) {
+          if (
+            ctrl.target.matches(URL_INPUT_SELECTOR) ||
+            ctrl.target.closest('button[aria-label="Remove preview"]')
+          ) {
+            ctrl.target.blur()
+            return focusBeforeBlock(editor, ctrl.pos)
+          }
+          return false
+        }
         if (!isAtFirstVisualLine(view, state)) return false
         const prevPos = findPrevBlockPos(state)
         if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'linkPreview') {
           return focusBlockAtPos(editor, prevPos, 'up')
         }
         return false
+      },
+    },
+    Enter: {
+      id: 'linkPreview.focusAfterEnter',
+      key: 'Enter',
+      label: 'Commit Link Preview URL',
+      mode: 'insert',
+      when: ({ state }, event) =>
+        Boolean(
+          findNodeViewControl(state, event, 'linkPreview')?.target.matches(URL_INPUT_SELECTOR),
+        ),
+      run: ({ editor, state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'linkPreview')
+        if (!ctrl) return false
+        ctrl.target.blur()
+        return focusAfterBlock(editor, ctrl.pos + ctrl.node.nodeSize)
       },
     },
   }),

@@ -5,7 +5,7 @@
 Hypertextual splits its vendored Helical editor baseline across three workspace packages:
 
 1. `libs/core-ts` (`core-ts`): Abstract `Editor<TDoc, TCommandMap>`, `defineEditorExtension`, `KeyScopeDispatcher`, `EmbeddedEditorRegistry`, and `EditorHostServices`.
-2. `libs/htmd-ts` (`htmd-ts`): Concrete `HtmdEditor` plugin (`kind: 'htmd'`, `scopeId: 'editor:htmd'`), `defineHtmdExtension`, `build-extensions.ts`, all 17 HTMD extensions, and the synchronous Markdown codec.
+2. `libs/htmd-ts` (`htmd-ts`): Concrete `HtmdEditor` plugin (`kind: 'htmd'`, `scopeId: 'editor:htmd'`), `defineHtmdExtension`, `build-extensions.ts`, all 15 HTMD extensions, and the synchronous Markdown codec.
 3. `libs/ui` (`@hypertextual/ui`): Svelte `HtmdEditor.svelte` wrapper, `Editor.svelte`, Svelte 5 NodeViews/overlays mounted via `svelte-node-view.ts`, and `useKeyScope`.
 
 Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`) still supply generic controls, `WhichKeyController`, theme tokens, and shared styles. React, the standalone Reader, documentation demos, and upstream build tools are excluded.
@@ -42,7 +42,7 @@ flowchart TD
     Controller -.->|implements| CoreTS[core-ts: Editor, defineEditorExtension, KeyScopeDispatcher]
     View --> Controls[Published Helical and Ark controls]
     Controller --> Build[htmd-ts: build-extensions.ts]
-    Build --> Extensions[htmd-ts: 17 extensions via defineHtmdExtension]
+    Build --> Extensions[htmd-ts: 15 extensions via defineHtmdExtension]
     Build --> Tiptap[Private Tiptap, ProseMirror, and lowlight packages]
     View -->|openOverlay / closeOverlay / attachOverlaySurface| Controller
     View --> Surfaces[Insertion forms, slash menu, bubble toolbar]
@@ -77,7 +77,7 @@ Extension modules in `libs/htmd-ts/src/editor/extensions/` export `HtmdExtension
 ```ts
 ImageNode.configure({ nodeView: nodeViews.image })
 NoticeNode.configure({ nodeView: nodeViews.notice })
-CodeBlockCustom.configure({ lowlight, nodeView: nodeViews.codeBlock })
+CodeBlock.configure({ lowlight, nodeView: nodeViews.codeBlock })
 InternalMention.configure({ hrefBuilder, suggestion: { items, render } })
 ```
 

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { LinkPreviewCardProps } from './types'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
   import { Link, X } from 'lucide-svelte'
@@ -11,14 +10,8 @@
 
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => editor.subscribe(update))
-  let wrapperEl = $state<HTMLDivElement | null>(null)
   let imageError = $state(false)
-
   let faviconError = $state(false)
-
-  let urlInputEl = $state<HTMLInputElement>()
-
-  let removeBtnEl = $state<HTMLButtonElement>()
 
   // Derived -------------------------------------------------------------------
   const editable = $derived.by(() => {
@@ -80,98 +73,6 @@
     }
   })
 
-  // Lifecycle -----------------------------------------------------------------
-  useKeyScope({
-    id: 'widget:link-preview',
-    priority: 'widget',
-    element: () => wrapperEl,
-    enabled: () => editable && Boolean(wrapperEl),
-    hotkeys: () => editor.services.hotkeys,
-    getContext: () => null,
-    keymap: {
-      Tab: {
-        id: 'linkPreview.tabNext',
-        key: 'Tab',
-        label: 'Next Link Preview Control',
-        run: (_ctx, event) => {
-          const target = event.target
-          if (target === urlInputEl && removeBtnEl) {
-            if (type === 'bookmark') commitBookmarkUrl()
-            else commitYouTubeUrl()
-            removeBtnEl.focus()
-            return true
-          }
-          if (target === removeBtnEl && urlInputEl) {
-            urlInputEl.focus()
-            return true
-          }
-          return false
-        },
-      },
-      'Shift+Tab': {
-        id: 'linkPreview.tabPrev',
-        key: 'Shift+Tab',
-        label: 'Previous Link Preview Control',
-        run: (_ctx, event) => {
-          const target = event.target
-          if (target === urlInputEl && removeBtnEl) {
-            if (type === 'bookmark') commitBookmarkUrl()
-            else commitYouTubeUrl()
-            removeBtnEl.focus()
-            return true
-          }
-          if (target === removeBtnEl && urlInputEl) {
-            urlInputEl.focus()
-            return true
-          }
-          return false
-        },
-      },
-      ArrowUp: {
-        id: 'linkPreview.focusBefore',
-        key: 'ArrowUp',
-        label: 'Focus Above Link Preview',
-        run: (_ctx, event) => {
-          const target = event.target
-          if (target !== urlInputEl && target !== removeBtnEl) return false
-          if (target === urlInputEl) {
-            if (type === 'bookmark') commitBookmarkUrl()
-            else commitYouTubeUrl()
-          }
-          focusBefore()
-          return true
-        },
-      },
-      ArrowDown: {
-        id: 'linkPreview.focusAfterDown',
-        key: 'ArrowDown',
-        label: 'Focus Below Link Preview',
-        run: (_ctx, event) => {
-          const target = event.target
-          if (target !== urlInputEl && target !== removeBtnEl) return false
-          if (target === urlInputEl) {
-            if (type === 'bookmark') commitBookmarkUrl()
-            else commitYouTubeUrl()
-          }
-          focusAfter()
-          return true
-        },
-      },
-      Enter: {
-        id: 'linkPreview.focusAfterEnter',
-        key: 'Enter',
-        label: 'Commit Link Preview URL',
-        run: (_ctx, event) => {
-          if (event.target !== urlInputEl) return false
-          if (type === 'bookmark') commitBookmarkUrl()
-          else commitYouTubeUrl()
-          focusAfter()
-          return true
-        },
-      },
-    },
-  })
-
   // Methods -------------------------------------------------------------------
   function openBookmarkDialog(event?: MouseEvent) {
     event?.preventDefault()
@@ -183,18 +84,6 @@
         data: { replace: true, url: String(url ?? '') },
       })
     }
-  }
-
-  function focusBefore() {
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof pos !== 'number') return
-    editor.focusBeforePosition(pos)
-  }
-
-  function focusAfter() {
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof pos !== 'number') return
-    editor.focusAfterPosition(pos + node.nodeSize)
   }
 
   function commitBookmarkUrl() {
@@ -244,7 +133,6 @@
 </script>
 
 <div
-  bind:this={wrapperEl}
   data-node-view-wrapper=""
   role="none"
   style="white-space: normal;"
@@ -290,7 +178,6 @@
           {/if}
           {#if editable}
             <input
-              bind:this={urlInputEl}
               type="url"
               aria-label="Bookmark URL"
               bind:value={draftUrl}
@@ -336,7 +223,6 @@
         >
           <Link class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
-            bind:this={urlInputEl}
             type="url"
             aria-label="YouTube URL"
             bind:value={draftUrl}
@@ -350,7 +236,6 @@
   {/if}
 
   {#if editable}<button
-      bind:this={removeBtnEl}
       type="button"
       aria-label="Remove preview"
       class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-background border border-border text-foreground shadow-sm cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 focus:bg-accent focus:text-accent-foreground focus:border-ring focus:ring-2 focus:ring-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring outline-none transition-opacity z-10"

@@ -2,7 +2,6 @@
   import type { NoticeNodeViewProps } from './types'
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
   import { noticeBody } from './styles'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { createSubscriber } from 'svelte/reactivity'
   import {
     Notice,
@@ -23,7 +22,6 @@
 
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => editor.subscribe(update))
-  let headerEl = $state<HTMLDivElement | null>(null)
   const variants = [
     { value: 'info', label: 'Info', icon: Info },
     { value: 'success', label: 'Success', icon: CircleCheck },
@@ -63,139 +61,11 @@
       node.firstChild?.type.name === 'paragraph' &&
       node.firstChild.content.size === 0,
   )
-
-  // Lifecycle -----------------------------------------------------------------
-  useKeyScope({
-    id: 'widget:notice',
-    priority: 'widget',
-    element: () => headerEl,
-    enabled: () => editable && Boolean(headerEl),
-    hotkeys: () => editor.services.hotkeys,
-    getContext: () => null,
-    keymap: {
-      Tab: {
-        id: 'notice.tabNext',
-        key: 'Tab',
-        label: 'Next Notice Control',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target || !headerEl) return false
-          if (target.matches('input[aria-label="Notice title"]')) {
-            const trigger = headerEl.querySelector<HTMLElement>(
-              'button[data-part="trigger"], [aria-label="Notice type"][data-part="trigger"]',
-            )
-            if (trigger) {
-              trigger.focus()
-              return true
-            }
-            return false
-          }
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
-          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
-            focusBody()
-            return true
-          }
-          return false
-        },
-      },
-      'Shift+Tab': {
-        id: 'notice.tabPrev',
-        key: 'Shift+Tab',
-        label: 'Previous Notice Control',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target || !headerEl) return false
-          if (target.matches('input[aria-label="Notice title"]')) {
-            focusBody()
-            return true
-          }
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
-          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
-            const titleInput = headerEl.querySelector<HTMLInputElement>(
-              'input[aria-label="Notice title"]',
-            )
-            if (titleInput) {
-              titleInput.focus()
-              return true
-            }
-          }
-          return false
-        },
-      },
-      ArrowUp: {
-        id: 'notice.focusBefore',
-        key: 'ArrowUp',
-        label: 'Focus Above Notice',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target) return false
-          if (target.matches('input[aria-label="Notice title"]')) {
-            focusBefore()
-            return true
-          }
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
-          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
-            focusBefore()
-            return true
-          }
-          return false
-        },
-      },
-      ArrowDown: {
-        id: 'notice.focusBodyDown',
-        key: 'ArrowDown',
-        label: 'Focus Notice Body',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target) return false
-          if (target.matches('input[aria-label="Notice title"]')) {
-            focusBody()
-            return true
-          }
-          const trigger = target.closest<HTMLElement>('[data-part="trigger"]')
-          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
-            focusBody()
-            return true
-          }
-          return false
-        },
-      },
-      Enter: {
-        id: 'notice.focusBodyEnter',
-        key: 'Enter',
-        label: 'Focus Notice Body',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target?.matches('input[aria-label="Notice title"]')) return false
-          focusBody()
-          return true
-        },
-      },
-    },
-  })
-
-  // Methods -------------------------------------------------------------------
-  function bodyStart(): number | null {
-    const nodePosition = typeof getPos === 'function' ? getPos() : undefined
-    return typeof nodePosition === 'number' ? nodePosition + 2 : null
-  }
-
-  function focusBody() {
-    const position = bodyStart()
-    if (position === null) return
-    editor.focusPosition(position)
-  }
-
-  function focusBefore() {
-    const position = getPos()
-    if (typeof position !== 'number') return
-    editor.focusBeforePosition(position)
-  }
 </script>
 
 <div data-node-view-wrapper="" role="none" style="white-space: normal;">
   <Notice {variant} class="editor-notice-node relative my-1 px-2 py-1">
-    <div bind:this={headerEl} class="flex items-center gap-2" contenteditable={false}>
+    <div class="flex items-center gap-2" contenteditable={false}>
       {#if editable}
         <input
           aria-label="Notice title"

@@ -45,7 +45,7 @@ flowchart TD
         Core --> MdEngine["Private Tiptap MarkdownManager & isolated Marked"]
 
         HE --> DEF["editor/define-htmd-extension.ts"]
-        HE --> EXT["editor/extensions/*<br/>17 extensions via defineHtmdExtension"]
+        HE --> EXT["editor/extensions/*<br/>15 extensions via defineHtmdExtension"]
         HE --> BE["editor/build-extensions.ts<br/>Sole Tiptap/ProseMirror compiler"]
         EXT --> DEF
         BE --> EXT
@@ -168,8 +168,8 @@ Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` no
 
 - `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own Markdown parsing, serialization, and schema validation.
 - `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` on top of `defineEditorExtension` from `core-ts`.
-- `src/editor/extensions/*` contains the 17 HTMD editor extensions. None of these files import `@tiptap/core`.
-- `src/editor/build-extensions.ts` is the only editor module that imports `@tiptap/core` and `@tiptap/extension-*` to compile `HtmdExtension` definitions into Tiptap extensions.
+- `src/editor/extensions/*` contains the 15 HTMD editor extensions (including consolidated keyboard navigation for both ProseMirror bodies and NodeView controls). None of these files import `@tiptap/core`.
+- `src/editor/build-extensions.ts` is the only editor module that imports `@tiptap/core` and `@tiptap/extension-*` to compile `HtmdExtension` definitions into Tiptap extensions. See [HTMD editor extensions and compiler](htmd-ts/editor-extensions.md).
 - `src/editor/htmd-editor.ts` owns `HtmdEditor` and wraps the private Tiptap `Editor` and ProseMirror `EditorView`.
 
 ### Testing
@@ -181,6 +181,7 @@ Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` no
 ## References
 
 - [core-ts editor plugin architecture](core-ts.md)
+- [HTMD editor extensions and compiler](htmd-ts/editor-extensions.md)
 - [Library entry point](../../libs/htmd-ts/README.md)
 - [Public API exports](../../libs/htmd-ts/src/index.ts)
 - [Public types](../../libs/htmd-ts/src/types.ts)

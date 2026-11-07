@@ -2,20 +2,26 @@ import { NodeSelection } from '@tiptap/pm/state'
 import {
   defineHtmdExtension,
   findNextBlockPos,
+  findNodeViewControl,
   findPrevBlockPos,
+  focusBeforeBlock,
   focusBlockAtPos,
+  focusTextPosition,
   isAtFirstVisualLine,
   isAtLastVisualLine,
   type HtmdInternalEditor,
 } from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory } from '../types.js'
 
-export interface CodeBlockCustomOptions {
+export interface CodeBlockOptions {
   lowlight?: unknown
   defaultLanguage?: string | null
   nodeView?: HtmdNodeViewFactory
   HTMLAttributes?: Record<string, unknown>
 }
+
+const LANG_TRIGGER_SELECTOR =
+  '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]'
 
 function focusLanguageSelectorAt(editor: HtmdInternalEditor, pos: number): boolean {
   return focusBlockAtPos(editor, pos, 'down')
@@ -38,7 +44,7 @@ function focusLanguageSelector(editor: HtmdInternalEditor): boolean {
   return false
 }
 
-export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
+export const CodeBlock = defineHtmdExtension<CodeBlockOptions>({
   name: 'codeBlock',
   kind: 'node',
   base: 'codeBlockLowlight',
@@ -54,18 +60,31 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
       Tab: {
         id: 'codeBlock.indent',
         key: 'Tab',
-        label: 'Insert Tab in Code Block',
+        label: 'Insert Tab or Next Code Block Control',
         mode: 'insert',
-        when: ({ editor }, event) => {
-          if (
-            event.target instanceof HTMLElement &&
-            event.target.closest('[contenteditable="false"]')
-          ) {
+        when: ({ editor, state }, event) =>
+          Boolean(findNodeViewControl(state, event, 'codeBlock')) || editor.isActive('codeBlock'),
+        run: ({ editor, state }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'codeBlock')
+          if (ctrl) {
+            const trigger = ctrl.target.closest<HTMLElement>(LANG_TRIGGER_SELECTOR)
+            if (trigger) {
+              if (trigger.getAttribute('aria-expanded') === 'true') return false
+              const copyBtn = ctrl.wrapper.querySelector<HTMLElement>(
+                'button[aria-label*="Copy"], button:not([data-scope="select"])',
+              )
+              if (copyBtn) {
+                copyBtn.focus()
+              } else {
+                focusTextPosition(editor, ctrl.pos + 1)
+              }
+              return true
+            }
+            if (ctrl.target.closest('button')) {
+              return focusTextPosition(editor, ctrl.pos + 1)
+            }
             return false
           }
-          return editor.isActive('codeBlock')
-        },
-        run: ({ editor }) => {
           if (editor.isActive('codeBlock')) {
             return editor.commands.insertContent('\t')
           }
@@ -77,16 +96,26 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
         key: 'Shift+Tab',
         label: 'Outdent or Focus Code Language',
         mode: 'insert',
-        when: ({ editor }, event) => {
-          if (
-            event.target instanceof HTMLElement &&
-            event.target.closest('[contenteditable="false"]')
-          ) {
+        when: ({ editor, state }, event) =>
+          Boolean(findNodeViewControl(state, event, 'codeBlock')) || editor.isActive('codeBlock'),
+        run: ({ editor, state }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'codeBlock')
+          if (ctrl) {
+            const trigger = ctrl.target.closest<HTMLElement>(LANG_TRIGGER_SELECTOR)
+            if (trigger) {
+              if (trigger.getAttribute('aria-expanded') === 'true') return false
+              return focusTextPosition(editor, ctrl.pos + 1)
+            }
+            if (ctrl.target.closest('button')) {
+              const langTrigger = ctrl.wrapper.querySelector<HTMLElement>(LANG_TRIGGER_SELECTOR)
+              if (langTrigger) {
+                langTrigger.focus()
+                return true
+              }
+              return focusTextPosition(editor, ctrl.pos + 1)
+            }
             return false
           }
-          return editor.isActive('codeBlock')
-        },
-        run: ({ editor, state }) => {
           if (!editor.isActive('codeBlock')) return false
           const { selection } = state
           const { $from } = selection
@@ -103,18 +132,30 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
       ArrowUp: {
         id: 'codeBlock.arrowUpToLanguage',
         key: 'ArrowUp',
-        label: 'Focus Code Language Selector',
+        label: 'Focus Code Language Selector or Above Code Block',
         mode: 'insert',
-        when: (_, event) => {
+        when: ({ state }, event) => {
           if (
             event.target instanceof HTMLElement &&
             event.target.closest('[contenteditable="false"]')
           ) {
-            return false
+            return Boolean(findNodeViewControl(state, event, 'codeBlock'))
           }
           return true
         },
-        run: ({ editor, state, view }) => {
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'codeBlock')
+          if (ctrl) {
+            const trigger = ctrl.target.closest<HTMLElement>(LANG_TRIGGER_SELECTOR)
+            if (trigger) {
+              if (trigger.getAttribute('aria-expanded') === 'true') return false
+              return focusBeforeBlock(editor, ctrl.pos)
+            }
+            if (ctrl.target.closest('button')) {
+              return focusBeforeBlock(editor, ctrl.pos)
+            }
+            return false
+          }
           const { selection } = state
           if (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock') {
             return focusLanguageSelectorAt(editor, selection.from)
@@ -142,16 +183,28 @@ export const CodeBlockCustom = defineHtmdExtension<CodeBlockCustomOptions>({
         key: 'ArrowDown',
         label: 'Enter Code Language Selector or Exit Code Block',
         mode: 'insert',
-        when: (_, event) => {
+        when: ({ state }, event) => {
           if (
             event.target instanceof HTMLElement &&
             event.target.closest('[contenteditable="false"]')
           ) {
-            return false
+            return Boolean(findNodeViewControl(state, event, 'codeBlock'))
           }
           return true
         },
-        run: ({ editor, state, view }) => {
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'codeBlock')
+          if (ctrl) {
+            const trigger = ctrl.target.closest<HTMLElement>(LANG_TRIGGER_SELECTOR)
+            if (trigger) {
+              if (trigger.getAttribute('aria-expanded') === 'true') return false
+              return focusTextPosition(editor, ctrl.pos + 1)
+            }
+            if (ctrl.target.closest('button')) {
+              return focusTextPosition(editor, ctrl.pos + 1)
+            }
+            return false
+          }
           const { selection } = state
           if (selection instanceof NodeSelection && selection.node.type.name === 'codeBlock') {
             return focusLanguageSelectorAt(editor, selection.from)

@@ -1,6 +1,11 @@
 export * from './types.js'
 export {
   defineHtmdExtension,
+  findNodeViewControl,
+  focusAfterBlock,
+  focusBeforeBlock,
+  focusBlockAtPos,
+  focusTextPosition,
   mergeHtmlAttributes,
   type HtmdAttributeSpec,
   type HtmdCommandContext,
@@ -8,7 +13,6 @@ export {
   type HtmdExtensionSpec,
   type HtmdInternalChain,
   type HtmdInternalEditor,
-  type HtmdTextblockInputRuleSpec,
 } from './define-htmd-extension.js'
 export {
   buildExtensions,
@@ -19,11 +23,9 @@ export {
 export { HtmdDocument } from './htmd-document.js'
 export { createHtmdEditorKeymap, HtmdEditor } from './htmd-editor.js'
 
-export { CodeBlockCustom } from './extensions/code-block-custom.js'
+export { CodeBlock, type CodeBlockOptions } from './extensions/code-block.js'
 export { CurrentEmptyBlock } from './extensions/current-empty-block.js'
-export { EditorHeading } from './extensions/editor-heading.js'
 export { EditorOverlays, editorOverlaysKey } from './extensions/editor-overlays.js'
-export { ExitHeading } from './extensions/exit-heading.js'
 export { HeadingWithId } from './extensions/heading-with-id.js'
 export { ImageNode } from './extensions/image-node.js'
 export { InternalMention } from './extensions/internal-mention.js'

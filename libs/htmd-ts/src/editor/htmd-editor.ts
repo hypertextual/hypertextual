@@ -1,5 +1,5 @@
 import { Editor as TiptapEditor, getSchema, type EditorOptions } from '@tiptap/core'
-import { NodeSelection, Selection } from '@tiptap/pm/state'
+import { NodeSelection } from '@tiptap/pm/state'
 import { registerModalEditor } from '@cloudvoyant/helical-ui'
 import {
   createStandaloneHotkeyService,
@@ -18,11 +18,7 @@ import type { SuggestionProps } from '@tiptap/suggestion'
 import { parse, serialize, validateDocument } from '../lib.js'
 import type { JSONContent } from '../types.js'
 import { buildExtensions, type CompiledExtensionKeymap } from './build-extensions.js'
-import {
-  focusBlockAtPos,
-  type HtmdCommandContext,
-  type HtmdInternalEditor,
-} from './define-htmd-extension.js'
+import type { HtmdCommandContext, HtmdInternalEditor } from './define-htmd-extension.js'
 import { editorOverlaysKey, type EditorOverlaysStorage } from './extensions/editor-overlays.js'
 import type { LinkPreviewStorage } from './extensions/link-preview.js'
 import {
@@ -818,42 +814,6 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     this.tiptap.commands.focus(position ?? 'start')
   }
 
-  focusPosition(position: number): void {
-    const clamped = Math.max(0, Math.min(this.tiptap.state.doc.content.size, position))
-    this.tiptap.commands.setTextSelection(clamped)
-    this.tiptap.view.focus()
-  }
-
-  focusBeforePosition(position: number): void {
-    const { doc } = this.tiptap.state
-    const clamped = Math.max(0, Math.min(doc.content.size, position))
-    const $resolved = doc.resolve(clamped)
-    if ($resolved.nodeBefore) {
-      const prevPos = clamped - $resolved.nodeBefore.nodeSize
-      if (focusBlockAtPos(this.internalEditor, prevPos, 'up')) {
-        return
-      }
-    }
-    const selection = Selection.findFrom($resolved, -1, true)
-    if (!selection) return
-    if (this.modalStorage) this.modalStorage.activeCompoundBlockPos = null
-    this.tiptap.commands.setTextSelection(selection.from)
-    this.tiptap.view.focus()
-  }
-
-  focusAfterPosition(position: number): void {
-    const { doc } = this.tiptap.state
-    const clamped = Math.max(0, Math.min(doc.content.size, position))
-    if (focusBlockAtPos(this.internalEditor, clamped, 'down', true)) {
-      return
-    }
-    const selection = Selection.findFrom(doc.resolve(clamped), 1, true)
-    if (!selection) return
-    if (this.modalStorage) this.modalStorage.activeCompoundBlockPos = null
-    this.tiptap.commands.setTextSelection(selection.from)
-    this.tiptap.view.focus()
-  }
-
   blur(): void {
     this.tiptap.commands.blur()
   }
@@ -982,18 +942,6 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         type: 'linkPreview',
         attrs: { url, description: '', image: '', type: 'embed' },
       })
-      .run()
-  }
-
-  splitImageCaptionToParagraph(posAfter: number, rightText: string): boolean {
-    return this.internalEditor
-      .chain()
-      .focus()
-      .insertContentAt(posAfter, {
-        type: 'paragraph',
-        content: rightText ? [{ type: 'text', text: rightText }] : [],
-      })
-      .setTextSelection(posAfter + 1)
       .run()
   }
 

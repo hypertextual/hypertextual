@@ -2,12 +2,10 @@ import { describe, expect, it } from 'bun:test'
 import { createStandaloneHotkeyService, type EditorNotification } from 'core-ts'
 import { parse } from '../lib.js'
 import {
-  CodeBlockCustom,
+  CodeBlock,
   CurrentEmptyBlock,
   defineHtmdExtension,
-  EditorHeading,
   EditorOverlays,
-  ExitHeading,
   HeadingWithId,
   HtmdDocument,
   HtmdEditor,
@@ -169,13 +167,11 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
     hotkeys.destroy()
   })
 
-  it('defines all 17 HTMD extensions via defineHtmdExtension', () => {
+  it('defines all 15 HTMD extensions via defineHtmdExtension', () => {
     const extensions = [
-      CodeBlockCustom,
+      CodeBlock,
       CurrentEmptyBlock,
-      EditorHeading,
       EditorOverlays,
-      ExitHeading,
       HeadingWithId,
       ImageNode,
       InternalMention,
@@ -189,7 +185,7 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
       UnparsedInline,
       UrlMention,
     ]
-    expect(extensions).toHaveLength(17)
+    expect(extensions).toHaveLength(15)
     for (const ext of extensions) {
       expect(typeof ext.spec.name).toBe('string')
       expect(typeof ext.configure).toBe('function')

@@ -93,7 +93,7 @@ stateDiagram-v2
     Select --> Normal: Escape
     Normal --> Insert: click article text, Enter on compound block, or i, a, o, O, c
     Insert --> WidgetFocus: Tab / ArrowUp / ArrowDown into Notice, CodeBlock, Image, or LinkPreview widget
-    WidgetFocus --> Insert: Tab / ArrowUp / ArrowDown / Enter back to body via useKeyScope
+    WidgetFocus --> Insert: Tab / ArrowUp / ArrowDown / Enter back to body via extension keymap
     WidgetFocus --> Normal: Escape via editor:htmd scope
     Insert --> Normal: Escape
     Insert --> BlockMenu: type slash in a text block
@@ -109,7 +109,7 @@ stateDiagram-v2
     Formatting --> Insert: Escape (overlay scope)
 ```
 
-- **Widget and overlay key scopes (`useKeyScope`)**: `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, `ImageNodeView.svelte`, and `LinkPreviewCard.svelte` register `widget`-priority keymaps (`Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, `Enter`) with `useKeyScope`. Floating dialogs (`ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`) register `overlay`-priority keymaps (`Escape`, `Enter`). No Svelte component uses raw `window.addEventListener('keydown')` or `onkeydowncapture`.
+- **Extension and overlay key scopes**: Compound-block extensions (`NoticeNode`, `CodeBlock`, `ImageNode`, `LinkPreview`) register `extension`-priority keymaps (`Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, `Enter`) that cover both ProseMirror text bodies and Svelte NodeView controls, keeping `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, `ImageNodeView.svelte`, and `LinkPreviewCard.svelte` purely presentational. Floating dialogs (`ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`) register `overlay`-priority keymaps (`Escape`, `Enter`) with `useKeyScope`. No Svelte component uses raw `window.addEventListener('keydown')` or `onkeydowncapture`.
 - **Svelte 5 NodeView adapter (`svelte-node-view.ts`)**: Mounts Svelte 5 NodeView components using `mount()` / `unmount()` from `'svelte'` against `HtmdNodeViewFactory` from `htmd-ts`, without `svelte-tiptap` or `@tiptap/*` imports.
 
 ## Implementation

@@ -1,8 +1,11 @@
 import {
   defineHtmdExtension,
   findNextBlockPos,
+  findNodeViewControl,
   findPrevBlockPos,
+  focusBeforeBlock,
   focusBlockAtPos,
+  focusTextPosition,
   isAtFirstVisualLine,
   isAtLastVisualLine,
   mergeHtmlAttributes,
@@ -74,18 +77,29 @@ export const NoticeNode = defineHtmdExtension<
       Tab: {
         id: 'notice.focusTitle',
         key: 'Tab',
-        label: 'Focus Notice Title',
+        label: 'Focus Notice Title or Next Notice Control',
         mode: 'insert',
-        when: ({ state }, event) => {
-          if (
-            event.target instanceof HTMLElement &&
-            event.target.closest('[contenteditable="false"]')
-          ) {
+        when: ({ state }, event) =>
+          Boolean(findNodeViewControl(state, event, 'notice')) || findNoticeDepth(state) > 0,
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'notice')
+          if (ctrl) {
+            if (ctrl.target.matches('input[aria-label="Notice title"]')) {
+              const trigger = ctrl.wrapper.querySelector<HTMLElement>(
+                'button[data-part="trigger"], [aria-label="Notice type"][data-part="trigger"]',
+              )
+              if (trigger) {
+                trigger.focus()
+                return true
+              }
+              return false
+            }
+            const trigger = ctrl.target.closest<HTMLElement>('[data-part="trigger"]')
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+              return focusTextPosition(editor, ctrl.pos + 2)
+            }
             return false
           }
-          return findNoticeDepth(state) > 0
-        },
-        run: ({ state, view }) => {
           const depth = findNoticeDepth(state)
           if (depth < 0) return false
           const dom = view.nodeDOM(state.selection.$from.before(depth))
@@ -99,18 +113,28 @@ export const NoticeNode = defineHtmdExtension<
       'Shift-Tab': {
         id: 'notice.focusType',
         key: 'Shift+Tab',
-        label: 'Focus Notice Type',
+        label: 'Focus Notice Type or Previous Notice Control',
         mode: 'insert',
-        when: ({ state }, event) => {
-          if (
-            event.target instanceof HTMLElement &&
-            event.target.closest('[contenteditable="false"]')
-          ) {
+        when: ({ state }, event) =>
+          Boolean(findNodeViewControl(state, event, 'notice')) || findNoticeDepth(state) > 0,
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'notice')
+          if (ctrl) {
+            if (ctrl.target.matches('input[aria-label="Notice title"]')) {
+              return focusTextPosition(editor, ctrl.pos + 2)
+            }
+            const trigger = ctrl.target.closest<HTMLElement>('[data-part="trigger"]')
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+              const titleInput = ctrl.wrapper.querySelector<HTMLInputElement>(
+                'input[aria-label="Notice title"]',
+              )
+              if (titleInput) {
+                titleInput.focus()
+                return true
+              }
+            }
             return false
           }
-          return findNoticeDepth(state) > 0
-        },
-        run: ({ state, view }) => {
           const depth = findNoticeDepth(state)
           if (depth < 0) return false
           const dom = view.nodeDOM(state.selection.$from.before(depth))
@@ -126,18 +150,29 @@ export const NoticeNode = defineHtmdExtension<
       ArrowUp: {
         id: 'notice.arrowUpToTitle',
         key: 'ArrowUp',
-        label: 'Move to Notice Title',
+        label: 'Move to Notice Title or Above Notice',
         mode: 'insert',
-        when: (_, event) => {
+        when: ({ state }, event) => {
           if (
             event.target instanceof HTMLElement &&
             event.target.closest('[contenteditable="false"]')
           ) {
-            return false
+            return Boolean(findNodeViewControl(state, event, 'notice'))
           }
           return true
         },
-        run: ({ editor, state, view }) => {
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'notice')
+          if (ctrl) {
+            if (ctrl.target.matches('input[aria-label="Notice title"]')) {
+              return focusBeforeBlock(editor, ctrl.pos)
+            }
+            const trigger = ctrl.target.closest<HTMLElement>('[data-part="trigger"]')
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+              return focusBeforeBlock(editor, ctrl.pos)
+            }
+            return false
+          }
           const depth = findNoticeDepth(state)
           if (depth > 0) {
             if (!state.selection.empty) return false
@@ -165,18 +200,29 @@ export const NoticeNode = defineHtmdExtension<
       ArrowDown: {
         id: 'notice.arrowDownToTitleOrExit',
         key: 'ArrowDown',
-        label: 'Move to Notice Title or Exit Notice',
+        label: 'Move to Notice Body or Exit Notice',
         mode: 'insert',
-        when: (_, event) => {
+        when: ({ state }, event) => {
           if (
             event.target instanceof HTMLElement &&
             event.target.closest('[contenteditable="false"]')
           ) {
-            return false
+            return Boolean(findNodeViewControl(state, event, 'notice'))
           }
           return true
         },
-        run: ({ editor, state, view }) => {
+        run: ({ editor, state, view }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'notice')
+          if (ctrl) {
+            if (ctrl.target.matches('input[aria-label="Notice title"]')) {
+              return focusTextPosition(editor, ctrl.pos + 2)
+            }
+            const trigger = ctrl.target.closest<HTMLElement>('[data-part="trigger"]')
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+              return focusTextPosition(editor, ctrl.pos + 2)
+            }
+            return false
+          }
           if (!isAtLastVisualLine(view, state)) return false
           const depth = findNoticeDepth(state)
           if (depth > 0) {
@@ -191,6 +237,23 @@ export const NoticeNode = defineHtmdExtension<
             return focusBlockAtPos(editor, nextPos, 'down')
           }
           return false
+        },
+      },
+      Enter: {
+        id: 'notice.focusBodyEnter',
+        key: 'Enter',
+        label: 'Focus Notice Body',
+        mode: 'insert',
+        when: ({ state }, event) =>
+          Boolean(
+            findNodeViewControl(state, event, 'notice')?.target.matches(
+              'input[aria-label="Notice title"]',
+            ),
+          ),
+        run: ({ editor, state }, event) => {
+          const ctrl = findNodeViewControl(state, event, 'notice')
+          if (!ctrl) return false
+          return focusTextPosition(editor, ctrl.pos + 2)
         },
       },
     }

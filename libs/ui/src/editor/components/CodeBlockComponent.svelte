@@ -1,7 +1,6 @@
 <script lang="ts">
   import { codeContent } from './styles'
   import type { CodeBlockComponentProps } from './types'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import {
     CodeBlock,
     CodeBlockHeader,
@@ -23,11 +22,10 @@
   import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, getPos, updateAttributes }: CodeBlockComponentProps = $props()
+  let { node, editor, updateAttributes }: CodeBlockComponentProps = $props()
 
   // State ---------------------------------------------------------------------
   const subscribe = createSubscriber((update) => editor.subscribe(update))
-  let headerEl = $state<HTMLDivElement | null>(null)
   const languages = [
     { value: 'javascript', label: 'JavaScript' },
     { value: 'typescript', label: 'TypeScript' },
@@ -70,119 +68,6 @@
     }
   })
 
-  useKeyScope({
-    id: 'widget:code-block',
-    priority: 'widget',
-    element: () => headerEl,
-    enabled: () => Boolean(headerEl),
-    hotkeys: () => editor.services.hotkeys,
-    getContext: () => null,
-    keymap: {
-      ArrowDown: {
-        id: 'codeBlock.focusBodyDown',
-        key: 'ArrowDown',
-        label: 'Focus Code Body',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target) return false
-          const trigger = target.closest<HTMLElement>(
-            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
-          )
-          if (trigger) {
-            if (trigger.getAttribute('aria-expanded') === 'true') return false
-            focusBody()
-            return true
-          }
-          if (target.closest('button')) {
-            focusBody()
-            return true
-          }
-          return false
-        },
-      },
-      ArrowUp: {
-        id: 'codeBlock.focusBefore',
-        key: 'ArrowUp',
-        label: 'Focus Above Code Block',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target) return false
-          const trigger = target.closest<HTMLElement>(
-            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
-          )
-          if (trigger) {
-            if (trigger.getAttribute('aria-expanded') === 'true') return false
-            focusBefore()
-            return true
-          }
-          if (target.closest('button')) {
-            focusBefore()
-            return true
-          }
-          return false
-        },
-      },
-      Tab: {
-        id: 'codeBlock.tabNext',
-        key: 'Tab',
-        label: 'Next Code Block Control',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target || !headerEl) return false
-          const trigger = target.closest<HTMLElement>(
-            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
-          )
-          if (trigger) {
-            if (trigger.getAttribute('aria-expanded') === 'true') return false
-            const copyBtn = headerEl.querySelector<HTMLElement>(
-              'button[aria-label*="Copy"], button:not([data-scope="select"])',
-            )
-            if (copyBtn) {
-              copyBtn.focus()
-            } else {
-              focusBody()
-            }
-            return true
-          }
-          if (target.closest('button')) {
-            focusBody()
-            return true
-          }
-          return false
-        },
-      },
-      'Shift+Tab': {
-        id: 'codeBlock.tabPrev',
-        key: 'Shift+Tab',
-        label: 'Previous Code Block Control',
-        run: (_ctx, event) => {
-          const target = event.target as HTMLElement | null
-          if (!target || !headerEl) return false
-          const trigger = target.closest<HTMLElement>(
-            '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
-          )
-          if (trigger) {
-            if (trigger.getAttribute('aria-expanded') === 'true') return false
-            focusBody()
-            return true
-          }
-          if (target.closest('button')) {
-            const langTrigger = headerEl.querySelector<HTMLElement>(
-              '[data-scope="select"][data-part="trigger"], [aria-label="Code language"][data-part="trigger"]',
-            )
-            if (langTrigger) {
-              langTrigger.focus()
-            } else {
-              focusBody()
-            }
-            return true
-          }
-          return false
-        },
-      },
-    },
-  })
-
   // Methods -------------------------------------------------------------------
   function getDefaultLanguage(): string {
     if (typeof window !== 'undefined') {
@@ -197,61 +82,47 @@
       localStorage.setItem('codeblock-last-language', newLanguage)
     }
   }
-
-  function focusBody() {
-    const position = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof position !== 'number') return
-    editor.focusPosition(position + 1)
-  }
-
-  function focusBefore() {
-    const position = typeof getPos === 'function' ? getPos() : undefined
-    if (typeof position !== 'number') return
-    editor.focusBeforePosition(position)
-  }
 </script>
 
 <div data-node-view-wrapper="" role="none" style="white-space: normal;" class="my-4">
   <CodeBlock code={node.textContent} {language} class="my-0">
-    <div bind:this={headerEl}>
-      <CodeBlockHeader contenteditable={false}>
-        <div class="flex items-center gap-2">
-          {#if editable}
-            <Select
-              items={languages}
-              value={[language]}
-              onValueChange={(details) => {
-                const next = details.value[0]
-                if (next) changeLanguage(next)
-              }}
+    <CodeBlockHeader contenteditable={false}>
+      <div class="flex items-center gap-2">
+        {#if editable}
+          <Select
+            items={languages}
+            value={[language]}
+            onValueChange={(details) => {
+              const next = details.value[0]
+              if (next) changeLanguage(next)
+            }}
+            aria-label="Code language"
+          >
+            <SelectTrigger
               aria-label="Code language"
+              size="sm"
+              class="min-w-36 justify-between font-mono text-xs focus:border-ring focus:ring-2 focus:ring-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <SelectTrigger
-                aria-label="Code language"
-                size="sm"
-                class="min-w-36 justify-between font-mono text-xs focus:border-ring focus:ring-2 focus:ring-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <SelectValue />
-                <SelectIndicator>
-                  <ChevronsUpDown class="size-3 opacity-50" />
-                </SelectIndicator>
-              </SelectTrigger>
-              <SelectContent data-editor-controls>
-                {#each languages as lang (lang.value)}
-                  <SelectItem item={lang}>
-                    <SelectItemText>{lang.label}</SelectItemText>
-                    <SelectItemIndicator><Check class="size-4" /></SelectItemIndicator>
-                  </SelectItem>
-                {/each}
-              </SelectContent>
-            </Select>
-          {:else}
-            <CodeBlockTitle>{currentLanguageLabel}</CodeBlockTitle>
-          {/if}
-        </div>
-        <CodeBlockCopyButton class="ml-auto" />
-      </CodeBlockHeader>
-    </div>
+              <SelectValue />
+              <SelectIndicator>
+                <ChevronsUpDown class="size-3 opacity-50" />
+              </SelectIndicator>
+            </SelectTrigger>
+            <SelectContent data-editor-controls>
+              {#each languages as lang (lang.value)}
+                <SelectItem item={lang}>
+                  <SelectItemText>{lang.label}</SelectItemText>
+                  <SelectItemIndicator><Check class="size-4" /></SelectItemIndicator>
+                </SelectItem>
+              {/each}
+            </SelectContent>
+          </Select>
+        {:else}
+          <CodeBlockTitle>{currentLanguageLabel}</CodeBlockTitle>
+        {/if}
+      </div>
+      <CodeBlockCopyButton class="ml-auto" />
+    </CodeBlockHeader>
     <div class={codeBlockBodyBase}>
       <pre class={cn(codeBlockContentBase, codeContent)}><code
           data-node-view-content=""

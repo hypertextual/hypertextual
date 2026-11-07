@@ -3,7 +3,10 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
   defineHtmdExtension,
   findNextBlockPos,
+  findNodeViewControl,
   findPrevBlockPos,
+  focusAfterBlock,
+  focusBeforeBlock,
   focusBlockAtPos,
   isAtFirstVisualLine,
   isAtLastVisualLine,
@@ -72,21 +75,107 @@ export const ImageNode = defineHtmdExtension<
         }),
   }),
   keymap: () => ({
+    Tab: {
+      id: 'image.tabNext',
+      key: 'Tab',
+      label: 'Next Image Control',
+      mode: 'insert',
+      when: ({ state }, event) => Boolean(findNodeViewControl(state, event, 'imageNode')),
+      run: ({ state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'imageNode')
+        if (!ctrl) return false
+        const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
+          'input[aria-label="Image caption"]',
+        )
+        const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Replace image"]',
+        )
+        const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Remove image"]',
+        )
+        if (ctrl.target === captionInput && replaceBtn) {
+          replaceBtn.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Replace image"]') && removeBtn) {
+          removeBtn.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Remove image"]') && captionInput) {
+          captionInput.focus()
+          return true
+        }
+        return false
+      },
+    },
+    'Shift-Tab': {
+      id: 'image.tabPrev',
+      key: 'Shift+Tab',
+      label: 'Previous Image Control',
+      mode: 'insert',
+      when: ({ state }, event) => Boolean(findNodeViewControl(state, event, 'imageNode')),
+      run: ({ state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'imageNode')
+        if (!ctrl) return false
+        const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
+          'input[aria-label="Image caption"]',
+        )
+        const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Replace image"]',
+        )
+        const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+          'button[aria-label="Remove image"]',
+        )
+        if (ctrl.target === captionInput && removeBtn) {
+          removeBtn.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Replace image"]') && captionInput) {
+          captionInput.focus()
+          return true
+        }
+        if (ctrl.target.closest('button[aria-label="Remove image"]') && replaceBtn) {
+          replaceBtn.focus()
+          return true
+        }
+        return false
+      },
+    },
     ArrowDown: {
       id: 'image.arrowDownToCaption',
       key: 'ArrowDown',
-      label: 'Focus Image Caption',
+      label: 'Focus Image Caption or Below Image',
       mode: 'insert',
-      when: (_, event) => {
+      when: ({ state }, event) => {
         if (
           event.target instanceof HTMLElement &&
           event.target.closest('[contenteditable="false"]')
         ) {
-          return false
+          return Boolean(findNodeViewControl(state, event, 'imageNode'))
         }
         return true
       },
-      run: ({ editor, state, view }) => {
+      run: ({ editor, state, view }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'imageNode')
+        if (ctrl) {
+          const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
+            'input[aria-label="Image caption"]',
+          )
+          if (ctrl.target === captionInput) {
+            captionInput.blur()
+            return focusAfterBlock(editor, ctrl.pos + ctrl.node.nodeSize)
+          }
+          if (
+            ctrl.target.closest(
+              'button[aria-label="Replace image"], button[aria-label="Remove image"]',
+            ) &&
+            captionInput
+          ) {
+            captionInput.focus()
+            return true
+          }
+          return false
+        }
         if (!isAtLastVisualLine(view, state)) return false
         const nextPos = findNextBlockPos(state)
         if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'imageNode') {
@@ -98,24 +187,77 @@ export const ImageNode = defineHtmdExtension<
     ArrowUp: {
       id: 'image.arrowUpToCaption',
       key: 'ArrowUp',
-      label: 'Focus Image Caption',
+      label: 'Focus Image Caption or Above Image',
       mode: 'insert',
-      when: (_, event) => {
+      when: ({ state }, event) => {
         if (
           event.target instanceof HTMLElement &&
           event.target.closest('[contenteditable="false"]')
         ) {
-          return false
+          return Boolean(findNodeViewControl(state, event, 'imageNode'))
         }
         return true
       },
-      run: ({ editor, state, view }) => {
+      run: ({ editor, state, view }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'imageNode')
+        if (ctrl) {
+          if (
+            ctrl.target.matches('input[aria-label="Image caption"]') ||
+            ctrl.target.closest(
+              'button[aria-label="Replace image"], button[aria-label="Remove image"]',
+            )
+          ) {
+            ctrl.target.blur()
+            return focusBeforeBlock(editor, ctrl.pos)
+          }
+          return false
+        }
         if (!isAtFirstVisualLine(view, state)) return false
         const prevPos = findPrevBlockPos(state)
         if (prevPos !== null && state.doc.nodeAt(prevPos)?.type.name === 'imageNode') {
           return focusBlockAtPos(editor, prevPos, 'up')
         }
         return false
+      },
+    },
+    Enter: {
+      id: 'image.splitCaption',
+      key: 'Enter',
+      label: 'Split Image Caption to Paragraph',
+      mode: 'insert',
+      when: ({ state }, event) =>
+        Boolean(
+          findNodeViewControl(state, event, 'imageNode')?.target.matches(
+            'input[aria-label="Image caption"]',
+          ),
+        ),
+      run: ({ editor, state }, event) => {
+        const ctrl = findNodeViewControl(state, event, 'imageNode')
+        if (!ctrl || !(ctrl.target instanceof HTMLInputElement)) return false
+        const caption = ctrl.target.value
+        const cursorIdx = ctrl.target.selectionStart ?? caption.length
+        const leftText = caption.slice(0, cursorIdx)
+        const rightText = caption.slice(cursorIdx)
+        ctrl.target.value = leftText
+        const posAfter = ctrl.pos + ctrl.node.nodeSize
+        return editor
+          .chain()
+          .command(({ tr, dispatch }) => {
+            if (dispatch) {
+              tr.setNodeMarkup(ctrl.pos, undefined, {
+                ...ctrl.node.attrs,
+                caption: leftText,
+              })
+            }
+            return true
+          })
+          .focus()
+          .insertContentAt(posAfter, {
+            type: 'paragraph',
+            content: rightText ? [{ type: 'text', text: rightText }] : [],
+          })
+          .setTextSelection(posAfter + 1)
+          .run()
       },
     },
   }),
