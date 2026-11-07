@@ -125,7 +125,7 @@
   useKeyScope({
     id: `pane:tree-view:${id}`,
     priority: 'pane',
-    element: () => rootEl,
+    element: () => rootEl?.closest<HTMLElement>('#workspace-sidebar') ?? rootEl,
     enabled: () => Boolean(rootEl),
     getContext: () => null,
     keymap: {
@@ -348,7 +348,8 @@
     event: KeyboardEvent,
   ): { nodeValue: string; isBranch: boolean } | null {
     const target = event.target
-    if (!(target instanceof HTMLElement) || !rootEl?.contains(target)) return null
+    const sidebarEl = rootEl?.closest<HTMLElement>('#workspace-sidebar') ?? rootEl
+    if (!(target instanceof HTMLElement) || !sidebarEl?.contains(target)) return null
     if (
       target.closest('[data-part="node-rename-input"]') ||
       target instanceof HTMLInputElement ||
@@ -357,7 +358,12 @@
     ) {
       return null
     }
-    const itemEl = target.closest<HTMLElement>('[data-tree-node-value]')
+    const itemEl =
+      target.closest<HTMLElement>('[data-tree-node-value]') ??
+      (target === sidebarEl || target.getAttribute('role') === 'tree'
+        ? (rootEl?.querySelector<HTMLElement>('[data-pane-focus-target][data-tree-node-value]') ??
+          rootEl?.querySelector<HTMLElement>('[data-tree-node-value]'))
+        : null)
     if (!itemEl) return null
     const nodeValue = itemEl.dataset.treeNodeValue
     if (!nodeValue) return null

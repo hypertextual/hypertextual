@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import type { KeymapMode } from '@cloudvoyant/helical-ui'
   import {
     Button,
@@ -42,7 +42,19 @@
   onMount(() => {
     let active = true
     const unlisteners: (() => void)[] = []
-    void workspace.open()
+    void workspace.open().then(async () => {
+      if (!active || workspace.editor.selected) return
+      await tick()
+      requestAnimationFrame(() => {
+        if (
+          active &&
+          !workspace.editor.selected &&
+          (!document.activeElement || document.activeElement === document.body)
+        ) {
+          hotkeys.focusPane('workspace')
+        }
+      })
+    })
     if (isTauri()) {
       void Promise.all(
         [
