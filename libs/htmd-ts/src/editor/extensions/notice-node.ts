@@ -56,6 +56,28 @@ export const NoticeNode = defineHtmdExtension<
       ],
       bodyOffset: 2,
       enterBelowMode: 'findFrom',
+      focusControl(editor, pos, _node, options) {
+        const dom = editor.view?.nodeDOM(pos)
+        if (!(dom instanceof HTMLElement)) return false
+        if (options?.control === 'type') {
+          const trigger = dom.querySelector<HTMLElement>(
+            '[aria-label="Notice type"][data-part="trigger"], [data-part="trigger"]',
+          )
+          if (trigger) {
+            trigger.focus()
+            return true
+          }
+        }
+        const input = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
+        if (!input) return false
+        input.focus()
+        const caret =
+          typeof options?.offset === 'number'
+            ? Math.max(0, Math.min(input.value.length, options.offset))
+            : input.value.length
+        input.setSelectionRange(caret, caret)
+        return true
+      },
     }),
   keymap() {
     return {

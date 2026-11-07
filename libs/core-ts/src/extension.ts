@@ -123,6 +123,10 @@ function createExtensionInstance<
   }
 }
 
+/**
+ * Creates a composable, engine-neutral editor extension descriptor supporting
+ * `.configure(options)` and `.extend(overrides)`.
+ */
 export function defineEditorExtension<
   TOptions = Record<string, never>,
   TStorage = Record<string, never>,

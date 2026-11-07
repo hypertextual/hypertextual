@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { createStandaloneHotkeyService, type EditorNotification } from 'core-ts'
+import {
+  KeyScopeDispatcher,
+  type EditorHotkeyService,
+  type EditorMode,
+  type EditorNotification,
+  type EditorPreset,
+} from 'core-ts'
 import { parse } from '../lib.js'
 import {
   CodeBlock,
@@ -132,8 +138,27 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
     )
   })
 
-  it('initializes headlessly, registers editor:htmd and extension keyscopes, and executes commands', () => {
-    const hotkeys = createStandaloneHotkeyService({ initialMode: 'insert' })
+  it('initializes headlessly, registers extension keyscopes, and executes commands', () => {
+    const dispatcher = new KeyScopeDispatcher()
+    let currentMode: EditorMode = 'insert'
+    let currentPreset: EditorPreset = 'helix'
+    const hotkeys: EditorHotkeyService = {
+      registerKeyScope: (scope) => dispatcher.register(scope),
+      registerCommand: () => () => {},
+      focusPane: () => false,
+      dispatchKeyDown: (event) => dispatcher.dispatch(event, currentMode),
+      getActiveBindings: () => dispatcher.getActiveBindings(currentMode),
+      getMode: () => currentMode,
+      setMode: (mode) => {
+        currentMode = mode
+      },
+      getPreset: () => currentPreset,
+      setPreset: (preset) => {
+        currentPreset = preset
+      },
+      isOverlayOpen: () => false,
+      subscribe: () => () => {},
+    }
     const notifications: EditorNotification[] = []
     const deserialized = HtmdEditor.deserialize('# Title\n\nHello world\n')
 
@@ -154,7 +179,7 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
     expect(editor.isEditable).toBe(true)
     expect(editor.getCounts().wordCount).toBeGreaterThanOrEqual(3)
 
-    const activeIds = hotkeys.getActiveBindings().map((b) => b.id)
+    const activeIds = dispatcher.getActiveBindings(currentMode).map((b) => b.id)
     expect(activeIds).toContain('htmd.exitToNormal')
     expect(activeIds).toContain('notice.focusTitle')
     expect(activeIds).toContain('codeBlock.indent')
@@ -170,7 +195,6 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
     expect(hotkeys.getMode()).toBe('normal')
 
     editor.destroy()
-    hotkeys.destroy()
   })
 
   it('defines all HTMD extensions via defineHtmdExtension', () => {

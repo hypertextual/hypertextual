@@ -68,6 +68,32 @@ export const LinkPreview = defineHtmdExtension<
         textSelector: '[data-bookmark-url-text]',
         inputSelector: URL_INPUT_SELECTOR,
       },
+      focusControl(editor, pos, _node, options) {
+        const dom = editor.view?.nodeDOM(pos)
+        if (!(dom instanceof HTMLElement)) return false
+        if (options?.control === 'dialog') {
+          const bookmarkEdit = dom.querySelector<HTMLElement>('[data-bookmark-edit]')
+          if (bookmarkEdit) {
+            bookmarkEdit.click()
+            return true
+          }
+        }
+        const input = dom.querySelector<HTMLInputElement>(URL_INPUT_SELECTOR)
+        if (input) {
+          input.focus()
+          const caret =
+            typeof options?.offset === 'number'
+              ? Math.max(0, Math.min(input.value.length, options.offset))
+              : input.value.length
+          input.setSelectionRange(caret, caret)
+          return true
+        }
+        const action = dom.querySelector<HTMLElement>(
+          'button[aria-label="Play video"], a.bookmark-card-edit, button[aria-label="Remove preview"]',
+        )
+        action?.focus()
+        return Boolean(action)
+      },
     }),
   createStorage: (options) => ({
     fetchLinkPreview: options.fetchLinkPreview,

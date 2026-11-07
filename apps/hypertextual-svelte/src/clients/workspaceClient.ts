@@ -62,6 +62,7 @@ export const workspaceClient: WorkspaceClient = {
     invoke('workspace_write', { relativePath, content, expectedRevision }),
 }
 
+/** Extracts a human-readable message string from an unknown error value. */
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'object' && error && 'message' in error) return String(error.message)

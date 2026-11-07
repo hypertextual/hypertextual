@@ -81,11 +81,12 @@ let { ... }: ComponentProps = $props()
 - Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
 - Keep HTMD node and mark schemas (`group`, `content`, `inline`, `atom`, `addAttributes`, `parseHTML`, `renderHTML`, `parseMarkdown`, `renderMarkdown`) in `nodes.ts` and `marks.ts`, and author interactive editor extensions in `libs/htmd-ts/src/editor/extensions` via `defineHtmdExtension` (`keymap`, `commands`, `nodeView`, and `// pm ---` ProseMirror plugins). Do not add legacy format shims; keep parsing fault-tolerant by recovering unsupported or malformed fragments as editable `UnparsableBlockFallback` / `UnparsableInlineFallback` (`unparsedBlock` / `unparsedInline`) wrappers.
 - Prefer built-in Tiptap extension capabilities over custom implementations when supported.
-- Document every HTMD editor extension with a JSDoc comment that explains its editor usage and includes a brief ASCII visual example of its expected behavior.
+- Document every exported TypeScript function with a JSDoc comment, and document every HTMD editor extension with a JSDoc comment that explains its editor usage and includes a brief ASCII visual example of its expected behavior.
 - Extract extension keymap handlers into named helper functions (`handleTab`, `handleShiftTab`, `handleArrowUp`, `handleArrowDown`, `handleEnter`) under `// helpers ---`.
 - Decompose modal editing in `libs/htmd-ts/src/editor/extensions` into dedicated mode (`NormalMode`, `SelectMode`, `InsertMode`) and preset (`Helix`, `Vim`, `Kakoune`) extensions composed by a parent `ModalEditing` extension.
 - [Proposed] Name HTMD extensions after their node or behavior without superfluous suffixes like `Custom`.
-- [Proposed] Keep node-level keyboard shortcuts inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting keymaps between extensions and Svelte NodeViews.
+- [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
+- [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
 - [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
 
 ### Documentation

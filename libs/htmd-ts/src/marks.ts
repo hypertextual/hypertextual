@@ -114,6 +114,7 @@ export const HtmlSyntax = Extension.create({
   },
 })
 
+/** Renders a marked text node as an escaped inline HTML fragment. */
 export function renderLiteral(node: JSONContent): string {
   let source = escape(node.text)
   for (const mark of [...(node.marks ?? [])].reverse()) {
@@ -154,6 +155,7 @@ export const Underline = Mark.create({
   renderMarkdown: (node, h) => `<u>${h.renderChildren(node.content ?? [])}</u>`,
 })
 
+/** Adapts built-in Tiptap marks with HTMD attribute defaults and Markdown serializers. */
 export function adaptMarks(extensions: AnyExtension[]): AnyExtension[] {
   return extensions.map((extension) =>
     extension.name === 'link'

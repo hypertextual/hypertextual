@@ -3,15 +3,20 @@ export {
   createAtomNodeNavigation,
   createContainerNodeNavigation,
   createTextblockNavigation,
+  CursorManager,
   defineHtmdExtension,
+  findNextBlockPos,
   findNodeViewControl,
+  findPrevBlockPos,
   focusAfterBlock,
   focusBeforeBlock,
   focusBlockAtPos,
+  focusControlAtPos,
   focusTextPosition,
   getNodeNavigation,
   mergeHtmlAttributes,
   registerNodeNavigation,
+  SelectionManager,
   type HtmdCommandContext,
   type HtmdExtension,
   type HtmdExtensionSpec,
@@ -21,11 +26,12 @@ export {
 export {
   buildExtensions,
   compileHtmdExtension,
+  createDefaultHtmdDocument,
   type BuildExtensionsOptions,
   type CompiledExtensionKeymap,
 } from './build-extensions.js'
 export { HtmdDocument } from './htmd-document.js'
-export { createHtmdEditorKeymap, HtmdEditor } from './htmd-editor.js'
+export { HtmdEditor } from './htmd-editor.js'
 
 export { CodeBlock, type CodeBlockOptions } from './extensions/code-block.js'
 export { CurrentEmptyBlock } from './extensions/current-empty-block.js'

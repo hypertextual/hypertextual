@@ -1,13 +1,4 @@
-import type {
-  EditorCommandDefinition,
-  EditorHotkeyService,
-  EditorMode,
-  EditorPreset,
-  KeyBinding,
-  Keymap,
-  KeyScopeOptions,
-  KeyScopePriority,
-} from './types.js'
+import type { EditorMode, KeyBinding, Keymap, KeyScopeOptions, KeyScopePriority } from './types.js'
 
 const PRIORITY_RANK: Record<KeyScopePriority, number> = {
   overlay: 0,
@@ -20,6 +11,10 @@ const PRIORITY_RANK: Record<KeyScopePriority, number> = {
 
 const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta'])
 
+/**
+ * Normalizes a DOM `KeyboardEvent` into a canonical chord string such as
+ * `'Control+e'`, `'Shift+Tab'`, or `'Space'`.
+ */
 export function normalizeKeyEvent(event: KeyboardEvent): string {
   const rawKey = event.key === ' ' ? 'Space' : event.key
   if (MODIFIER_KEYS.has(rawKey)) return rawKey
@@ -39,6 +34,10 @@ export function normalizeKeyEvent(event: KeyboardEvent): string {
   return parts.join('+')
 }
 
+/**
+ * Returns all candidate keymap lookup keys (`'+'`, `'-'`, and `'Mod'` aliases)
+ * that match a `KeyboardEvent`.
+ */
 export function candidateKeysForEvent(event: KeyboardEvent): string[] {
   const rawKey = event.key === ' ' ? 'Space' : event.key
   if (MODIFIER_KEYS.has(rawKey)) return [rawKey]
@@ -70,14 +69,10 @@ interface RegisteredScope {
   options: KeyScopeOptions<unknown>
 }
 
-interface HasContains {
-  contains?: (other: unknown) => boolean
-}
-
 function nodeContains(container: unknown, target: unknown): boolean {
   if (!container || !target) return false
   if (container === target) return true
-  const maybeContainer = container as HasContains
+  const maybeContainer = container as { contains?: (other: unknown) => boolean }
   if (typeof maybeContainer.contains === 'function') {
     try {
       return maybeContainer.contains(target)
@@ -101,6 +96,10 @@ function resolveKeymap<TCtx>(keymap: Keymap<TCtx> | (() => Keymap<TCtx>)): Keyma
   return typeof keymap === 'function' ? keymap() : keymap
 }
 
+/**
+ * Dispatches keyboard events across active DOM scopes ordered by overlay status,
+ * innermost DOM containment, priority tier, and registration recency.
+ */
 export class KeyScopeDispatcher {
   private scopes = new Map<number, RegisteredScope>()
   private nextOrder = 1
@@ -219,138 +218,4 @@ export class KeyScopeDispatcher {
     }
     return result
   }
-}
-
-export type StandaloneEditorHotkeyService = EditorHotkeyService & {
-  setOverlayOpen(open: boolean): void
-  destroy(): void
-}
-
-export function createStandaloneHotkeyService(options?: {
-  initialMode?: EditorMode
-  initialPreset?: EditorPreset
-  attachWindowListener?: boolean
-  syncState?: () => {
-    mode?: EditorMode
-    preset?: EditorPreset
-    overlayOpen?: boolean
-    prefixActive?: boolean
-  } | null
-}): StandaloneEditorHotkeyService {
-  const dispatcher = new KeyScopeDispatcher()
-  const commands = new Map<string, EditorCommandDefinition>()
-  const listeners = new Set<
-    (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void
-  >()
-
-  let mode: EditorMode = options?.initialMode ?? 'normal'
-  let preset: EditorPreset = options?.initialPreset ?? 'helix'
-  let overlayOpen = false
-  let prefixActive = false
-
-  const syncFromExternal = () => {
-    const ext = options?.syncState?.()
-    if (!ext) return
-    if (ext.mode !== undefined) mode = ext.mode
-    if (ext.preset !== undefined) preset = ext.preset
-    if (ext.overlayOpen !== undefined) overlayOpen = ext.overlayOpen
-    if (ext.prefixActive !== undefined) prefixActive = ext.prefixActive
-  }
-
-  const emit = () => {
-    const snapshot = { mode, preset, overlayOpen }
-    for (const listener of listeners) listener(snapshot)
-  }
-
-  const handleWindowKeyDown = (event: KeyboardEvent) => {
-    service.dispatchKeyDown(event)
-  }
-
-  if (options?.attachWindowListener && typeof window !== 'undefined') {
-    window.addEventListener('keydown', handleWindowKeyDown, true)
-  }
-
-  const service: EditorHotkeyService & { setOverlayOpen(open: boolean): void; destroy(): void } = {
-    getMode: () => mode,
-    setMode(nextMode: EditorMode) {
-      if (mode === nextMode) return
-      mode = nextMode
-      emit()
-    },
-    getPreset: () => preset,
-    setPreset(nextPreset: EditorPreset) {
-      if (preset === nextPreset) return
-      preset = nextPreset
-      emit()
-    },
-    isOverlayOpen: () => overlayOpen,
-    setOverlayOpen(nextOpen: boolean) {
-      if (overlayOpen === nextOpen) return
-      overlayOpen = nextOpen
-      emit()
-    },
-    subscribe(listener) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    registerKeyScope(scopeOptions) {
-      return dispatcher.register(scopeOptions)
-    },
-    registerCommand(command) {
-      commands.set(command.id, command)
-      return () => {
-        commands.delete(command.id)
-      }
-    },
-    registerModalTarget() {
-      return () => {}
-    },
-    focusPane() {
-      return false
-    },
-    dispatchKeyDown(event: KeyboardEvent): boolean {
-      syncFromExternal()
-      return dispatcher.dispatch(event, mode, { overlayOpen, prefixActive })
-    },
-    getActiveBindings() {
-      syncFromExternal()
-      return dispatcher.getActiveBindings(mode)
-    },
-    destroy() {
-      if (options?.attachWindowListener && typeof window !== 'undefined') {
-        window.removeEventListener('keydown', handleWindowKeyDown, true)
-      }
-      listeners.clear()
-      commands.clear()
-    },
-  }
-
-  return service
-}
-
-const documentHotkeyServices = new WeakMap<Document, EditorHotkeyService>()
-
-export function setDocumentHotkeyService(
-  doc: Document | null | undefined,
-  service: EditorHotkeyService | null,
-): () => void {
-  if (!doc) return () => {}
-  if (service) {
-    documentHotkeyServices.set(doc, service)
-  } else {
-    documentHotkeyServices.delete(doc)
-  }
-  return () => {
-    if (documentHotkeyServices.get(doc) === service) {
-      documentHotkeyServices.delete(doc)
-    }
-  }
-}
-
-export function getDocumentHotkeyService(doc?: Document | null): EditorHotkeyService | undefined {
-  const targetDoc = doc ?? (typeof document !== 'undefined' ? document : null)
-  if (!targetDoc) return undefined
-  return documentHotkeyServices.get(targetDoc)
 }

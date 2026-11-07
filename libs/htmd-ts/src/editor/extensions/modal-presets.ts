@@ -78,6 +78,10 @@ export const KakounePreset = defineHtmdExtension<ModalPresetOptions, ModalPreset
 
 // helpers -------------------------------------------------------------------
 
+/**
+ * Returns `true` for selection-first presets (`helix` and `kakoune`) and `false`
+ * for operator-first presets (`vim`).
+ */
 export function isPresetSelectionFirst(preset: KeybindingPreset): boolean {
   return preset === 'helix' || preset === 'kakoune'
 }

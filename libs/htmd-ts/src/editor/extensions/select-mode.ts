@@ -52,6 +52,9 @@ export const SelectMode = defineHtmdExtension<Record<string, never>, SelectModeS
 
 // helpers -------------------------------------------------------------------
 
+/**
+ * Selects or extends whole-line block selections (`x`) by `count` blocks.
+ */
 export function executeSelectLines(editor: TiptapEditor, count: number): boolean {
   const state = editor.state
   const doc = state.doc
@@ -117,6 +120,9 @@ export function executeSelectLines(editor: TiptapEditor, count: number): boolean
   return true
 }
 
+/**
+ * Extends the active modal selection in `editor` along `motion` by `count` steps.
+ */
 export function executeSelectModeExtend(
   editor: TiptapEditor,
   motion: ModalMotion,
@@ -394,6 +400,10 @@ export function executeSelectModeExtend(
   return false
 }
 
+/**
+ * Applies a selection transformation (`collapse`, `flip`, `addBelow`, `addAbove`,
+ * `selectAll`, `keepPrimary`) to the active primary and secondary modal ranges.
+ */
 export function executeSelectionTransform(
   editor: TiptapEditor,
   action: ModalSelectionTransform,

@@ -1,17 +1,36 @@
 import {
-  createStandaloneHotkeyService,
   DefaultEmbeddedEditorRegistry,
+  KeyScopeDispatcher,
   type Editor,
+  type EditorHotkeyService,
   type EditorMediaAsset,
   type EditorMediaService,
+  type EditorMode,
   type EditorNotification,
+  type EditorPreset,
 } from 'core-ts'
 import { HtmdEditor, type HtmdNodeViewFactory, type JSONContent } from 'htmd-ts'
 
-const hotkeys = createStandaloneHotkeyService({
-  initialMode: 'insert',
-  attachWindowListener: false,
-})
+const dispatcher = new KeyScopeDispatcher()
+let currentMode: EditorMode = 'insert'
+let currentPreset: EditorPreset = 'helix'
+const hotkeys: EditorHotkeyService = {
+  registerKeyScope: (scope) => dispatcher.register(scope),
+  registerCommand: () => () => {},
+  focusPane: () => false,
+  dispatchKeyDown: (event) => dispatcher.dispatch(event, currentMode),
+  getActiveBindings: () => dispatcher.getActiveBindings(currentMode),
+  getMode: () => currentMode,
+  setMode: (mode) => {
+    currentMode = mode
+  },
+  getPreset: () => currentPreset,
+  setPreset: (preset) => {
+    currentPreset = preset
+  },
+  isOverlayOpen: () => false,
+  subscribe: () => () => {},
+}
 window.addEventListener(
   'keydown',
   (event) => {

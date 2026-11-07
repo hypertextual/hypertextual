@@ -8,6 +8,10 @@ export interface SvelteNodeViewProps<TEditor = HtmdEditor>
   readonly subtextRange: { from: number; to: number } | null
 }
 
+/**
+ * Wraps a Svelte 5 `Component` into an engine-neutral `NodeViewRenderer` for
+ * `HtmdEditor`.
+ */
 export function createSvelteNodeView<
   TProps extends SvelteNodeViewProps<HtmdEditor> = SvelteNodeViewProps<HtmdEditor>,
 >(

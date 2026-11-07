@@ -1,6 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
 import {
-  createStandaloneHotkeyService,
   DefaultEmbeddedEditorRegistry,
   defineEditorExtension,
   isUntitledFormatFile,
@@ -306,18 +305,5 @@ describe('DefaultEmbeddedEditorRegistry and format helpers', () => {
     expect(isUntitledFormatFile('Untitled 2.htmd', formats)).toBe(true)
     expect(isUntitledFormatFile('Untitled.md', formats)).toBe(true)
     expect(isUntitledFormatFile('My Note.htmd', formats)).toBe(false)
-  })
-
-  it('creates a standalone hotkey service that tracks mode, preset, and key scopes', () => {
-    const service = createStandaloneHotkeyService({ initialMode: 'normal', initialPreset: 'helix' })
-    const states: string[] = []
-    service.subscribe((s) => states.push(`${s.mode}:${s.preset}`))
-
-    service.setMode('insert')
-    service.setPreset('vim')
-    expect(service.getMode()).toBe('insert')
-    expect(service.getPreset()).toBe('vim')
-    expect(states).toEqual(['insert:helix', 'insert:vim'])
-    service.destroy()
   })
 })

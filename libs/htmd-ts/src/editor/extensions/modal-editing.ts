@@ -1,4 +1,4 @@
-import type { EditorNotification } from 'core-ts'
+import type { EditorHotkeyService, EditorMode, EditorNotification } from 'core-ts'
 import {
   registerModalEditor,
   type KeybindingPreset,
@@ -21,7 +21,12 @@ import {
   type Transaction,
 } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { defineHtmdExtension } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  focusControlAtPos,
+  getNodeNavigation,
+} from '../define-htmd-extension.js'
+import { editorOverlaysKey } from './editor-overlays.js'
 import { applyModalStateTransition, executeInsertModeEntry, InsertMode } from './insert-mode.js'
 import { HelixPreset, KakounePreset, VimPreset } from './modal-presets.js'
 import { executeNormalModeMove, executeNormalModeTextObject, NormalMode } from './normal-mode.js'
@@ -36,7 +41,13 @@ import {
 
 export interface ModalEditingOptions {
   enforceTitle?: boolean
+  clickToEdit?: boolean
+  initialEditable?: boolean
   onNotification?: (notification: EditorNotification) => void
+  onEdit?: () => boolean
+  onExit?: () => void
+  getHotkeys?: () => EditorHotkeyService | undefined
+  getScopeElement?: () => HTMLElement | null
 }
 
 export type ModalKeymapOptions = ModalEditingOptions
@@ -70,6 +81,7 @@ export interface ModalKeymapStorage {
   preset: KeybindingPreset
   registerSlice: Slice | null
   clickToInsert: boolean
+  options?: ModalEditingOptions
   activeCompoundBlockPos?: number | null
   focusControlRequest?: {
     pos: number
@@ -78,6 +90,8 @@ export interface ModalKeymapStorage {
     offset?: number
   } | null
   cleanupDomRegistration?: () => void
+  cleanupTransactionListener?: () => void
+  cleanupHotkeySubscription?: () => void
 }
 
 export interface BlockDescriptor {
@@ -143,44 +157,88 @@ export const ModalEditing = defineHtmdExtension<ModalEditingOptions, ModalKeymap
 
   defaultOptions: () => ({
     enforceTitle: true,
+    clickToEdit: true,
+    initialEditable: undefined,
     onNotification: undefined,
+    onEdit: undefined,
+    onExit: undefined,
+    getHotkeys: undefined,
+    getScopeElement: undefined,
   }),
 
-  createStorage: () => ({
+  createStorage: (options) => ({
     target: null,
     mode: 'insert',
     preset: 'helix',
     registerSlice: null,
-    clickToInsert: true,
+    clickToInsert: options.clickToEdit ?? true,
+    options,
     activeCompoundBlockPos: null,
     cleanupDomRegistration: undefined,
+    cleanupTransactionListener: undefined,
   }),
 
-  onCreate({ editor, options, storage }) {
+  onBeforeCreate({ editor, options, storage }) {
+    storage.options = options
+    storage.clickToInsert = options.clickToEdit ?? true
     const target = storage.target ?? createModalTargetForEditor(editor, options)
     storage.target = target
 
-    try {
-      const dom = editor.view.dom
-      if (typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement) {
-        storage.cleanupDomRegistration = registerModalEditor(dom, target)
-      }
-    } catch {
-      // Headless editor without a mounted DOM view
+    const initialEditable = options.initialEditable ?? editor.isEditable
+    const preset = (options.getHotkeys?.()?.getPreset() ?? 'helix') as KeybindingPreset
+    target.setModalState({
+      mode: initialEditable ? 'insert' : 'normal',
+      preset,
+    })
+
+    const onTransaction = () => {
+      syncModalEditableState(editor)
+    }
+    editor.on('transaction', onTransaction)
+    storage.cleanupTransactionListener = () => {
+      editor.off('transaction', onTransaction)
+    }
+
+    const hotkeys = options.getHotkeys?.()
+    if (hotkeys) {
+      storage.cleanupHotkeySubscription = hotkeys.subscribe(({ preset: nextPreset }) => {
+        const currentMode =
+          modalKeymapPluginKey.getState(editor.state)?.mode ??
+          (editor.isEditable ? 'insert' : 'normal')
+        target.setModalState({
+          mode: currentMode as KeymapMode,
+          preset: nextPreset as KeybindingPreset,
+        })
+      })
     }
   },
 
+  onCreate({ editor, options, storage }) {
+    const initialEditable = options.initialEditable ?? editor.isEditable
+    const preset = (options.getHotkeys?.()?.getPreset() ?? 'helix') as KeybindingPreset
+    storage.target?.setModalState({
+      mode: initialEditable ? 'insert' : 'normal',
+      preset,
+    })
+    syncModalDomRegistration(editor)
+  },
+
   onDestroy({ storage }) {
+    storage.cleanupHotkeySubscription?.()
+    storage.cleanupHotkeySubscription = undefined
+    storage.cleanupTransactionListener?.()
+    storage.cleanupTransactionListener = undefined
     storage.cleanupDomRegistration?.()
     storage.cleanupDomRegistration = undefined
     storage.target = null
   },
 
   pmPlugins({ editor, options, storage }) {
+    storage.options = options
     if (!storage.target) {
       storage.target = createModalTargetForEditor(editor, options)
     }
-    return [createModalEditingPlugin(storage)]
+    return [createModalEditingPlugin(editor, storage)]
   },
 })
 
@@ -196,12 +254,19 @@ export const modalEditingExtensions = [
   ModalEditing,
 ] as const
 
+/**
+ * Returns `true` when `editor` is currently in `insert` mode.
+ */
 export function isEditorInInsertMode(editor: TiptapEditor): boolean {
   const storage = getModalStorage(editor)
   if (!storage) return true
   return storage.mode === 'insert'
 }
 
+/**
+ * Subscribes `onUpdate` to both `'update'` and `'transaction'` events on
+ * `editor` and returns an unsubscribe callback.
+ */
 export function subscribeToEditorTransactions(
   editor: TiptapEditor,
   onUpdate: () => void,
@@ -214,6 +279,10 @@ export function subscribeToEditorTransactions(
   }
 }
 
+/**
+ * Returns the `ModalEditorTarget` associated with `editor`, creating one if
+ * needed.
+ */
 export function getEditorModalTarget(editor: TiptapEditor): ModalEditorTarget | undefined {
   const storage = getModalStorage(editor)
   if (!storage) return undefined
@@ -228,7 +297,10 @@ export function getEditorModalTarget(editor: TiptapEditor): ModalEditorTarget | 
 
 // pm ------------------------------------------------------------------------
 
-function createModalEditingPlugin(storage: ModalKeymapStorage): Plugin<ModalKeymapPluginState> {
+function createModalEditingPlugin(
+  editor: TiptapEditor,
+  storage: ModalKeymapStorage,
+): Plugin<ModalKeymapPluginState> {
   return new Plugin<ModalKeymapPluginState>({
     key: modalKeymapPluginKey,
     state: {
@@ -359,6 +431,71 @@ function createModalEditingPlugin(storage: ModalKeymapStorage): Plugin<ModalKeym
       }
     },
     props: {
+      handleClick(view, position, event) {
+        const modalOptions = storage.options
+        if (view.editable || !modalOptions?.onEdit) return false
+        const target = event.target
+        const bookmarkEdit =
+          target instanceof Element ? target.closest<HTMLElement>('[data-bookmark-edit]') : null
+        if (
+          target instanceof Element &&
+          !bookmarkEdit &&
+          target.closest(
+            'a, button, input, select, summary, iframe, [role="button"], [role="combobox"], [data-modal-ignore-pointer]',
+          )
+        ) {
+          return false
+        }
+        if (!storage.clickToInsert) {
+          let compoundPos: number | null = null
+          if (target instanceof Element) {
+            view.state.doc.descendants((node, pos) => {
+              if (getNodeNavigation(editor, node.type.name)) {
+                const nodeDom = view.nodeDOM(pos)
+                if (nodeDom instanceof HTMLElement && nodeDom.contains(target)) {
+                  compoundPos = pos
+                }
+                return false
+              }
+              return true
+            })
+          }
+          if (compoundPos !== null) {
+            const node = view.state.doc.nodeAt(compoundPos)
+            if (node && NodeSelection.isSelectable(node)) {
+              view.dispatch(
+                view.state.tr.setSelection(NodeSelection.create(view.state.doc, compoundPos)),
+              )
+            }
+          } else {
+            editor.commands.setTextSelection(position)
+          }
+          const region = modalOptions?.getScopeElement?.()
+          region?.focus({ preventScroll: true })
+          return true
+        }
+        if (!modalOptions.onEdit()) return false
+        editor.setEditable(true)
+        try {
+          editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+        } catch {
+          // Ignore
+        }
+        const hotkeys = modalOptions?.getHotkeys?.()
+        const preset = (hotkeys?.getPreset() ?? storage.preset ?? 'helix') as KeybindingPreset
+        getEditorModalTarget(editor)?.setModalState({
+          mode: 'insert',
+          preset,
+        })
+        hotkeys?.setMode('insert')
+        if (bookmarkEdit) {
+          queueMicrotask(() => bookmarkEdit.click())
+          return true
+        }
+        editor.commands.setTextSelection(position)
+        view.focus()
+        return true
+      },
       handleDOMEvents: {
         mousedown(view, event) {
           if (!storage.clickToInsert) {
@@ -624,10 +761,277 @@ function createModalEditingPlugin(storage: ModalKeymapStorage): Plugin<ModalKeym
 
 // helpers -------------------------------------------------------------------
 
+/**
+ * Returns the `ModalKeymapStorage` instance attached to `editor.storage`.
+ */
 export function getModalStorage(editor: TiptapEditor): ModalKeymapStorage | undefined {
   return (editor.storage as unknown as { modalKeymap?: ModalKeymapStorage }).modalKeymap
 }
 
+/**
+ * Schedules control focus on the compound block at `pos` using the owning
+ * node extension's `navigation.focusControl` hook.
+ */
+export function focusModalCompoundBlockControl(
+  editor: TiptapEditor,
+  pos: number,
+  options?: { control?: string; offset?: number },
+): void {
+  const run = () => {
+    if (!editor || editor.isDestroyed) return
+    focusControlAtPos(editor, pos, options)
+  }
+  queueMicrotask(() => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run)
+    } else {
+      run()
+    }
+  })
+}
+
+/**
+ * Enters `insert` mode and focuses the active control of the selected or
+ * enclosing compound block (`notice`, `codeBlock`, `imageNode`, `linkPreview`).
+ */
+export function enterModalCompoundBlock(editor: TiptapEditor): boolean {
+  if (!editor || editor.isEditable) return false
+  const storage = getModalStorage(editor)
+  const modalOptions = storage?.options
+  const sel = editor.state.selection
+  const pluginState = modalKeymapPluginKey.getState(editor.state)
+  let blockPos: number | null = null
+  let control: string | undefined
+  let offset: number | undefined
+
+  if (pluginState?.subtextCursor) {
+    blockPos = pluginState.subtextCursor.pos
+    offset = pluginState.subtextCursor.offset
+    control =
+      pluginState.subtextCursor.kind === 'noticeTitle'
+        ? 'type'
+        : pluginState.subtextCursor.kind === 'linkPreviewUrl'
+          ? 'url'
+          : 'caption'
+  } else if (sel instanceof NodeSelection && getNodeNavigation(editor, sel.node.type.name)) {
+    blockPos = sel.from
+    if (sel.node.type.name === 'codeBlock') control = 'language'
+  } else {
+    const resolvedFrom = sel.$from
+    for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
+      const node = resolvedFrom.node(d)
+      const nav = getNodeNavigation(editor, node.type.name)
+      if (nav?.kind === 'container') {
+        blockPos = resolvedFrom.before(d)
+        control = node.type.name === 'codeBlock' ? 'language' : 'type'
+        break
+      }
+    }
+  }
+  if (blockPos === null) return false
+  if (modalOptions?.onEdit && !modalOptions.onEdit()) return false
+
+  if (storage) {
+    storage.activeCompoundBlockPos = blockPos
+  }
+  editor.setEditable(true)
+  const hotkeys = modalOptions?.getHotkeys?.()
+  const preset = (hotkeys?.getPreset() ?? storage?.preset ?? 'helix') as KeybindingPreset
+  getEditorModalTarget(editor)?.setModalState({ mode: 'insert', preset })
+  hotkeys?.setMode('insert')
+  try {
+    editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+  } catch {
+    // Ignore
+  }
+
+  focusModalCompoundBlockControl(editor, blockPos, { control, offset })
+  return true
+}
+
+/**
+ * Updates `editor.setEditable(editable)` and synchronizes modal state, host
+ * hotkeys, active overlays, and compound-block control focus.
+ */
+export function setModalEditable(editor: TiptapEditor, editable: boolean): void {
+  if (!editor) return
+  const storage = getModalStorage(editor)
+  const modalOptions = storage?.options
+  const hotkeys = modalOptions?.getHotkeys?.()
+  const editableChanged = editor.isEditable !== editable
+  editor.setEditable(editable)
+  if (editableChanged) {
+    try {
+      editor.view.dispatch(editor.state.tr.setMeta('editableChanged', editable))
+    } catch {
+      // Ignore if view is not yet mounted
+    }
+  }
+  const target = getEditorModalTarget(editor)
+  const currentMode = modalKeymapPluginKey.getState(editor.state)?.mode ?? 'insert'
+  const preset = (hotkeys?.getPreset() ?? storage?.preset ?? 'helix') as KeybindingPreset
+
+  if (editable) {
+    if (currentMode !== 'insert') {
+      target?.setModalState({ mode: 'insert', preset })
+    }
+    if (hotkeys && hotkeys.getMode() !== 'insert') {
+      hotkeys.setMode('insert')
+    }
+    const sel = editor.state.selection
+    if (storage?.focusControlRequest) {
+      const req = storage.focusControlRequest
+      storage.focusControlRequest = null
+      focusModalCompoundBlockControl(editor, req.pos, {
+        control: req.control,
+        offset: req.offset,
+      })
+    } else if (
+      sel instanceof NodeSelection &&
+      getNodeNavigation(editor, sel.node.type.name)?.kind === 'atom'
+    ) {
+      focusModalCompoundBlockControl(editor, sel.from)
+    }
+  } else {
+    const activeOverlay = editorOverlaysKey.getState(editor.state)
+    if (activeOverlay) {
+      const cmds = editor.commands as unknown as { closeOverlay?: (name?: string) => boolean }
+      cmds.closeOverlay?.(activeOverlay.name)
+    }
+    if (currentMode === 'insert') {
+      target?.setModalState({ mode: 'normal', preset })
+    }
+    if (hotkeys && hotkeys.getMode() === 'insert') {
+      hotkeys.setMode('normal')
+    }
+  }
+}
+
+/**
+ * Exits `insert` mode back to `normal` mode, notifying `onExit` and syncing
+ * editable state and host hotkeys.
+ */
+export function exitModalToNormal(editor: TiptapEditor): boolean {
+  if (!editor) return false
+  const storage = getModalStorage(editor)
+  storage?.options?.onExit?.()
+  setModalEditable(editor, false)
+  storage?.options?.getHotkeys?.()?.setMode('normal')
+  return true
+}
+
+/**
+ * Synchronizes `registerModalEditor` and `hotkeys.registerModalTarget` bindings
+ * across the editor DOM, surface element, and outer region container.
+ */
+export function syncModalDomRegistration(editor: TiptapEditor): void {
+  const storage = getModalStorage(editor)
+  if (!storage) return
+  storage.cleanupDomRegistration?.()
+  storage.cleanupDomRegistration = undefined
+
+  const target = getEditorModalTarget(editor)
+  if (!target) return
+
+  const cleanups: Array<() => void> = []
+  const hotkeys = storage.options?.getHotkeys?.()
+  const registered = new Set<HTMLElement>()
+  const registerEl = (el: HTMLElement | null | undefined) => {
+    if (!el || typeof HTMLElement === 'undefined' || !(el instanceof HTMLElement)) return
+    if (registered.has(el)) return
+    registered.add(el)
+    cleanups.push(registerModalEditor(el, target))
+    if (hotkeys?.registerModalTarget) {
+      cleanups.push(hotkeys.registerModalTarget(el, target))
+    }
+  }
+
+  try {
+    if (typeof HTMLElement !== 'undefined' && editor.view.dom instanceof HTMLElement) {
+      registerEl(editor.view.dom)
+    }
+  } catch {
+    // Headless view
+  }
+
+  const scopeEl = storage.options?.getScopeElement?.()
+  if (scopeEl) {
+    registerEl(scopeEl)
+    const region = scopeEl.closest('[role="region"]')
+    if (region instanceof HTMLElement) {
+      registerEl(region)
+    }
+  }
+
+  storage.cleanupDomRegistration = () => {
+    for (const cleanup of cleanups) cleanup()
+  }
+}
+
+/**
+ * Synchronizes `editor.isEditable` and compound-block control focus when a
+ * modal transaction transitions between `insert` and `normal`/`select` modes.
+ */
+export function syncModalEditableState(editor: TiptapEditor): void {
+  if (!editor) return
+  const storage = getModalStorage(editor)
+  const modalOptions = storage?.options
+  const hotkeys = modalOptions?.getHotkeys?.()
+  if (hotkeys?.isOverlayOpen()) return
+  const active = typeof document !== 'undefined' ? document.activeElement : null
+  const scopeEl = modalOptions?.getScopeElement?.()
+  if (
+    active &&
+    scopeEl &&
+    !scopeEl.contains(active) &&
+    !active.contains(scopeEl) &&
+    active.closest('[data-pane-id], [data-which-key-explorer], [data-part="node-rename-input"]')
+  ) {
+    return
+  }
+  const pluginState = modalKeymapPluginKey.getState(editor.state)
+  if (!pluginState) return
+  if (pluginState.mode === 'insert' && !editor.isEditable) {
+    if (!modalOptions?.onEdit || modalOptions.onEdit()) {
+      editor.setEditable(true)
+      hotkeys?.setMode('insert')
+      try {
+        editor.view.dispatch(editor.state.tr.setMeta('editableChanged', true))
+      } catch {
+        // Ignore
+      }
+      const sel = editor.state.selection
+      if (storage?.focusControlRequest) {
+        const req = storage.focusControlRequest
+        storage.focusControlRequest = null
+        focusModalCompoundBlockControl(editor, req.pos, {
+          control: req.control,
+          offset: req.offset,
+        })
+      } else if (
+        sel instanceof NodeSelection &&
+        getNodeNavigation(editor, sel.node.type.name)?.kind === 'atom'
+      ) {
+        focusModalCompoundBlockControl(editor, sel.from)
+      } else {
+        editor.view.focus()
+      }
+    }
+  } else if (pluginState.mode !== 'insert' && editor.isEditable) {
+    modalOptions?.onExit?.()
+    editor.setEditable(false)
+    hotkeys?.setMode(pluginState.mode as EditorMode)
+    try {
+      editor.view.dispatch(editor.state.tr.setMeta('editableChanged', false))
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+/**
+ * Attaches a `modalKeymapPluginKey` metadata patch to `tr`.
+ */
 export function updateModalMeta(
   editor: TiptapEditor,
   tr: Transaction,
@@ -649,6 +1053,10 @@ export function updateModalMeta(
   })
 }
 
+/**
+ * Returns the plain-text subtext string (`noticeTitle`, `imageCaption`, or
+ * `linkPreviewUrl`) stored on `node`.
+ */
 export function getSubtextValue(
   node: PMNode,
   kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl',
@@ -662,6 +1070,10 @@ export function getSubtextValue(
   return String(node.attrs.caption ?? '')
 }
 
+/**
+ * Collects ordered leaf block descriptors (including subtext and code-block line
+ * slices) across `doc` for modal line/paragraph navigation.
+ */
 export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
@@ -751,6 +1163,10 @@ export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
   return blocks
 }
 
+/**
+ * Collects ordered word and punctuation tokens across `doc` (including compound
+ * block subtext fields) for `w`, `b`, and `e` word motions.
+ */
 export function collectWords(doc: PMNode): WordToken[] {
   const tokens: WordToken[] = []
   doc.descendants((node, pos) => {
@@ -873,6 +1289,10 @@ function findScrollContainer(el: HTMLElement | null): HTMLElement | null {
   return null
 }
 
+/**
+ * Dispatches `tr` on `editor.view` and keeps the active modal cursor decoration
+ * visible inside its scroll container when `tr.scrolledIntoView` is set.
+ */
 export function dispatchModalTransaction(editor: TiptapEditor, tr: Transaction): void {
   const shouldScroll = tr.scrolledIntoView
   editor.view.dispatch(tr)
@@ -905,6 +1325,9 @@ export function dispatchModalTransaction(editor: TiptapEditor, tr: Transaction):
   }
 }
 
+/**
+ * Returns the inclusive end position of the character or inline atom at `pos`.
+ */
 export function getCharEnd(doc: PMNode, pos: number): number {
   if (pos < 0 || pos >= doc.content.size) return pos
   const $pos = doc.resolve(pos)
@@ -924,6 +1347,10 @@ export function getCharEnd(doc: PMNode, pos: number): number {
   return pos
 }
 
+/**
+ * Returns the active character position of the cursor head for `sel` or
+ * `extendedRange`.
+ */
 export function getCursorCharPos(
   doc: PMNode,
   sel: Selection,
@@ -953,6 +1380,10 @@ export function getCursorCharPos(
   return sel.head
 }
 
+/**
+ * Returns the character position of the selection anchor for `sel` or
+ * `extendedRange`.
+ */
 export function getAnchorCharPos(
   doc: PMNode,
   sel: Selection,
@@ -982,6 +1413,10 @@ export function getAnchorCharPos(
   return sel.anchor
 }
 
+/**
+ * Returns the first and last inline text positions inside container `node` at
+ * `nodePos`.
+ */
 export function getContainerInnerTextBounds(
   node: PMNode,
   nodePos: number,
@@ -1007,6 +1442,10 @@ export function getContainerInnerTextBounds(
   return { firstTextStart, lastTextEnd }
 }
 
+/**
+ * Expands `[from, to]` to cover any container or atom block whose inner text is
+ * completely spanned by the range.
+ */
 export function expandWholeContainerRange(
   doc: PMNode,
   from: number,
@@ -1041,6 +1480,10 @@ export function expandWholeContainerRange(
   return { from: nextFrom, to: nextTo }
 }
 
+/**
+ * Creates a valid ProseMirror `NodeSelection` or `TextSelection` spanning from
+ * `anchorPos` to `headPos`.
+ */
 export function createSafeModalSelection(
   doc: PMNode,
   anchorPos: number,
@@ -1074,6 +1517,10 @@ export function createSafeModalSelection(
   return Selection.near(doc.resolve(headPos))
 }
 
+/**
+ * Computes the updated ProseMirror `Selection` and `{ anchor, head }` range when
+ * extending a modal selection to `nextCursorChar` or `targetAtomBlock`.
+ */
 export function computeExtendedRangeAndSelection(
   doc: PMNode,
   sel: Selection,
@@ -1104,6 +1551,10 @@ export function computeExtendedRangeAndSelection(
   }
 }
 
+/**
+ * Finds the index in `blocks` containing the current modal cursor or subtext
+ * cursor.
+ */
 export function findCurrentBlockIndex(
   blocks: BlockDescriptor[],
   doc: PMNode,

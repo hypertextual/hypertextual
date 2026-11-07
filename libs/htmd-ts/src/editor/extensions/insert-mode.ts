@@ -2,9 +2,10 @@ import type { KeybindingPreset, KeymapMode } from '@cloudvoyant/helical-ui'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { NodeSelection, type Selection, TextSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension } from '../define-htmd-extension.js'
+import { defineHtmdExtension, type HtmdCommandContext } from '../define-htmd-extension.js'
 import {
   dispatchModalTransaction,
+  exitModalToNormal,
   getContainerInnerTextBounds,
   getModalStorage,
   modalKeymapPluginKey,
@@ -41,17 +42,44 @@ export interface InsertModeStorage {
  * Insert `Escape` inside Notice --> Selects outer Notice block in Normal mode
  * ```
  */
-export const InsertMode = defineHtmdExtension<Record<string, never>, InsertModeStorage>({
+export const InsertMode = defineHtmdExtension<
+  Record<string, never>,
+  InsertModeStorage,
+  {
+    exitToNormal: () => (ctx: HtmdCommandContext) => boolean
+  }
+>({
   name: 'insertMode',
   kind: 'behavior',
   createStorage: () => ({
     enterInsert: executeInsertModeEntry,
     setModalState: applyModalStateTransition,
   }),
+  commands: () => ({
+    exitToNormal:
+      () =>
+      ({ editor }) =>
+        exitModalToNormal(editor),
+  }),
+  keymap: () => ({
+    Escape: {
+      id: 'htmd.exitToNormal',
+      key: 'Escape',
+      label: 'Exit Insert Mode',
+      category: 'Editor',
+      mode: 'insert',
+      when: ({ editor }) => editor.isEditable,
+      run: ({ editor }) => exitModalToNormal(editor),
+    },
+  }),
 })
 
 // helpers -------------------------------------------------------------------
 
+/**
+ * Transitions the editor into `insert` mode using the specified entry operator
+ * (`insertStart`, `appendEnd`, `openBelow`, `openAbove`).
+ */
 export function executeInsertModeEntry(
   editor: TiptapEditor,
   op: InsertEntryOperator,
@@ -192,12 +220,21 @@ export function executeInsertModeEntry(
   return false
 }
 
+/**
+ * Applies a modal mode/preset transition to `editor` and restores compound-block
+ * node selection when exiting `insert` mode back to `normal` mode.
+ */
 export function applyModalStateTransition(
   editor: TiptapEditor,
   { mode: nextMode, preset: nextPreset }: { mode: KeymapMode; preset: KeybindingPreset },
 ): void {
   const storage = getModalStorage(editor)
   if (!storage) return
+  if (!editor.state) {
+    storage.mode = nextMode
+    storage.preset = nextPreset
+    return
+  }
   const prev = modalKeymapPluginKey.getState(editor.state)
   const exitingInsert =
     (prev?.mode === 'insert' || storage.mode === 'insert') && nextMode === 'normal'

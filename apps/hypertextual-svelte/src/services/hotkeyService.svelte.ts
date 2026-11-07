@@ -9,7 +9,6 @@ import {
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
 import {
   KeyScopeDispatcher,
-  setDocumentHotkeyService,
   type EditorCommandDefinition,
   type EditorHotkeyService,
   type EditorMode,
@@ -427,7 +426,6 @@ export class HotkeyService implements EditorHotkeyService {
 
   mountControllerSync(): () => void {
     if (typeof document === 'undefined') return () => {}
-    const unsubDocHotkeys = setDocumentHotkeyService(document, this)
     const handleWindowKeyDown = (event: KeyboardEvent) => {
       this.dispatchKeyDown(event)
     }
@@ -464,7 +462,6 @@ export class HotkeyService implements EditorHotkeyService {
     const unsubRoot = subscribeDocumentWhichKeyController(document, attachSub)
     return () => {
       window.removeEventListener('keydown', handleWindowKeyDown, true)
-      unsubDocHotkeys()
       cleanupSub?.()
       unsubRoot()
     }

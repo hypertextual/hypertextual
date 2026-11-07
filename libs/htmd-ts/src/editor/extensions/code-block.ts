@@ -58,6 +58,21 @@ export const CodeBlock = defineHtmdExtension<CodeBlockOptions>({
       controls: [LANG_TRIGGER_SELECTOR],
       bodyOffset: 1,
       enterBelowMode: 'endPos',
+      focusControl(editor, pos, _node, options) {
+        const dom = editor.view?.nodeDOM(pos)
+        if (dom instanceof HTMLElement && options?.control === 'language') {
+          const trigger = dom.querySelector<HTMLElement>(
+            '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
+          )
+          if (trigger) {
+            trigger.focus()
+            return true
+          }
+        }
+        editor.commands.setTextSelection(pos + 1)
+        editor.view?.focus()
+        return true
+      },
     }),
   keymap() {
     return {

@@ -1,12 +1,13 @@
 import type { KeybindingPreset, ModalMotion, ModalTextObjectSpec } from '@cloudvoyant/helical-ui'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension } from '../define-htmd-extension.js'
+import { defineHtmdExtension, type HtmdCommandContext } from '../define-htmd-extension.js'
 import {
   collectLeafBlocks,
   collectWords,
   createSafeModalSelection,
   dispatchModalTransaction,
+  enterModalCompoundBlock,
   findCurrentBlockIndex,
   getContainerInnerTextBounds,
   getCursorCharPos,
@@ -47,17 +48,48 @@ export interface NormalModeStorage {
  *   +----------------------------------------------------+
  * ```
  */
-export const NormalMode = defineHtmdExtension<Record<string, never>, NormalModeStorage>({
+export const NormalMode = defineHtmdExtension<
+  Record<string, never>,
+  NormalModeStorage,
+  {
+    enterCompoundBlock: () => (ctx: HtmdCommandContext) => boolean
+  }
+>({
   name: 'normalMode',
   kind: 'behavior',
   createStorage: () => ({
     move: executeNormalModeMove,
     selectTextObject: executeNormalModeTextObject,
   }),
+  commands: () => ({
+    enterCompoundBlock:
+      () =>
+      ({ editor }) =>
+        enterModalCompoundBlock(editor),
+  }),
+  keymap: () => ({
+    Enter: {
+      id: 'htmd.enterCompoundBlock',
+      key: 'Enter',
+      label: 'Enter Compound Block',
+      category: 'Editor',
+      mode: 'normal',
+      when: ({ editor }, event) => {
+        if (editor.isEditable) return false
+        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
+        return true
+      },
+      run: ({ editor }) => enterModalCompoundBlock(editor),
+    },
+  }),
 })
 
 // helpers -------------------------------------------------------------------
 
+/**
+ * Executes a normal-mode cursor or subtext motion (`h`/`j`/`k`/`l`, `w`/`b`/`e`,
+ * `0`/`$`, `gg`/`G`, `{`/`}`).
+ */
 export function executeNormalModeMove(
   editor: TiptapEditor,
   motion: ModalMotion,
@@ -419,6 +451,10 @@ export function executeNormalModeMove(
   return false
 }
 
+/**
+ * Selects the requested inner/around text object (`iw`, `aw`, `ip`, `ap`, `ib`,
+ * `ab`) in `editor` and transitions to `select` mode.
+ */
 export function executeNormalModeTextObject(
   editor: TiptapEditor,
   spec: ModalTextObjectSpec,

@@ -1,10 +1,7 @@
 import { Editor as TiptapEditor, getSchema, type EditorOptions } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
-import { registerModalEditor } from '@cloudvoyant/helical-ui'
 import {
-  createStandaloneHotkeyService,
   DefaultEmbeddedEditorRegistry,
-  getDocumentHotkeyService,
   isUntitledFormatFile,
   matchesFormatExtension,
   stripFormatExtension,
@@ -12,19 +9,20 @@ import {
   type EditorCounts,
   type EditorHostServices,
   type EditorMode,
-  type EditorPreset,
 } from 'core-ts'
-import type { SuggestionProps } from '@tiptap/suggestion'
 import { parse, serialize, validateDocument } from '../lib.js'
 import type { JSONContent } from '../types.js'
-import { buildExtensions, type CompiledExtensionKeymap } from './build-extensions.js'
-import type { HtmdCommandContext } from './define-htmd-extension.js'
-import { editorOverlaysKey, type EditorOverlaysStorage } from './extensions/editor-overlays.js'
+import { buildExtensions, createDefaultHtmdDocument } from './build-extensions.js'
+import type { EditorOverlaysStorage } from './extensions/editor-overlays.js'
 import type { LinkPreviewStorage } from './extensions/link-preview.js'
 import {
-  getEditorModalTarget,
+  enterModalCompoundBlock,
+  exitModalToNormal,
+  focusModalCompoundBlockControl,
   isEditorInInsertMode,
   modalKeymapPluginKey,
+  setModalEditable,
+  syncModalDomRegistration,
   type ModalKeymapStorage,
 } from './extensions/modal-editing.js'
 import { HtmdDocument } from './htmd-document.js'
@@ -39,9 +37,7 @@ import type {
   HtmdSelectionState,
   HtmdSubtextCursor,
   LinkPreviewAttributes,
-  MentionItem,
   NoticeAttributes,
-  SlashCommandItem,
   UrlMentionAttributes,
 } from './types.js'
 
@@ -67,60 +63,6 @@ const htmdEditorSchema = getSchema(
     },
   }),
 )
-
-export function createHtmdEditorKeymap(): HtmdEditorKeymap {
-  return {
-    Enter: {
-      id: 'htmd.enterCompoundBlock',
-      key: 'Enter',
-      label: 'Enter Compound Block',
-      category: 'Editor',
-      mode: 'normal',
-      when: (editor, event) => {
-        if (editor.isEditable) return false
-        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
-        return true
-      },
-      run: (editor) => editor.execCommand('enterCompoundBlock'),
-    },
-    Escape: {
-      id: 'htmd.exitToNormal',
-      key: 'Escape',
-      label: 'Exit Insert Mode',
-      category: 'Editor',
-      mode: 'insert',
-      when: (editor) => editor.isEditable,
-      run: (editor) => editor.execCommand('exitToNormal'),
-    },
-    'Mod-b': {
-      id: 'htmd.toggleBold',
-      key: 'Mod-b',
-      label: 'Toggle Bold',
-      category: 'Formatting',
-      mode: 'insert',
-      when: (editor) => editor.isEditable,
-      run: (editor) => editor.execCommand('toggleBold'),
-    },
-    'Mod-i': {
-      id: 'htmd.toggleItalic',
-      key: 'Mod-i',
-      label: 'Toggle Italic',
-      category: 'Formatting',
-      mode: 'insert',
-      when: (editor) => editor.isEditable,
-      run: (editor) => editor.execCommand('toggleItalic'),
-    },
-    'Mod-u': {
-      id: 'htmd.toggleUnderline',
-      key: 'Mod-u',
-      label: 'Toggle Underline',
-      category: 'Formatting',
-      mode: 'insert',
-      when: (editor) => editor.isEditable,
-      run: (editor) => editor.execCommand('toggleUnderline'),
-    },
-  }
-}
 
 export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   static readonly kind = 'htmd'
@@ -185,17 +127,13 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   readonly formats = HtmdEditor.formats
   readonly scopeId = HtmdEditor.scopeId
   readonly services: EditorHostServices
-  readonly keymap: HtmdEditorKeymap = createHtmdEditorKeymap()
+  readonly keymap: HtmdEditorKeymap = {}
 
   private tiptap!: TiptapEditor
   private options: HtmdEditorOptions
   private mountElement: HTMLElement | null = null
   private surfaceElement: HTMLElement | null = null
   private clickToEdit: boolean
-  private standaloneHotkeys: ReturnType<typeof createStandaloneHotkeyService> | null = null
-  private scopeCleanups: Array<() => void> = []
-  private modalDomCleanups: Array<() => void> = []
-  private compiledExtensionKeymaps: CompiledExtensionKeymap[] = []
   private listeners = new Set<() => void>()
 
   constructor(options: HtmdEditorOptions = {}) {
@@ -204,19 +142,8 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     this.surfaceElement = options.surfaceElement ?? null
     this.mountElement = options.element ?? null
 
-    const initialEditable = options.editable ?? true
-    const resolvedHotkeys =
-      options.services?.hotkeys ?? getDocumentHotkeyService(this.mountElement?.ownerDocument)
-    if (!resolvedHotkeys) {
-      this.standaloneHotkeys = createStandaloneHotkeyService({
-        initialMode: initialEditable ? 'insert' : 'normal',
-        initialPreset: 'helix',
-        attachWindowListener: typeof window !== 'undefined',
-      })
-    }
-
     this.services = {
-      hotkeys: resolvedHotkeys ?? this.standaloneHotkeys ?? undefined,
+      hotkeys: options.services?.hotkeys,
       notifications: options.services?.notifications,
       media: options.services?.media,
       embedRegistry: options.services?.embedRegistry ?? new DefaultEmbeddedEditorRegistry(),
@@ -228,14 +155,10 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   private initTiptap(element?: HTMLElement) {
     const enforceTitle = this.options.enforceTitle ?? true
     const editable = this.options.editable ?? true
-    this.compiledExtensionKeymaps = []
 
     const extensions = buildExtensions({
       nodeViews: this.options.nodeViews ?? {},
       getHostEditor: () => this,
-      onExtensionKeymap: (compiled) => {
-        this.compiledExtensionKeymaps.push(compiled)
-      },
       onNotification: (notification) => {
         this.services.notifications?.notify(notification)
       },
@@ -245,83 +168,23 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
       mentionSource: this.options.mentionSource,
       hrefBuilder: this.options.hrefBuilder,
       fetchLinkPreview: this.options.fetchLinkPreview,
-      mentionRender: this.options.mentionRender
-        ? () => {
-            const renderer = this.options.mentionRender!()
-            return {
-              onStart: (props: SuggestionProps<MentionItem>) => {
-                renderer.onStart?.({
-                  items: props.items,
-                  query: props.query,
-                  range: props.range,
-                  command: (item) => props.command(item),
-                  clientRect: props.clientRect,
-                })
-              },
-              onUpdate: (props: SuggestionProps<MentionItem>) => {
-                renderer.onUpdate?.({
-                  items: props.items,
-                  query: props.query,
-                  range: props.range,
-                  command: (item) => props.command(item),
-                  clientRect: props.clientRect,
-                })
-              },
-              onKeyDown: (props: { event: KeyboardEvent }) => renderer.onKeyDown?.(props) ?? false,
-              onExit: () => {
-                renderer.onExit?.()
-              },
-            }
-          }
-        : undefined,
-      slashRender: this.options.slashRender
-        ? () => {
-            const renderer = this.options.slashRender!()
-            return {
-              onStart: (props: SuggestionProps<SlashCommandItem>) => {
-                renderer.onStart?.({
-                  items: props.items,
-                  query: props.query,
-                  range: props.range,
-                  command: (item) => props.command(item),
-                  clientRect: props.clientRect,
-                })
-              },
-              onUpdate: (props: SuggestionProps<SlashCommandItem>) => {
-                renderer.onUpdate?.({
-                  items: props.items,
-                  query: props.query,
-                  range: props.range,
-                  command: (item) => props.command(item),
-                  clientRect: props.clientRect,
-                })
-              },
-              onKeyDown: (props: { event: KeyboardEvent }) => renderer.onKeyDown?.(props) ?? false,
-              onExit: () => {
-                renderer.onExit?.()
-              },
-            }
-          }
-        : undefined,
+      mentionRender: this.options.mentionRender,
+      slashRender: this.options.slashRender,
       enforceTitle,
       headingWithId: this.options.headingWithId,
+      clickToEdit: this.clickToEdit,
+      editable,
+      onEdit: this.options.onedit,
+      onExit: this.options.onexit,
+      getHotkeys: () => this.services.hotkeys,
+      getScopeElement: () => this.getScopeRootElement(),
     })
-
-    const defaultDoc: JSONContent = {
-      type: 'doc',
-      content: enforceTitle
-        ? [
-            { type: 'heading', attrs: { level: 1 }, content: [] },
-            { type: 'paragraph', content: [] },
-          ]
-        : [{ type: 'paragraph', content: [] }],
-    }
 
     this.tiptap = new TiptapEditor({
       ...(element ? { element } : {}),
       ...({ immediatelyRender: false } as unknown as Partial<EditorOptions>),
       extensions,
-      content: this.options.content ?? defaultDoc,
+      content: this.options.content ?? createDefaultHtmdDocument(enforceTitle),
       editable,
       onBeforeCreate: ({ editor }) => {
         this.tiptap = editor
@@ -331,104 +194,19 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
           this.options.onchange?.(editor.getJSON() as JSONContent)
         }
       },
-      editorProps: {
-        handleClick: (view, position, event) => {
-          if (view.editable || !this.options.onedit) return false
-          const target = event.target
-          const bookmarkEdit =
-            target instanceof Element ? target.closest<HTMLElement>('[data-bookmark-edit]') : null
-          if (
-            target instanceof Element &&
-            !bookmarkEdit &&
-            target.closest(
-              'a, button, input, select, summary, iframe, [role="button"], [role="combobox"], [data-modal-ignore-pointer]',
-            )
-          ) {
-            return false
-          }
-          if (!this.clickToEdit) {
-            let compoundPos: number | null = null
-            if (target instanceof Element) {
-              view.state.doc.descendants((node, pos) => {
-                if (
-                  node.type.name === 'notice' ||
-                  node.type.name === 'codeBlock' ||
-                  node.type.name === 'image' ||
-                  node.type.name === 'imageNode' ||
-                  node.type.name === 'linkPreview'
-                ) {
-                  const nodeDom = view.nodeDOM(pos)
-                  if (nodeDom instanceof HTMLElement && nodeDom.contains(target)) {
-                    compoundPos = pos
-                  }
-                  return false
-                }
-                return true
-              })
-            }
-            if (compoundPos !== null) {
-              const node = view.state.doc.nodeAt(compoundPos)
-              if (node && NodeSelection.isSelectable(node)) {
-                view.dispatch(
-                  view.state.tr.setSelection(NodeSelection.create(view.state.doc, compoundPos)),
-                )
-              }
-            } else {
-              this.tiptap.commands.setTextSelection(position)
-            }
-            const region = this.getScopeRootElement()
-            region?.focus({ preventScroll: true })
-            return true
-          }
-          if (!this.options.onedit()) return false
-          this.tiptap.setEditable(true)
-          try {
-            this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', true))
-          } catch {
-            // Ignore
-          }
-          const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-          getEditorModalTarget(this.tiptap)?.setModalState({
-            mode: 'insert',
-            preset,
-          })
-          this.services.hotkeys?.setMode('insert')
-          if (bookmarkEdit) {
-            queueMicrotask(() => bookmarkEdit.click())
-            return true
-          }
-          this.tiptap.commands.setTextSelection(position)
-          view.focus()
-          return true
-        },
-        ...(this.options.editorClass
-          ? {
+      ...(this.options.editorClass
+        ? {
+            editorProps: {
               attributes: {
                 class: this.options.editorClass,
               },
-            }
-          : {}),
-      },
+            },
+          }
+        : {}),
     })
 
-    const storage = this.modalStorage
-    if (storage) {
-      storage.clickToInsert = this.clickToEdit
-    }
-
-    const target = getEditorModalTarget(this.tiptap)
-    if (target) {
-      const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-      target.setModalState({
-        mode: editable ? 'insert' : 'normal',
-        preset,
-      })
-    }
-
-    this.tiptap.on('transaction', this.handleTransaction)
+    this.tiptap.on('transaction', this.notifySubscribers)
     this.tiptap.on('selectionUpdate', this.notifySubscribers)
-    this.registerScopes()
-    this.syncModalDomRegistration()
     this.notifySubscribers()
   }
 
@@ -465,222 +243,15 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     return null
   }
 
-  private registerScopes() {
-    for (const cleanup of this.scopeCleanups) cleanup()
-    this.scopeCleanups = []
-
-    const hotkeys = this.services.hotkeys
-    if (!hotkeys) return
-
-    this.scopeCleanups.push(
-      hotkeys.registerKeyScope({
-        id: this.scopeId,
-        priority: 'editor',
-        element: () => this.getScopeRootElement(),
-        matchesTarget: (target) =>
-          typeof Element !== 'undefined' &&
-          target instanceof Element &&
-          Boolean(target.closest('[data-editor-controls]')),
-        getContext: () => this as Editor<JSONContent, HtmdCommandMap>,
-        keymap: () => this.keymap,
-      }),
-    )
-
-    for (const extKeymap of this.compiledExtensionKeymaps) {
-      this.scopeCleanups.push(
-        hotkeys.registerKeyScope<HtmdCommandContext>({
-          id: `extension:${extKeymap.name}`,
-          priority: 'extension',
-          element: () => this.getScopeRootElement(),
-          enabled: () => Boolean(extKeymap.getContext()),
-          getContext: () => extKeymap.getContext()!,
-          keymap: () => extKeymap.getKeymap(),
-        }),
-      )
-    }
-
-    this.scopeCleanups.push(
-      hotkeys.subscribe(({ preset }) => {
-        const target = getEditorModalTarget(this.tiptap)
-        const currentMode = this.mode
-        if (target) {
-          target.setModalState({ mode: currentMode, preset: preset as EditorPreset })
-        }
-      }),
-    )
-  }
-
-  private syncModalDomRegistration() {
-    for (const cleanup of this.modalDomCleanups) cleanup()
-    this.modalDomCleanups = []
-
-    const target = getEditorModalTarget(this.tiptap)
-    if (!target) return
-
-    const registerEl = (el: HTMLElement) => {
-      this.modalDomCleanups.push(registerModalEditor(el, target))
-      if (this.services.hotkeys?.registerModalTarget) {
-        this.modalDomCleanups.push(this.services.hotkeys.registerModalTarget(el, target))
-      }
-    }
-
-    if (this.surfaceElement) {
-      registerEl(this.surfaceElement)
-      const region = this.surfaceElement.closest('[role="region"]')
-      if (region instanceof HTMLElement && region !== this.surfaceElement) {
-        registerEl(region)
-      }
-    } else if (this.mountElement) {
-      registerEl(this.mountElement)
-    }
-  }
-
   private notifySubscribers = () => {
     for (const listener of this.listeners) {
       listener()
     }
   }
 
-  private handleTransaction = () => {
-    this.syncModalEditableState()
-    this.notifySubscribers()
-  }
-
-  private syncModalEditableState() {
+  focusCompoundBlockControl(pos: number, _type?: string, control?: string, offset?: number) {
     if (!this.tiptap) return
-    if (this.services.hotkeys?.isOverlayOpen()) return
-    const active = typeof document !== 'undefined' ? document.activeElement : null
-    const scopeEl = this.surfaceElement ?? this.mountElement
-    if (
-      active &&
-      scopeEl &&
-      !scopeEl.contains(active) &&
-      !active.contains(scopeEl) &&
-      active.closest('[data-pane-id], [data-which-key-explorer], [data-part="node-rename-input"]')
-    ) {
-      return
-    }
-    const pluginState = modalKeymapPluginKey.getState(this.tiptap.state)
-    if (!pluginState) return
-    if (pluginState.mode === 'insert' && !this.tiptap.isEditable) {
-      if (!this.options.onedit || this.options.onedit()) {
-        this.tiptap.setEditable(true)
-        this.services.hotkeys?.setMode('insert')
-        try {
-          this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', true))
-        } catch {
-          // Ignore
-        }
-        const storage = this.modalStorage
-        const sel = this.tiptap.state.selection
-        if (storage?.focusControlRequest) {
-          const req = storage.focusControlRequest
-          storage.focusControlRequest = null
-          this.focusCompoundBlockControl(req.pos, req.type, req.control, req.offset)
-        } else if (
-          sel instanceof NodeSelection &&
-          (sel.node.type.name === 'image' ||
-            sel.node.type.name === 'imageNode' ||
-            sel.node.type.name === 'linkPreview')
-        ) {
-          this.focusCompoundBlockControl(sel.from, sel.node.type.name)
-        } else {
-          this.tiptap.view.focus()
-        }
-      }
-    } else if (pluginState.mode !== 'insert' && this.tiptap.isEditable) {
-      this.options.onexit?.()
-      this.tiptap.setEditable(false)
-      this.services.hotkeys?.setMode(pluginState.mode as EditorMode)
-      try {
-        this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', false))
-      } catch {
-        // Ignore
-      }
-    }
-  }
-
-  focusCompoundBlockControl(pos: number, type: string, control?: string, offset?: number) {
-    const run = () => {
-      if (!this.tiptap || this.tiptap.isDestroyed) return
-      const dom = this.tiptap.view.nodeDOM(pos)
-      if (!(dom instanceof HTMLElement)) return
-      if (type === 'notice') {
-        if (control === 'type') {
-          const trigger = dom.querySelector<HTMLElement>(
-            '[aria-label="Notice type"][data-part="trigger"], [data-part="trigger"]',
-          )
-          if (trigger) {
-            trigger.focus()
-            return
-          }
-        }
-        const input = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-        if (input) {
-          input.focus()
-          const caret =
-            typeof offset === 'number'
-              ? Math.max(0, Math.min(input.value.length, offset))
-              : input.value.length
-          input.setSelectionRange(caret, caret)
-        }
-      } else if (type === 'codeBlock') {
-        if (control === 'language') {
-          const trigger = dom.querySelector<HTMLElement>(
-            '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-          )
-          if (trigger) {
-            trigger.focus()
-            return
-          }
-        }
-        this.tiptap.commands.setTextSelection(pos + 1)
-        this.tiptap.view.focus()
-      } else if (type === 'image' || type === 'imageNode') {
-        const input = dom.querySelector<HTMLInputElement>(
-          'input.caption-input, input[aria-label="Image caption"]',
-        )
-        if (input) {
-          input.focus()
-          const caret =
-            typeof offset === 'number'
-              ? Math.max(0, Math.min(input.value.length, offset))
-              : input.value.length
-          input.setSelectionRange(caret, caret)
-        }
-      } else if (type === 'linkPreview') {
-        if (control === 'dialog') {
-          const bookmarkEdit = dom.querySelector<HTMLElement>('[data-bookmark-edit]')
-          if (bookmarkEdit) {
-            bookmarkEdit.click()
-            return
-          }
-        }
-        const input = dom.querySelector<HTMLInputElement>(
-          'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
-        )
-        if (input) {
-          input.focus()
-          const caret =
-            typeof offset === 'number'
-              ? Math.max(0, Math.min(input.value.length, offset))
-              : input.value.length
-          input.setSelectionRange(caret, caret)
-          return
-        }
-        const action = dom.querySelector<HTMLElement>(
-          'button[aria-label="Play video"], a.bookmark-card-edit, button[aria-label="Remove preview"]',
-        )
-        action?.focus()
-      }
-    }
-    queueMicrotask(() => {
-      if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(run)
-      } else {
-        run()
-      }
-    })
+    focusModalCompoundBlockControl(this.tiptap, pos, { control, offset })
   }
 
   get isEditable(): boolean {
@@ -702,7 +273,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     this.mountElement = element
     if (this.tiptap) {
       const currentDoc = this.getDocument()
-      this.tiptap.off('transaction', this.handleTransaction)
+      this.tiptap.off('transaction', this.notifySubscribers)
       this.tiptap.off('selectionUpdate', this.notifySubscribers)
       this.tiptap.destroy()
       this.options = { ...this.options, content: currentDoc }
@@ -712,7 +283,9 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
 
   setSurfaceElement(surfaceEl: HTMLElement | null): void {
     this.surfaceElement = surfaceEl
-    this.syncModalDomRegistration()
+    if (this.tiptap) {
+      syncModalDomRegistration(this.tiptap)
+    }
   }
 
   setClickToEdit(clickToEdit: boolean): void {
@@ -724,18 +297,12 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   }
 
   destroy(): void {
-    for (const cleanup of this.scopeCleanups) cleanup()
-    this.scopeCleanups = []
-    for (const cleanup of this.modalDomCleanups) cleanup()
-    this.modalDomCleanups = []
     this.listeners.clear()
     if (this.tiptap) {
-      this.tiptap.off('transaction', this.handleTransaction)
+      this.tiptap.off('transaction', this.notifySubscribers)
       this.tiptap.off('selectionUpdate', this.notifySubscribers)
       this.tiptap.destroy()
     }
-    this.standaloneHotkeys?.destroy()
-    this.standaloneHotkeys = null
   }
 
   getDocument(): JSONContent {
@@ -758,52 +325,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
 
   setEditable(editable: boolean): void {
     if (!this.tiptap) return
-    const editableChanged = this.tiptap.isEditable !== editable
-    this.tiptap.setEditable(editable)
-    if (editableChanged) {
-      try {
-        this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', editable))
-      } catch {
-        // Ignore if view is not yet mounted
-      }
-    }
-    const target = getEditorModalTarget(this.tiptap)
-    const currentMode = modalKeymapPluginKey.getState(this.tiptap.state)?.mode ?? 'insert'
-    const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-    const storage = this.modalStorage
-
-    if (editable) {
-      if (currentMode !== 'insert') {
-        target?.setModalState({ mode: 'insert', preset })
-      }
-      if (this.services.hotkeys && this.services.hotkeys.getMode() !== 'insert') {
-        this.services.hotkeys.setMode('insert')
-      }
-      const sel = this.tiptap.state.selection
-      if (storage?.focusControlRequest) {
-        const req = storage.focusControlRequest
-        storage.focusControlRequest = null
-        this.focusCompoundBlockControl(req.pos, req.type, req.control, req.offset)
-      } else if (
-        sel instanceof NodeSelection &&
-        (sel.node.type.name === 'image' ||
-          sel.node.type.name === 'imageNode' ||
-          sel.node.type.name === 'linkPreview')
-      ) {
-        this.focusCompoundBlockControl(sel.from, sel.node.type.name)
-      }
-    } else {
-      const activeOverlay = editorOverlaysKey.getState(this.tiptap.state)
-      if (activeOverlay) {
-        this.closeOverlay(activeOverlay.name)
-      }
-      if (currentMode === 'insert') {
-        target?.setModalState({ mode: 'normal', preset })
-      }
-      if (this.services.hotkeys && this.services.hotkeys.getMode() === 'insert') {
-        this.services.hotkeys.setMode('normal')
-      }
-    }
+    setModalEditable(this.tiptap, editable)
   }
 
   focus(position?: 'start' | 'end' | number): void {
@@ -963,82 +485,13 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   }
 
   enterCompoundBlock(): boolean {
-    if (!this.tiptap || this.tiptap.isEditable) return false
-    const sel = this.tiptap.state.selection
-    const pluginState = modalKeymapPluginKey.getState(this.tiptap.state)
-    let blockPos: number | null = null
-    let blockType: string | null = null
-    let control: string | undefined
-    let offset: number | undefined
-    if (pluginState?.subtextCursor) {
-      blockPos = pluginState.subtextCursor.pos
-      offset = pluginState.subtextCursor.offset
-      if (pluginState.subtextCursor.kind === 'noticeTitle') {
-        blockType = 'notice'
-        control = 'type'
-      } else if (pluginState.subtextCursor.kind === 'linkPreviewUrl') {
-        blockType = 'linkPreview'
-        control = 'url'
-      } else {
-        blockType = 'image'
-        control = 'caption'
-      }
-    } else if (
-      sel instanceof NodeSelection &&
-      (sel.node.type.name === 'notice' ||
-        sel.node.type.name === 'codeBlock' ||
-        sel.node.type.name === 'image' ||
-        sel.node.type.name === 'imageNode' ||
-        sel.node.type.name === 'linkPreview')
-    ) {
-      blockPos = sel.from
-      blockType = sel.node.type.name
-      if (blockType === 'codeBlock') control = 'language'
-    } else {
-      const resolvedFrom = sel.$from
-      for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
-        const name = resolvedFrom.node(d).type.name
-        if (name === 'notice') {
-          blockPos = resolvedFrom.before(d)
-          blockType = 'notice'
-          control = 'type'
-          break
-        }
-        if (name === 'codeBlock') {
-          blockPos = resolvedFrom.before(d)
-          blockType = 'codeBlock'
-          control = 'language'
-          break
-        }
-      }
-    }
-    if (blockPos === null || !blockType) return false
-    if (this.options.onedit && !this.options.onedit()) return false
-
-    const storage = this.modalStorage
-    if (storage) {
-      storage.activeCompoundBlockPos = blockPos
-    }
-    this.tiptap.setEditable(true)
-    const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-    getEditorModalTarget(this.tiptap)?.setModalState({ mode: 'insert', preset })
-    this.services.hotkeys?.setMode('insert')
-    try {
-      this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', true))
-    } catch {
-      // Ignore
-    }
-
-    this.focusCompoundBlockControl(blockPos, blockType, control, offset)
-    return true
+    if (!this.tiptap) return false
+    return enterModalCompoundBlock(this.tiptap)
   }
 
   exitToNormal(): boolean {
     if (!this.tiptap) return false
-    this.options.onexit?.()
-    this.setEditable(false)
-    this.services.hotkeys?.setMode('normal')
-    return true
+    return exitModalToNormal(this.tiptap)
   }
 
   execCommand<K extends keyof HtmdCommandMap & string>(

@@ -19,8 +19,14 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import Typography from '@tiptap/extension-typography'
 import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
-import type { SuggestionOptions } from '@tiptap/suggestion'
-import type { EditorNotification, Keymap } from 'core-ts'
+import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion'
+import {
+  candidateKeysForEvent,
+  type EditorHotkeyService,
+  type EditorMode,
+  type EditorNotification,
+  type Keymap,
+} from 'core-ts'
 import { common, createLowlight } from 'lowlight'
 
 import {
@@ -33,6 +39,7 @@ import {
   UnparsedInline as SchemaUnparsedInlineNode,
   UrlMention as SchemaUrlMentionNode,
 } from '../nodes.js'
+import type { JSONContent } from '../types.js'
 import {
   registerNodeNavigation,
   type HtmdCommandContext,
@@ -46,7 +53,7 @@ import { ImageNode } from './extensions/image-node.js'
 import { InsertMode } from './extensions/insert-mode.js'
 import { InternalMention } from './extensions/internal-mention.js'
 import { LinkPreview } from './extensions/link-preview.js'
-import { ModalEditing } from './extensions/modal-editing.js'
+import { ModalEditing, modalKeymapPluginKey } from './extensions/modal-editing.js'
 import { HelixPreset, KakounePreset, VimPreset } from './extensions/modal-presets.js'
 import { NormalMode } from './extensions/normal-mode.js'
 import { NoticeNode } from './extensions/notice-node.js'
@@ -65,6 +72,7 @@ import type {
   HtmdNodeViews,
   HtmdOverlayDefinition,
   HtmdOverlayState,
+  HtmdSuggestionRenderer,
   LinkPreviewFetcher,
   MentionItem,
   SlashCommandItem,
@@ -89,10 +97,16 @@ export interface BuildExtensionsOptions<TEditor = unknown> {
   mentionSource?: (query: string) => Promise<MentionItem[]>
   hrefBuilder?: (item: MentionItem) => string
   fetchLinkPreview?: LinkPreviewFetcher
-  mentionRender?: SuggestionOptions<MentionItem>['render']
-  slashRender?: SuggestionOptions<SlashCommandItem>['render']
+  mentionRender?: () => HtmdSuggestionRenderer<MentionItem>
+  slashRender?: () => HtmdSuggestionRenderer<SlashCommandItem>
   enforceTitle?: boolean
   headingWithId?: boolean
+  clickToEdit?: boolean
+  editable?: boolean
+  onEdit?: () => boolean
+  onExit?: () => void
+  getHotkeys?: () => EditorHotkeyService | undefined
+  getScopeElement?: () => HTMLElement | null
 }
 
 interface TiptapHookThis<TOptions, TStorage> {
@@ -130,10 +144,13 @@ export function compileHtmdExtension<
   options?: {
     getHostEditor?: () => unknown
     onExtensionKeymap?: (compiled: CompiledExtensionKeymap) => void
+    getHotkeys?: () => EditorHotkeyService | undefined
+    getScopeElement?: () => HTMLElement | null
   },
 ): AnyExtension {
   const { spec, options: configuredOptions } = ext
   const getHostEditor = options?.getHostEditor ?? (() => undefined)
+  let cleanupDomKeymap: (() => void) | undefined
 
   const sharedConfig: Record<string, unknown> = {
     name: spec.name,
@@ -189,6 +206,28 @@ export function compileHtmdExtension<
         return { ...baseKeymap, ...optionKeymap }
       }
 
+      const hotkeys = options?.getHotkeys?.()
+      if (hotkeys) {
+        cleanupDomKeymap?.()
+        cleanupDomKeymap = hotkeys.registerKeyScope<HtmdCommandContext>({
+          id: `extension:${spec.name}`,
+          priority: 'extension',
+          element: () => {
+            const scopeEl = options?.getScopeElement?.()
+            if (scopeEl) return scopeEl
+            try {
+              const dom = editorRef.view?.dom
+              return typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement ? dom : null
+            } catch {
+              return null
+            }
+          },
+          enabled: () => Boolean(editorRef?.schema),
+          getContext: () => toCommandContext(editorRef),
+          keymap: getKeymap,
+        })
+      }
+
       options?.onExtensionKeymap?.({
         name: spec.name,
         getKeymap,
@@ -219,7 +258,7 @@ export function compileHtmdExtension<
       return spec.pmPlugins!(this)
     }
   }
-  if (spec.onBeforeCreate || spec.navigation) {
+  if (spec.onBeforeCreate || spec.navigation || spec.keymap || hasOptionKeymap) {
     sharedConfig.onBeforeCreate = function (this: TiptapHookThis<TOptions, TStorage>) {
       if (spec.navigation) {
         registerNodeNavigation(
@@ -228,17 +267,109 @@ export function compileHtmdExtension<
           spec.navigation({ options: this.options, storage: this.storage }),
         )
       }
+      if (spec.keymap || hasOptionKeymap) {
+        const { editor: editorRef, options: optionsRef, storage: storageRef } = this
+        const getKeymap = () => {
+          const baseKeymap = spec.keymap
+            ? spec.keymap({ editor: editorRef, options: optionsRef, storage: storageRef })
+            : {}
+          const optionKeymap =
+            (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
+          return { ...baseKeymap, ...optionKeymap }
+        }
+        const hotkeys = options?.getHotkeys?.()
+        if (hotkeys) {
+          cleanupDomKeymap?.()
+          cleanupDomKeymap = hotkeys.registerKeyScope<HtmdCommandContext>({
+            id: `extension:${spec.name}`,
+            priority: 'extension',
+            element: () => {
+              const scopeEl = options?.getScopeElement?.()
+              if (scopeEl) return scopeEl
+              try {
+                const dom = editorRef.view?.dom
+                return typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement ? dom : null
+              } catch {
+                return null
+              }
+            },
+            enabled: () => Boolean(editorRef?.schema),
+            getContext: () => toCommandContext(editorRef),
+            keymap: getKeymap,
+          })
+        }
+      }
       spec.onBeforeCreate?.(this)
     }
   }
-  if (spec.onCreate) {
+  if (spec.onCreate || spec.keymap || hasOptionKeymap) {
     sharedConfig.onCreate = function (this: TiptapHookThis<TOptions, TStorage>) {
-      spec.onCreate!(this)
+      if (spec.keymap || hasOptionKeymap) {
+        const { editor: editorRef, options: optionsRef, storage: storageRef } = this
+        const getKeymap = () => {
+          const baseKeymap = spec.keymap
+            ? spec.keymap({ editor: editorRef, options: optionsRef, storage: storageRef })
+            : {}
+          const optionKeymap =
+            (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
+          return { ...baseKeymap, ...optionKeymap }
+        }
+        if (!options?.getHotkeys?.()) {
+          try {
+            const dom = options?.getScopeElement?.() ?? editorRef.view?.dom
+            const doc =
+              typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement
+                ? dom.ownerDocument
+                : undefined
+            if (doc) {
+              const onKeyDown = (event: KeyboardEvent) => {
+                if (event.isComposing || event.defaultPrevented) return
+                const scopeEl =
+                  options?.getScopeElement?.() ??
+                  (typeof HTMLElement !== 'undefined' && editorRef.view?.dom instanceof HTMLElement
+                    ? editorRef.view.dom
+                    : null)
+                const targetNode =
+                  typeof Node !== 'undefined' && event.target instanceof Node ? event.target : null
+                if (scopeEl && targetNode && !scopeEl.contains(targetNode)) return
+                const ctx = toCommandContext(editorRef)
+                const mode: EditorMode =
+                  (modalKeymapPluginKey.getState(editorRef.state)?.mode as
+                    EditorMode | undefined) ?? (editorRef.isEditable ? 'insert' : 'normal')
+                const keymap = getKeymap()
+                for (const candidate of candidateKeysForEvent(event)) {
+                  const binding = keymap[candidate]
+                  if (!binding) continue
+                  if (binding.mode) {
+                    const matches = Array.isArray(binding.mode)
+                      ? binding.mode.includes(mode)
+                      : binding.mode === mode
+                    if (!matches) continue
+                  }
+                  if (binding.when && !binding.when(ctx, event)) continue
+                  if (binding.run(ctx, event)) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    return
+                  }
+                }
+              }
+              doc.addEventListener('keydown', onKeyDown, true)
+              cleanupDomKeymap = () => doc.removeEventListener('keydown', onKeyDown, true)
+            }
+          } catch {
+            // Headless editor without a mounted DOM view
+          }
+        }
+      }
+      spec.onCreate?.(this)
     }
   }
-  if (spec.onDestroy) {
+  if (spec.onDestroy || spec.keymap || hasOptionKeymap) {
     sharedConfig.onDestroy = function (this: TiptapHookThis<TOptions, TStorage>) {
-      spec.onDestroy!(this)
+      cleanupDomKeymap?.()
+      cleanupDomKeymap = undefined
+      spec.onDestroy?.(this)
     }
   }
 
@@ -254,6 +385,25 @@ export function compileHtmdExtension<
   return baseExtension.configure(configuredOptions as never)
 }
 
+/**
+ * Creates the default initial HTMD document JSON (`heading` + `paragraph` when
+ * `enforceTitle` is enabled, or a single `paragraph` otherwise).
+ */
+export function createDefaultHtmdDocument(enforceTitle = true): JSONContent {
+  return {
+    type: 'doc',
+    content: enforceTitle
+      ? [
+          { type: 'heading', attrs: { level: 1 }, content: [] },
+          { type: 'paragraph', content: [] },
+        ]
+      : [{ type: 'paragraph', content: [] }],
+  }
+}
+
+/**
+ * Compiles and returns the complete Tiptap extension array for `HtmdEditor`.
+ */
 export function buildExtensions<TEditor = unknown>(
   options: BuildExtensionsOptions<TEditor>,
 ): Extensions {
@@ -267,6 +417,12 @@ export function buildExtensions<TEditor = unknown>(
     mentionRender,
     slashRender,
     headingWithId,
+    clickToEdit,
+    editable,
+    onEdit,
+    onExit,
+    getHotkeys,
+    getScopeElement,
   } = options
   const untypedNodeViews = nodeViews as HtmdNodeViews<unknown>
   const enforceTitle = options.enforceTitle ?? true
@@ -277,7 +433,13 @@ export function buildExtensions<TEditor = unknown>(
     TCommands extends Record<string, (...args: never[]) => (ctx: HtmdCommandContext) => boolean>,
   >(
     ext: HtmdExtension<TOptions, TStorage, TCommands>,
-  ) => compileHtmdExtension(ext, { getHostEditor, onExtensionKeymap })
+  ) =>
+    compileHtmdExtension(ext, {
+      getHostEditor,
+      onExtensionKeymap,
+      getHotkeys,
+      getScopeElement,
+    })
 
   return [
     StarterKit.configure({
@@ -339,7 +501,7 @@ export function buildExtensions<TEditor = unknown>(
               return []
             }
           },
-          render: mentionRender ?? (() => ({})),
+          render: adaptSuggestionRender(mentionRender),
         },
       }),
     ),
@@ -355,7 +517,7 @@ export function buildExtensions<TEditor = unknown>(
       SlashCommands.configure({
         suggestion: {
           ...SlashCommands.options.suggestion,
-          render: slashRender ?? (() => ({})),
+          render: adaptSuggestionRender(slashRender),
         },
       }),
     ),
@@ -365,11 +527,55 @@ export function buildExtensions<TEditor = unknown>(
     compile(HelixPreset),
     compile(VimPreset),
     compile(KakounePreset),
-    compile(ModalEditing.configure({ enforceTitle, onNotification })),
+    compile(
+      ModalEditing.configure({
+        enforceTitle,
+        clickToEdit,
+        initialEditable: editable,
+        onNotification,
+        onEdit,
+        onExit,
+        getHotkeys,
+        getScopeElement,
+      }),
+    ),
   ] as Extensions
 }
 
 // helpers -------------------------------------------------------------------
+
+function adaptSuggestionRender<TItem>(
+  renderFactory?: () => HtmdSuggestionRenderer<TItem>,
+): SuggestionOptions<TItem>['render'] {
+  if (!renderFactory) return () => ({})
+  return () => {
+    const renderer = renderFactory()
+    return {
+      onStart: (props: SuggestionProps<TItem>) => {
+        renderer.onStart?.({
+          items: props.items,
+          query: props.query,
+          range: props.range,
+          command: (item) => props.command(item),
+          clientRect: props.clientRect,
+        })
+      },
+      onUpdate: (props: SuggestionProps<TItem>) => {
+        renderer.onUpdate?.({
+          items: props.items,
+          query: props.query,
+          range: props.range,
+          command: (item) => props.command(item),
+          clientRect: props.clientRect,
+        })
+      },
+      onKeyDown: (props: { event: KeyboardEvent }) => renderer.onKeyDown?.(props) ?? false,
+      onExit: () => {
+        renderer.onExit?.()
+      },
+    }
+  }
+}
 
 class HtmdAdaptedNodeView extends NodeView<
   (ctx: HtmdNodeViewContext<unknown>) => HtmdNodeViewInstance
@@ -496,13 +702,26 @@ function toCommandContext(
       // Headless environment without DOM selection APIs
     }
   }
+  let view: HtmdCommandContext['view']
+  try {
+    view = (overrides?.view as HtmdCommandContext['view']) ?? editor.view
+  } catch {
+    view = undefined as unknown as HtmdCommandContext['view']
+  }
   return {
     editor,
     state: (overrides?.state as HtmdCommandContext['state']) ?? editor.state,
-    view: (overrides?.view as HtmdCommandContext['view']) ?? editor.view,
+    view,
     tr: (overrides?.tr as HtmdCommandContext['tr']) ?? editor.state.tr,
     dispatch:
-      (overrides?.dispatch as HtmdCommandContext['dispatch']) ?? ((tr) => editor.view.dispatch(tr)),
+      (overrides?.dispatch as HtmdCommandContext['dispatch']) ??
+      ((tr) => {
+        try {
+          editor.view.dispatch(tr)
+        } catch {
+          // Headless environment without a mounted view
+        }
+      }),
     commands: (overrides?.commands as HtmdCommandContext['commands']) ?? editor.commands,
   }
 }
