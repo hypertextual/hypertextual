@@ -5,7 +5,7 @@
 Hypertextual splits its vendored Helical editor baseline across three workspace packages:
 
 1. `libs/core-ts` (`core-ts`): Abstract `Editor<TDoc, TCommandMap>`, `defineEditorExtension`, `KeyScopeDispatcher`, `EmbeddedEditorRegistry`, and `EditorHostServices`.
-2. `libs/htmd-ts` (`htmd-ts`): Concrete `HtmdEditor` plugin (`kind: 'htmd'`, `scopeId: 'editor:htmd'`), `defineHtmdExtension`, `build-extensions.ts`, all 15 HTMD extensions, and the synchronous Markdown codec.
+2. `libs/htmd-ts` (`htmd-ts`): Concrete `HtmdEditor` plugin (`kind: 'htmd'`, `scopeId: 'editor:htmd'`), `defineHtmdExtension`, `build-extensions.ts`, all 21 HTMD extensions, and the synchronous Markdown codec.
 3. `libs/ui` (`@hypertextual/ui`): Svelte `HtmdEditor.svelte` wrapper, `Editor.svelte`, Svelte 5 NodeViews/overlays mounted via `svelte-node-view.ts`, and `useKeyScope`.
 
 Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`) still supply generic controls, `WhichKeyController`, theme tokens, and shared styles. React, the standalone Reader, documentation demos, and upstream build tools are excluded.
@@ -42,7 +42,7 @@ flowchart TD
     Controller -.->|implements| CoreTS[core-ts: Editor, defineEditorExtension, KeyScopeDispatcher]
     View --> Controls[Published Helical and Ark controls]
     Controller --> Build[htmd-ts: build-extensions.ts]
-    Build --> Extensions[htmd-ts: 15 extensions via defineHtmdExtension]
+    Build --> Extensions[htmd-ts: 21 extensions via defineHtmdExtension]
     Build --> Tiptap[Private Tiptap, ProseMirror, and lowlight packages]
     View -->|openOverlay / closeOverlay / attachOverlaySurface| Controller
     View --> Surfaces[Insertion forms, slash menu, bubble toolbar]
@@ -68,7 +68,7 @@ The editor exchanges native `JSONContent` with the app. `EditorService` restores
 
 ### Interfaces and Contracts
 
-The public component contract is documented in [HTMD editor](htmd-editor.md), the plugin and extension contract in [htmd-ts](../htmd-ts.md), and the abstract editor/key-scope contract in [core-ts](../core-ts.md).
+The public component contract is documented in [HTMD editor](htmd-editor.md), the plugin and extension contract in [htmd-ts](../htmd-ts/index.md), and the abstract editor/key-scope contract in [core-ts](../core-ts.md).
 
 #### Extension authoring and compilation (`defineHtmdExtension` -> `build-extensions.ts`)
 
@@ -159,7 +159,7 @@ binding.destroy()
 ## References
 
 - [core-ts architecture](../core-ts.md)
-- [htmd-ts architecture](../htmd-ts.md)
+- [htmd-ts architecture](../htmd-ts/index.md)
 - [HTMD editor (`HtmdEditor`)](htmd-editor.md)
 - [Development commands](../../development.md)
 - [HYPE-160](https://linear.app/cloudvoyant/issue/HYPE-160/vendor-the-helical-editor-for-development-inside-hypertextual)

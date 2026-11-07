@@ -157,6 +157,6 @@ Colocated integration and unit tests in `libs/core-ts/src/core.test.ts` verify:
 ## References
 
 - [System architecture](index.md)
-- [htmd-ts format and editor plugin architecture](htmd-ts.md)
+- [htmd-ts format and editor plugin architecture](htmd-ts/index.md)
 - [HtmdEditor Svelte component](ui/htmd-editor.md)
 - [Keybindings specification](../keybindings/index.md)

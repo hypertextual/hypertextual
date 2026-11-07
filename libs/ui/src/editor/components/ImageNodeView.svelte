@@ -2,43 +2,20 @@
   import { captionInput, imageSurface } from './styles'
   import type { ImageNodeViewProps } from './types'
   import { ImagePlus, X } from 'lucide-svelte'
-  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps = $props()
+  let { node, editable, subtextRange, deleteNode, updateAttributes, editor, getPos }: ImageNodeViewProps =
+    $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => editor.subscribe(update))
   let captionFocused = $state(false)
 
   // Derived -------------------------------------------------------------------
-  const editable = $derived.by(() => {
-    subscribe()
-    return editor.isEditable && editor.isInsertMode
-  })
   const src = $derived(node.attrs.src as string | undefined)
   const srcset = $derived(node.attrs.srcset as string | undefined)
   const alt = $derived(node.attrs.alt as string | undefined)
 
   let caption = $derived((node.attrs.caption as string | undefined) || '')
-
-  const modalSubtext = $derived.by(() => {
-    subscribe()
-    const st = editor.getSubtextCursor()
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (!st || st.kind !== 'imageCaption' || st.pos !== pos) return null
-    return st
-  })
-
-  const modalCharRange = $derived.by(() => {
-    if (!modalSubtext) return null
-    if (typeof modalSubtext.anchorOffset === 'number') {
-      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
-      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
-      return { from, to: Math.max(from + 1, to) }
-    }
-    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
-  })
 
   // Methods -------------------------------------------------------------------
   function handleReplaceImage() {
@@ -99,7 +76,7 @@
         </button>
       {/if}
     </div>
-    {#if editable || caption || modalCharRange}
+    {#if editable || caption || subtextRange}
       <figcaption class="mt-2">
         {#if editable}
           <input
@@ -115,13 +92,13 @@
             style="background: transparent; box-shadow: none; outline: none;"
             class={captionInput}
           />
-        {:else if modalCharRange}
+        {:else if subtextRange}
           <span data-image-caption-text
-            >{caption.slice(0, modalCharRange.from)}<span
+            >{caption.slice(0, subtextRange.from)}<span
               class="pm-modal-cursor"
               data-pm-modal-cursor="normal"
-              >{caption.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
-            >{caption.slice(modalCharRange.to)}</span
+              >{caption.slice(subtextRange.from, subtextRange.to) || '\u00a0'}</span
+            >{caption.slice(subtextRange.to)}</span
           >
         {:else}
           <span data-image-caption-text>{caption}</span>

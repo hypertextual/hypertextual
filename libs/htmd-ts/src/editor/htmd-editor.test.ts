@@ -7,19 +7,25 @@ import {
   defineHtmdExtension,
   EditorOverlays,
   HeadingWithId,
+  HelixPreset,
   HtmdDocument,
   HtmdEditor,
   ImageNode,
+  InsertMode,
   InternalMention,
+  KakounePreset,
   LinkPreview,
-  ModalKeymap,
+  ModalEditing,
+  NormalMode,
   NoticeNode,
   PasteUrl,
+  SelectMode,
   SlashCommands,
   TitleHeading,
-  UnparsedBlock,
-  UnparsedInline,
+  UnparsableBlockFallback,
+  UnparsableInlineFallback,
   UrlMention,
+  VimPreset,
 } from './index.js'
 
 // integration ---------------------------------------------------------------
@@ -167,25 +173,31 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
     hotkeys.destroy()
   })
 
-  it('defines all 15 HTMD extensions via defineHtmdExtension', () => {
+  it('defines all HTMD extensions via defineHtmdExtension', () => {
     const extensions = [
       CodeBlock,
       CurrentEmptyBlock,
       EditorOverlays,
       HeadingWithId,
+      HelixPreset,
       ImageNode,
+      InsertMode,
       InternalMention,
+      KakounePreset,
       LinkPreview,
-      ModalKeymap,
+      ModalEditing,
+      NormalMode,
       NoticeNode,
       PasteUrl,
+      SelectMode,
       SlashCommands,
       TitleHeading,
-      UnparsedBlock,
-      UnparsedInline,
+      UnparsableBlockFallback,
+      UnparsableInlineFallback,
       UrlMention,
+      VimPreset,
     ]
-    expect(extensions).toHaveLength(15)
+    expect(extensions).toHaveLength(21)
     for (const ext of extensions) {
       expect(typeof ext.spec.name).toBe('string')
       expect(typeof ext.configure).toBe('function')
@@ -197,5 +209,50 @@ describe('HtmdEditor format adapter and headless lifecycle', () => {
       kind: 'behavior',
     })
     expect(custom.spec.name).toBe('customBehavior')
+  })
+
+  it('inherits and overrides extension keymaps and navigation via .extend() and .configure()', () => {
+    const ExtendedNotice = NoticeNode.extend({
+      navigation: (_ctx, parent) => ({
+        ...parent!,
+        controls: ['input[data-custom-title]'],
+      }),
+      keymap: (_ctx, parent) => ({
+        ...parent,
+        'Mod-Shift-n': {
+          id: 'notice.quickInsert',
+          key: 'Mod-Shift-n',
+          label: 'Quick Insert Notice',
+          mode: 'insert',
+          run: () => true,
+        },
+      }),
+    }).configure({
+      keymap: {
+        'Mod-Alt-n': {
+          id: 'notice.altInsert',
+          key: 'Mod-Alt-n',
+          label: 'Alt Insert Notice',
+          mode: 'insert',
+          run: () => true,
+        },
+      },
+    })
+
+    const nav = ExtendedNotice.spec.navigation!({
+      options: ExtendedNotice.options,
+      storage: {},
+    })
+    expect(nav.kind).toBe('container')
+    expect(nav.controls).toEqual(['input[data-custom-title]'])
+
+    const keymap = ExtendedNotice.spec.keymap!({
+      editor: {} as never,
+      options: ExtendedNotice.options,
+      storage: {},
+    })
+    expect(Object.keys(keymap)).toContain('Tab')
+    expect(Object.keys(keymap)).toContain('Mod-Shift-n')
+    expect(Object.keys(keymap)).toContain('Mod-Alt-n')
   })
 })

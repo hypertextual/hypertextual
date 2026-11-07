@@ -19,13 +19,11 @@
   } from '@cloudvoyant/helical-svelte'
   import { cn, codeBlockBodyBase, codeBlockContentBase } from '@cloudvoyant/helical-ui'
   import { ChevronsUpDown, Check } from 'lucide-svelte'
-  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, updateAttributes }: CodeBlockComponentProps = $props()
+  let { node, editable, updateAttributes }: CodeBlockComponentProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => editor.subscribe(update))
   const languages = [
     { value: 'javascript', label: 'JavaScript' },
     { value: 'typescript', label: 'TypeScript' },
@@ -47,11 +45,6 @@
 
   // Derived -------------------------------------------------------------------
   const language = $derived((node.attrs.language as string | undefined) || getDefaultLanguage())
-
-  const editable = $derived.by(() => {
-    subscribe()
-    return editor.isEditable && editor.isInsertMode
-  })
 
   const currentLanguageLabel = $derived(
     languages.find((l) => l.value === language)?.label || 'JavaScript',

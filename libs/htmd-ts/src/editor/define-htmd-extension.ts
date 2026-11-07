@@ -4,7 +4,8 @@ import {
   type EditorExtensionSpec,
   type Keymap,
 } from 'core-ts'
-import type { DOMOutputSpec, Node as PMNode, ParseRule, Schema } from '@tiptap/pm/model'
+import type { Editor as TiptapEditor } from '@tiptap/core'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import {
   NodeSelection,
   Selection,
@@ -14,100 +15,34 @@ import {
 } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 
-import type { LinkPreviewAttributes, NoticeAttributes, UrlMentionAttributes } from './types.js'
+import { mergeHtmlAttributes } from '../nodes.js'
 
-export interface HtmdInternalChain {
-  focus: (position?: 'start' | 'end' | number | boolean | null) => HtmdInternalChain
-  deleteRange: (range: { from: number; to: number }) => HtmdInternalChain
-  setNode: (typeOrName: string, attributes?: Record<string, unknown>) => HtmdInternalChain
-  setTextSelection: (position: number | { from: number; to: number }) => HtmdInternalChain
-  insertContent: (value: unknown) => HtmdInternalChain
-  insertContentAt: (
-    position: number | { from: number; to: number },
-    value: unknown,
-  ) => HtmdInternalChain
-  command: (
-    fn: (props: {
-      tr: Transaction
-      state: EditorState
-      dispatch?: (tr: Transaction) => void
-    }) => boolean,
-  ) => HtmdInternalChain
-  toggleBlockquote: () => HtmdInternalChain
-  toggleBulletList: () => HtmdInternalChain
-  toggleOrderedList: () => HtmdInternalChain
-  toggleTaskList: () => HtmdInternalChain
-  setHorizontalRule: () => HtmdInternalChain
-  setCodeBlock: (attributes?: { language?: string }) => HtmdInternalChain
-  insertNotice: (attributes?: NoticeAttributes) => HtmdInternalChain
-  insertImage: (attributes: {
-    src: string
-    srcset?: string
-    alt?: string
-    caption?: string
-  }) => HtmdInternalChain
-  insertLinkPreview: (attributes: LinkPreviewAttributes) => HtmdInternalChain
-  insertUrlMention: (attributes: UrlMentionAttributes) => HtmdInternalChain
-  openOverlay: (name: string, options?: { position?: number; data?: unknown }) => HtmdInternalChain
-  closeOverlay: (name?: string) => HtmdInternalChain
-  run: () => boolean
-}
+export { mergeHtmlAttributes }
 
-export interface HtmdInternalEditor {
-  readonly state: EditorState
-  readonly view: EditorView
-  readonly schema: Schema
-  readonly isEditable: boolean
-  readonly isFocused: boolean
-  readonly isDestroyed: boolean
-  readonly storage: Record<string, unknown>
-  readonly extensionManager?: {
-    plugins?: Plugin[]
-    attributes?: unknown[]
-  }
-  readonly commands: {
-    insertContent: (value: unknown) => boolean
-    insertContentAt: (position: number | { from: number; to: number }, value: unknown) => boolean
-    deleteRange: (range: { from: number; to: number }) => boolean
-    setNode: (typeOrName: string, attributes?: Record<string, unknown>) => boolean
-    setTextSelection: (position: number | { from: number; to: number }) => boolean
-    focus: (position?: 'start' | 'end' | number | boolean | null) => boolean
-    openOverlay: (name: string, options?: { position?: number; data?: unknown }) => boolean
-    closeOverlay: (name?: string) => boolean
-    insertNotice: (attributes?: NoticeAttributes) => boolean
-    insertImage: (attributes: {
-      src: string
-      srcset?: string
-      alt?: string
-      caption?: string
-    }) => boolean
-    insertLinkPreview: (attributes: LinkPreviewAttributes) => boolean
-    insertUrlMention: (attributes: UrlMentionAttributes) => boolean
-    undo?: () => boolean
-    redo?: () => boolean
-  }
-  chain: () => HtmdInternalChain
-  isActive: (name: string, attributes?: Record<string, unknown>) => boolean
-  getAttributes: (name: string) => Record<string, unknown>
-  on: (event: string, listener: (...args: never[]) => void) => void
-  off: (event: string, listener: (...args: never[]) => void) => void
-}
+// types ---------------------------------------------------------------------
 
 export interface HtmdCommandContext {
-  editor: HtmdInternalEditor
+  editor: TiptapEditor
   state: EditorState
   view: EditorView
   tr: Transaction
   dispatch?: (tr: Transaction) => void
-  commands: HtmdInternalEditor['commands']
-  chain: () => HtmdInternalChain
+  commands: TiptapEditor['commands']
 }
 
-export interface HtmdAttributeSpec {
-  default?: unknown
-  rendered?: boolean
-  parseHTML?: (element: HTMLElement) => unknown
-  renderHTML?: (attributes: Record<string, unknown>) => Record<string, unknown>
+export interface HtmdSubtextSpec {
+  kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
+  attr: string
+  textSelector: string
+  inputSelector: string
+}
+
+export interface HtmdNodeNavigation {
+  kind: 'textblock' | 'container' | 'atom'
+  controls?: readonly string[]
+  subtext?: HtmdSubtextSpec
+  enterFromAbove: (editor: TiptapEditor, pos: number, node: PMNode) => boolean
+  enterFromBelow: (editor: TiptapEditor, pos: number, node: PMNode) => boolean
 }
 
 export interface HtmdExtensionSpec<
@@ -119,38 +54,21 @@ export interface HtmdExtensionSpec<
   EditorExtensionSpec<TOptions, TStorage, HtmdCommandContext, TCommands>,
   'keymap' | 'onCreate'
 > {
-  base?: 'heading' | 'codeBlockLowlight' | 'mention'
-  group?: string
-  content?: string
-  inline?: boolean
-  atom?: boolean
-  code?: boolean
-  marks?: string
-  defining?: boolean
-  selectable?: boolean
-  attributes?: Record<string, HtmdAttributeSpec>
-  parseHTML?: () => ParseRule[]
-  renderHTML?: (props: {
-    node: PMNode
-    HTMLAttributes: Record<string, unknown>
-    options: TOptions
-  }) => DOMOutputSpec
-  pmPlugins?: (ctx: {
-    editor: HtmdInternalEditor
-    options: TOptions
-    storage: TStorage
-  }) => Plugin[]
-  onBeforeCreate?: (ctx: {
-    editor: HtmdInternalEditor
-    options: TOptions
-    storage: TStorage
-  }) => void
-  onCreate?: (ctx: { editor: HtmdInternalEditor; options: TOptions; storage: TStorage }) => void
-  keymap?: (ctx: {
-    editor: HtmdInternalEditor
-    options: TOptions
-    storage: TStorage
-  }) => Keymap<HtmdCommandContext>
+  pmPlugins?: (ctx: { editor: TiptapEditor; options: TOptions; storage: TStorage }) => Plugin[]
+  onBeforeCreate?: (ctx: { editor: TiptapEditor; options: TOptions; storage: TStorage }) => void
+  onCreate?: (ctx: { editor: TiptapEditor; options: TOptions; storage: TStorage }) => void
+  navigation?: (
+    ctx: { options: TOptions; storage: TStorage },
+    parent?: HtmdNodeNavigation,
+  ) => HtmdNodeNavigation
+  keymap?: (
+    ctx: {
+      editor: TiptapEditor
+      options: TOptions
+      storage: TStorage
+    },
+    parent?: Keymap<HtmdCommandContext>,
+  ) => Keymap<HtmdCommandContext>
 }
 
 export interface HtmdExtension<
@@ -176,6 +94,8 @@ export interface HtmdExtension<
   ): HtmdExtension<TNextOptions, TNextStorage, TNextCommands>
 }
 
+// api -----------------------------------------------------------------------
+
 export function defineHtmdExtension<
   TOptions = Record<string, never>,
   TStorage = Record<string, never>,
@@ -184,32 +104,253 @@ export function defineHtmdExtension<
 >(
   spec: HtmdExtensionSpec<TOptions, TStorage, TCommands>,
 ): HtmdExtension<TOptions, TStorage, TCommands> {
-  return defineEditorExtension(
+  const base = defineEditorExtension(
     spec as unknown as EditorExtensionSpec<TOptions, TStorage, HtmdCommandContext, TCommands>,
   ) as HtmdExtension<TOptions, TStorage, TCommands>
+
+  const wrapInstance = <
+    TOpts,
+    TStor,
+    TCmds extends Record<string, (...args: never[]) => (ctx: HtmdCommandContext) => boolean>,
+  >(
+    instance: HtmdExtension<TOpts, TStor, TCmds>,
+  ): HtmdExtension<TOpts, TStor, TCmds> => ({
+    ...instance,
+    configure(nextOptions: Partial<TOpts>) {
+      return wrapInstance(instance.configure(nextOptions))
+    },
+    extend<
+      TNextOptions extends TOpts = TOpts,
+      TNextStorage extends TStor = TStor,
+      TNextCommands extends Record<
+        string,
+        (...args: never[]) => (ctx: HtmdCommandContext) => boolean
+      > = TCmds,
+    >(
+      overrides: Partial<HtmdExtensionSpec<TNextOptions, TNextStorage, TNextCommands>>,
+    ): HtmdExtension<TNextOptions, TNextStorage, TNextCommands> {
+      const parentNavigation = instance.spec.navigation
+      const nextNavigation =
+        overrides.navigation || parentNavigation
+          ? (ctx: { options: TNextOptions; storage: TNextStorage }) => {
+              const resolvedParent = parentNavigation
+                ? parentNavigation(ctx as unknown as { options: TOpts; storage: TStor })
+                : createTextblockNavigation()
+              return overrides.navigation
+                ? overrides.navigation(ctx, resolvedParent)
+                : resolvedParent
+            }
+          : undefined
+      const extended = instance.extend({
+        ...overrides,
+        ...(nextNavigation ? { navigation: nextNavigation } : {}),
+      })
+      return wrapInstance(extended)
+    },
+  })
+
+  return wrapInstance(base)
 }
 
-export function mergeHtmlAttributes(
-  ...objects: Array<Record<string, unknown> | null | undefined>
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = {}
-  for (const item of objects) {
-    if (!item) continue
-    for (const [key, value] of Object.entries(item)) {
-      if (value === undefined || value === null) continue
-      if (key === 'class' && typeof merged.class === 'string' && typeof value === 'string') {
-        const classes = new Set(
-          [...merged.class.split(/\s+/), ...value.split(/\s+/)].filter(Boolean),
-        )
-        merged.class = [...classes].join(' ')
-      } else if (key === 'style' && typeof merged.style === 'string' && typeof value === 'string') {
-        merged.style = `${merged.style.replace(/;?\s*$/, '')}; ${value}`
-      } else {
-        merged[key] = value
-      }
-    }
+export function createTextblockNavigation(): HtmdNodeNavigation {
+  return {
+    kind: 'textblock',
+    enterFromAbove(editor, pos) {
+      const { doc } = editor.state
+      const selection = Selection.findFrom(doc.resolve(Math.min(pos, doc.content.size)), 1, true)
+      if (!selection) return false
+      clearActiveCompoundBlockPos(editor)
+      editor.commands.setTextSelection(selection.from)
+      editor.view?.focus()
+      return true
+    },
+    enterFromBelow(editor, pos, node) {
+      const { doc } = editor.state
+      const resolvedPos = Math.min(pos + node.nodeSize, doc.content.size)
+      const selection = Selection.findFrom(doc.resolve(resolvedPos), -1, true)
+      if (!selection) return false
+      clearActiveCompoundBlockPos(editor)
+      editor.commands.setTextSelection(selection.from)
+      editor.view?.focus()
+      return true
+    },
   }
-  return merged
+}
+
+export function createContainerNodeNavigation(config: {
+  controls: readonly string[]
+  bodyOffset?: number
+  enterBelowMode?: 'endPos' | 'findFrom'
+}): HtmdNodeNavigation {
+  const bodyOffset = config.bodyOffset ?? 1
+  const enterBelowMode = config.enterBelowMode ?? 'endPos'
+  const controlSelector = config.controls.join(', ')
+
+  return {
+    kind: 'container',
+    controls: config.controls,
+    enterFromAbove(editor, pos) {
+      const { doc } = editor.state
+      setActiveCompoundBlockPos(editor, pos)
+      const targetPos = Math.min(pos + bodyOffset, doc.content.size)
+      if (editor.state.selection.from !== targetPos) {
+        editor.commands.setTextSelection(targetPos)
+      }
+      const dom = editor.view?.nodeDOM(pos)
+      if (dom instanceof HTMLElement && controlSelector) {
+        const control = dom.querySelector<HTMLElement>(controlSelector)
+        if (control) {
+          control.focus()
+          return true
+        }
+      }
+      editor.view?.focus()
+      return true
+    },
+    enterFromBelow(editor, pos, node) {
+      const { doc } = editor.state
+      setActiveCompoundBlockPos(editor, pos)
+      if (enterBelowMode === 'endPos') {
+        const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
+        editor.commands.setTextSelection(endPos)
+        editor.view?.focus()
+        return true
+      }
+      const selection = Selection.findFrom(doc.resolve(pos + node.nodeSize - 1), -1, true)
+      if (selection) {
+        editor.commands.setTextSelection(selection.from)
+        editor.view?.focus()
+        return true
+      }
+      return false
+    },
+  }
+}
+
+export function createAtomNodeNavigation(config: {
+  controls: readonly string[]
+  subtext?: HtmdSubtextSpec
+}): HtmdNodeNavigation {
+  const primarySelector = config.controls[0] ?? ''
+
+  const focusPrimaryControl = (
+    editor: TiptapEditor,
+    pos: number,
+    node: PMNode,
+    direction: 'down' | 'up',
+  ): boolean => {
+    const dom = editor.view?.nodeDOM(pos)
+    if (!(dom instanceof HTMLElement) || !primarySelector) return false
+    const input = dom.querySelector<HTMLElement>(primarySelector)
+    if (!input) return false
+    const { doc } = editor.state
+    setActiveCompoundBlockPos(editor, pos)
+    const nearPos =
+      direction === 'up' ? Math.max(0, pos) : Math.min(pos + node.nodeSize, doc.content.size)
+    const sel = Selection.findFrom(doc.resolve(nearPos), direction === 'up' ? -1 : 1, true)
+    if (sel) {
+      editor.commands.setTextSelection(sel.from)
+    }
+    input.focus({ preventScroll: true })
+    return true
+  }
+
+  return {
+    kind: 'atom',
+    controls: config.controls,
+    subtext: config.subtext,
+    enterFromAbove(editor, pos, node) {
+      return focusPrimaryControl(editor, pos, node, 'down')
+    },
+    enterFromBelow(editor, pos, node) {
+      return focusPrimaryControl(editor, pos, node, 'up')
+    },
+  }
+}
+
+// helpers -------------------------------------------------------------------
+
+const DEFAULT_NODE_NAVIGATIONS: Readonly<Record<string, HtmdNodeNavigation>> = {
+  codeBlock: createContainerNodeNavigation({
+    controls: ['[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]'],
+    bodyOffset: 1,
+    enterBelowMode: 'endPos',
+  }),
+  notice: createContainerNodeNavigation({
+    controls: [
+      'input[aria-label="Notice title"]',
+      '[aria-label="Notice type"][data-part="trigger"]',
+    ],
+    bodyOffset: 2,
+    enterBelowMode: 'findFrom',
+  }),
+  imageNode: createAtomNodeNavigation({
+    controls: [
+      'input.caption-input, input[aria-label="Image caption"]',
+      'button[aria-label="Replace image"]',
+      'button[aria-label="Remove image"]',
+    ],
+    subtext: {
+      kind: 'imageCaption',
+      attr: 'caption',
+      textSelector: '[data-image-caption-text]',
+      inputSelector: 'input.caption-input, input[aria-label="Image caption"]',
+    },
+  }),
+  image: createAtomNodeNavigation({
+    controls: [
+      'input.caption-input, input[aria-label="Image caption"]',
+      'button[aria-label="Replace image"]',
+      'button[aria-label="Remove image"]',
+    ],
+  }),
+  linkPreview: createAtomNodeNavigation({
+    controls: [
+      'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
+      'button[aria-label="Remove link preview"], button[aria-label="Remove YouTube embed"]',
+    ],
+    subtext: {
+      kind: 'linkPreviewUrl',
+      attr: 'url',
+      textSelector: '[data-bookmark-url-text]',
+      inputSelector: 'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
+    },
+  }),
+}
+
+const DEFAULT_TEXTBLOCK_NAVIGATION = createTextblockNavigation()
+
+const editorNavigationRegistry = new WeakMap<TiptapEditor, Map<string, HtmdNodeNavigation>>()
+
+export function registerNodeNavigation(
+  editor: TiptapEditor,
+  nodeName: string,
+  navigation: HtmdNodeNavigation,
+): void {
+  let map = editorNavigationRegistry.get(editor)
+  if (!map) {
+    map = new Map()
+    editorNavigationRegistry.set(editor, map)
+  }
+  map.set(nodeName, navigation)
+}
+
+export function getNodeNavigation(
+  editor: TiptapEditor,
+  nodeName: string,
+): HtmdNodeNavigation | undefined {
+  return editorNavigationRegistry.get(editor)?.get(nodeName) ?? DEFAULT_NODE_NAVIGATIONS[nodeName]
+}
+
+function setActiveCompoundBlockPos(editor: TiptapEditor, pos: number | null): void {
+  const modalStorage = (
+    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
+  )?.modalKeymap
+  if (modalStorage) modalStorage.activeCompoundBlockPos = pos
+}
+
+function clearActiveCompoundBlockPos(editor: TiptapEditor): void {
+  setActiveCompoundBlockPos(editor, null)
 }
 
 export function isAtFirstVisualLine(view: EditorView, state: EditorState): boolean {
@@ -289,7 +430,7 @@ export function findPrevBlockPos(state: EditorState): number | null {
 }
 
 export function focusBlockAtPos(
-  editor: HtmdInternalEditor,
+  editor: TiptapEditor,
   pos: number,
   direction: 'down' | 'up',
   allowTextblockFallback = false,
@@ -298,115 +439,18 @@ export function focusBlockAtPos(
   if (pos < 0 || pos >= doc.content.size) return false
   const node = doc.nodeAt(pos)
   if (!node) return false
-  const dom = editor.view?.nodeDOM(pos)
-  const modalStorage = (
-    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
-  )?.modalKeymap
 
-  if (node.type.name === 'codeBlock') {
-    if (modalStorage) modalStorage.activeCompoundBlockPos = pos
-    if (direction === 'down') {
-      const targetPos = Math.min(pos + 1, doc.content.size)
-      if (editor.state.selection.from !== targetPos) {
-        editor.commands.setTextSelection(targetPos)
-      }
-      if (dom instanceof HTMLElement) {
-        const trigger = dom.querySelector<HTMLElement>(
-          '[aria-label="Code language"][data-part="trigger"], [data-part="trigger"]',
-        )
-        if (trigger) {
-          trigger.focus()
-          return true
-        }
-      }
-      editor.view?.focus()
-      return true
-    }
-    const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
-    editor.commands.setTextSelection(endPos)
-    editor.view?.focus()
-    return true
-  }
-
-  if (node.type.name === 'notice') {
-    if (modalStorage) modalStorage.activeCompoundBlockPos = pos
-    if (direction === 'down') {
-      const targetPos = Math.min(pos + 2, doc.content.size)
-      if (editor.state.selection.from !== targetPos) {
-        editor.commands.setTextSelection(targetPos)
-      }
-      if (dom instanceof HTMLElement) {
-        const titleInput = dom.querySelector<HTMLInputElement>('input[aria-label="Notice title"]')
-        if (titleInput) {
-          titleInput.focus()
-          return true
-        }
-      }
-      editor.view?.focus()
-      return true
-    }
-    const selection = Selection.findFrom(doc.resolve(pos + node.nodeSize - 1), -1, true)
-    if (selection) {
-      editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
-      return true
-    }
-    return false
-  }
-
-  if (node.type.name === 'imageNode' || node.type.name === 'image') {
-    if (dom instanceof HTMLElement) {
-      const input = dom.querySelector<HTMLInputElement>(
-        'input.caption-input, input[aria-label="Image caption"]',
-      )
-      if (input) {
-        if (modalStorage) modalStorage.activeCompoundBlockPos = pos
-        const nearPos =
-          direction === 'up' ? Math.max(0, pos) : Math.min(pos + node.nodeSize, doc.content.size)
-        const sel = Selection.findFrom(doc.resolve(nearPos), direction === 'up' ? -1 : 1, true)
-        if (sel) {
-          editor.commands.setTextSelection(sel.from)
-        }
-        input.focus({ preventScroll: true })
-        return true
-      }
-    }
-    return false
-  }
-
-  if (node.type.name === 'linkPreview') {
-    if (dom instanceof HTMLElement) {
-      const input = dom.querySelector<HTMLInputElement>(
-        'input[aria-label="Bookmark URL"], input[aria-label="YouTube URL"]',
-      )
-      if (input) {
-        if (modalStorage) modalStorage.activeCompoundBlockPos = pos
-        const nearPos =
-          direction === 'up' ? Math.max(0, pos) : Math.min(pos + node.nodeSize, doc.content.size)
-        const sel = Selection.findFrom(doc.resolve(nearPos), direction === 'up' ? -1 : 1, true)
-        if (sel) {
-          editor.commands.setTextSelection(sel.from)
-        }
-        input.focus({ preventScroll: true })
-        return true
-      }
-    }
-    return false
+  const nav = getNodeNavigation(editor, node.type.name)
+  if (nav) {
+    return direction === 'down'
+      ? nav.enterFromAbove(editor, pos, node)
+      : nav.enterFromBelow(editor, pos, node)
   }
 
   if (allowTextblockFallback) {
-    const resolvedPos = direction === 'down' ? pos : Math.min(pos + node.nodeSize, doc.content.size)
-    const selection = Selection.findFrom(
-      doc.resolve(resolvedPos),
-      direction === 'down' ? 1 : -1,
-      true,
-    )
-    if (selection) {
-      if (modalStorage) modalStorage.activeCompoundBlockPos = null
-      editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
-      return true
-    }
+    return direction === 'down'
+      ? DEFAULT_TEXTBLOCK_NAVIGATION.enterFromAbove(editor, pos, node)
+      : DEFAULT_TEXTBLOCK_NAVIGATION.enterFromBelow(editor, pos, node)
   }
 
   return false
@@ -429,14 +473,14 @@ export function findNodeViewControl(
   return { target: event.target, wrapper, pos, node }
 }
 
-export function focusTextPosition(editor: HtmdInternalEditor, position: number): boolean {
+export function focusTextPosition(editor: TiptapEditor, position: number): boolean {
   const clamped = Math.max(0, Math.min(editor.state.doc.content.size, position))
   editor.commands.setTextSelection(clamped)
   editor.view?.focus()
   return true
 }
 
-export function focusBeforeBlock(editor: HtmdInternalEditor, position: number): boolean {
+export function focusBeforeBlock(editor: TiptapEditor, position: number): boolean {
   const { doc } = editor.state
   const clamped = Math.max(0, Math.min(doc.content.size, position))
   const $resolved = doc.resolve(clamped)
@@ -448,16 +492,13 @@ export function focusBeforeBlock(editor: HtmdInternalEditor, position: number): 
   }
   const selection = Selection.findFrom($resolved, -1, true)
   if (!selection) return false
-  const modalStorage = (
-    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
-  )?.modalKeymap
-  if (modalStorage) modalStorage.activeCompoundBlockPos = null
+  clearActiveCompoundBlockPos(editor)
   editor.commands.setTextSelection(selection.from)
   editor.view?.focus()
   return true
 }
 
-export function focusAfterBlock(editor: HtmdInternalEditor, position: number): boolean {
+export function focusAfterBlock(editor: TiptapEditor, position: number): boolean {
   const { doc } = editor.state
   const clamped = Math.max(0, Math.min(doc.content.size, position))
   if (focusBlockAtPos(editor, clamped, 'down', true)) {
@@ -465,10 +506,7 @@ export function focusAfterBlock(editor: HtmdInternalEditor, position: number): b
   }
   const selection = Selection.findFrom(doc.resolve(clamped), 1, true)
   if (!selection) return false
-  const modalStorage = (
-    editor.storage as { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
-  )?.modalKeymap
-  if (modalStorage) modalStorage.activeCompoundBlockPos = null
+  clearActiveCompoundBlockPos(editor)
   editor.commands.setTextSelection(selection.from)
   editor.view?.focus()
   return true

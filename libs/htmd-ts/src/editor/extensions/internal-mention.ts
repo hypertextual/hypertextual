@@ -1,7 +1,10 @@
+import type { Editor as TiptapEditor } from '@tiptap/core'
 import type { SuggestionOptions } from '@tiptap/suggestion'
-import { defineHtmdExtension, type HtmdInternalEditor } from '../define-htmd-extension.js'
+import { defineHtmdExtension } from '../define-htmd-extension.js'
 import type { MentionItem } from '../types.js'
-import { isEditorInInsertMode } from './modal-keymap.js'
+import { isEditorInInsertMode } from './modal-editing.js'
+
+// types ---------------------------------------------------------------------
 
 export interface InternalMentionOptions {
   hrefBuilder?: (item: MentionItem) => string
@@ -9,10 +12,23 @@ export interface InternalMentionOptions {
   suggestion?: Partial<Omit<SuggestionOptions<MentionItem>, 'editor'>>
 }
 
+// api -----------------------------------------------------------------------
+
+/**
+ * Inline `@mention` extension (`:mention[...]{id="..." type="post"}`) that
+ * opens an autocomplete menu when typing `@` in insert mode:
+ *
+ * ```text
+ * Related to @arch|
+ *            +------------------------+
+ *            | > Architecture Guide   |
+ *            |   Editor Overview      |
+ *            +------------------------+
+ * ```
+ */
 export const InternalMention = defineHtmdExtension<InternalMentionOptions>({
   name: 'internalMention',
   kind: 'node',
-  base: 'mention',
   defaultOptions: () => ({
     hrefBuilder: undefined,
     HTMLAttributes: {
@@ -21,8 +37,7 @@ export const InternalMention = defineHtmdExtension<InternalMentionOptions>({
     suggestion: {
       char: '@',
       allowSpaces: true,
-      allow: ({ editor }: { editor: unknown }) =>
-        isEditorInInsertMode(editor as HtmdInternalEditor),
+      allow: ({ editor }: { editor: unknown }) => isEditorInInsertMode(editor as TiptapEditor),
       command: ({
         editor,
         range,
@@ -32,7 +47,7 @@ export const InternalMention = defineHtmdExtension<InternalMentionOptions>({
         range: { from: number; to: number }
         props: MentionItem
       }) => {
-        ;(editor as HtmdInternalEditor)
+        ;(editor as TiptapEditor)
           .chain()
           .focus()
           .insertContentAt(range, [
@@ -47,68 +62,4 @@ export const InternalMention = defineHtmdExtension<InternalMentionOptions>({
       render: () => ({}),
     },
   }),
-  parseHTML() {
-    return [{ tag: 'span[data-type="internal-mention"]' }]
-  },
-  renderHTML({ node, HTMLAttributes, options }) {
-    const { id, label, type, seriesId } = node.attrs as {
-      id: string
-      label: string
-      type: string
-      seriesId?: string | null
-    }
-
-    const href = options.hrefBuilder
-      ? options.hrefBuilder({ id, label, type, seriesId })
-      : type === 'post' && seriesId
-        ? `/read/${seriesId}?post=${id}`
-        : `/read/${id}`
-
-    return [
-      'a',
-      {
-        ...HTMLAttributes,
-        class: 'internal-mention',
-        'data-type': 'internal-mention',
-        'data-id': id,
-        'data-label': label,
-        'data-mention-type': type,
-        'data-series-id': seriesId,
-        href,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-      },
-      label,
-    ]
-  },
-  attributes: {
-    id: {
-      default: null,
-      parseHTML: (element) => element.getAttribute('data-id'),
-      renderHTML: (attributes) => ({
-        'data-id': attributes.id,
-      }),
-    },
-    label: {
-      default: null,
-      parseHTML: (element) => element.getAttribute('data-label'),
-      renderHTML: (attributes) => ({
-        'data-label': attributes.label,
-      }),
-    },
-    type: {
-      default: 'post',
-      parseHTML: (element) => element.getAttribute('data-type'),
-      renderHTML: (attributes) => ({
-        'data-type': attributes.type,
-      }),
-    },
-    seriesId: {
-      default: null,
-      parseHTML: (element) => element.getAttribute('data-series-id'),
-      renderHTML: (attributes) => ({
-        'data-series-id': attributes.seriesId,
-      }),
-    },
-  },
 })

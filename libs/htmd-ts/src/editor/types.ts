@@ -134,6 +134,10 @@ export type HtmdNodeViewFactory<TEditor = unknown> = () => (
   ctx: HtmdNodeViewContext<TEditor>,
 ) => HtmdNodeViewInstance
 
+export type NodeView = HtmdNodeViewInstance
+export type NodeViewProps<TEditor = unknown> = HtmdNodeViewContext<TEditor>
+export type NodeViewRenderer<TEditor = unknown> = HtmdNodeViewFactory<TEditor>
+
 export interface HtmdNodeViews<TEditor = unknown> {
   image?: HtmdNodeViewFactory<TEditor>
   urlMention?: HtmdNodeViewFactory<TEditor>

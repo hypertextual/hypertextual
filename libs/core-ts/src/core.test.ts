@@ -245,7 +245,11 @@ describe('defineEditorExtension', () => {
     expect(configured.options).toEqual({ defaultType: 'warning', collapsible: false })
 
     const extended = configured.extend({
-      keymap: () => ({
+      commands: (_ctx, parent) => ({
+        setCallout: (type = 'error') => parent!.setCallout(type),
+      }),
+      keymap: (_ctx, parent) => ({
+        ...parent,
         'Mod-Alt-c': {
           id: 'callout.alt',
           key: 'Mod-Alt-c',
@@ -257,6 +261,10 @@ describe('defineEditorExtension', () => {
 
     const storage = extended.spec.createStorage!(extended.options)
     expect(storage).toEqual({ activeType: 'warning' })
+    const commands = extended.spec.commands!({ options: extended.options, storage })
+    const log: string[] = []
+    expect(commands.setCallout()({ log })).toBe(true)
+    expect(log).toEqual(['callout:error'])
     const keymap = extended.spec.keymap!({ options: extended.options, storage })
     expect(Object.keys(keymap)).toEqual(['Mod-Shift-c', 'Mod-Alt-c'])
   })

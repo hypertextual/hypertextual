@@ -1,5 +1,6 @@
+import type { Editor as TiptapEditor } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { defineHtmdExtension, type HtmdInternalEditor } from '../define-htmd-extension.js'
+import { defineHtmdExtension, type HtmdCommandContext } from '../define-htmd-extension.js'
 import type {
   HtmdOverlayBinding,
   HtmdOverlayOpenOptions,
@@ -10,6 +11,8 @@ import type {
   HtmdOverlaysOptions,
 } from '../types.js'
 
+// types ---------------------------------------------------------------------
+
 /** Query the active overlay through the editor's ProseMirror state. */
 export const editorOverlaysKey = new PluginKey<HtmdOverlayState | null>('editorOverlays')
 
@@ -19,7 +22,19 @@ export type EditorOverlaysStorage = HtmdOverlaysController & {
   bindings: Set<HtmdOverlayBinding>
 }
 
-/** Own registered overlay state and anchor mapping; the host supplies rendering. */
+// api -----------------------------------------------------------------------
+
+/**
+ * Manages positioned editor overlay popovers (`image`, `bookmark`, `youtube`,
+ * floating selection toolbar) anchored to document positions or selections:
+ *
+ * ```text
+ * Paragraph cursor |
+ *                  +----------------------------------+
+ *                  | [Paste Bookmark URL...         ] |
+ *                  +----------------------------------+
+ * ```
+ */
 export const EditorOverlays = defineHtmdExtension<
   HtmdOverlaysOptions,
   EditorOverlaysStorage,
@@ -27,17 +42,8 @@ export const EditorOverlays = defineHtmdExtension<
     openOverlay: (
       name: string,
       options?: HtmdOverlayOpenOptions,
-    ) => (ctx: {
-      tr: import('@tiptap/pm/state').Transaction
-      dispatch?: (tr: import('@tiptap/pm/state').Transaction) => void
-    }) => boolean
-    closeOverlay: (
-      name?: string,
-    ) => (ctx: {
-      state: import('@tiptap/pm/state').EditorState
-      tr: import('@tiptap/pm/state').Transaction
-      dispatch?: (tr: import('@tiptap/pm/state').Transaction) => void
-    }) => boolean
+    ) => (ctx: HtmdCommandContext) => boolean
+    closeOverlay: (name?: string) => (ctx: HtmdCommandContext) => boolean
   }
 >({
   name: 'editorOverlays',
@@ -101,40 +107,46 @@ export const EditorOverlays = defineHtmdExtension<
       },
   }),
   pmPlugins({ options }) {
-    const onChange = options.onChange
-    return [
-      new Plugin<HtmdOverlayState | null>({
-        key: editorOverlaysKey,
-        state: {
-          init: () => null,
-          apply(transaction, active) {
-            const action = transaction.getMeta(editorOverlaysKey) as OverlayAction | undefined
-            if (action) return action.type === 'open' ? action.overlay : null
-            if (!active || !transaction.docChanged) return active
-            const mapped = transaction.mapping.mapResult(active.position, 1)
-            if (mapped.deleted) return null
-            return { ...active, position: mapped.pos }
-          },
-        },
-        view(view) {
-          onChange?.(editorOverlaysKey.getState(view.state) ?? null)
-          return {
-            update(currentView, previousState) {
-              const active = editorOverlaysKey.getState(currentView.state) ?? null
-              if (active !== editorOverlaysKey.getState(previousState)) onChange?.(active)
-            },
-            destroy() {
-              onChange?.(null)
-            },
-          }
-        },
-      }),
-    ]
+    return [createEditorOverlaysPlugin(options)]
   },
 })
 
+// pm ------------------------------------------------------------------------
+
+function createEditorOverlaysPlugin(options: HtmdOverlaysOptions): Plugin<HtmdOverlayState | null> {
+  const onChange = options.onChange
+  return new Plugin<HtmdOverlayState | null>({
+    key: editorOverlaysKey,
+    state: {
+      init: () => null,
+      apply(transaction, active) {
+        const action = transaction.getMeta(editorOverlaysKey) as OverlayAction | undefined
+        if (action) return action.type === 'open' ? action.overlay : null
+        if (!active || !transaction.docChanged) return active
+        const mapped = transaction.mapping.mapResult(active.position, 1)
+        if (mapped.deleted) return null
+        return { ...active, position: mapped.pos }
+      },
+    },
+    view(view) {
+      onChange?.(editorOverlaysKey.getState(view.state) ?? null)
+      return {
+        update(currentView, previousState) {
+          const active = editorOverlaysKey.getState(currentView.state) ?? null
+          if (active !== editorOverlaysKey.getState(previousState)) onChange?.(active)
+        },
+        destroy() {
+          onChange?.(null)
+        },
+      }
+    },
+  })
+}
+
+// helpers -------------------------------------------------------------------
+
 function attachSurface(
-  editor: HtmdInternalEditor,
+  editor: TiptapEditor,
   surface: HTMLElement,
   options: HtmdOverlaySurfaceOptions,
   onDestroy: () => void,
@@ -200,7 +212,7 @@ function attachSurface(
 }
 
 function resolveAnchor(
-  editor: HtmdInternalEditor,
+  editor: TiptapEditor,
   anchor: ReturnType<HtmdOverlaySurfaceOptions['anchor']>,
 ): HtmdOverlayRect | null {
   if (anchor === null) return null

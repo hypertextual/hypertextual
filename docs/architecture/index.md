@@ -90,7 +90,7 @@ New document or block formats (such as `DbmdEditor`, Mermaid, Draw.io, or Manim)
 ## References
 
 - [core-ts editor plugin architecture](core-ts.md)
-- [htmd-ts format and editor plugin architecture](htmd-ts.md)
+- [htmd-ts format and editor plugin architecture](htmd-ts/index.md)
 - [hyped-fs workspace persistence](hyped-fs.md)
 - [Keybindings](../keybindings/index.md)
 - [UI library components](ui/index.md)

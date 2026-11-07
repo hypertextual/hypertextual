@@ -2,7 +2,6 @@
   import type { NoticeNodeViewProps } from './types'
   import type { NoticeVariants } from '@cloudvoyant/helical-ui'
   import { noticeBody } from './styles'
-  import { createSubscriber } from 'svelte/reactivity'
   import {
     Notice,
     Select,
@@ -18,10 +17,9 @@
   type NoticeType = Exclude<NoticeVariants['variant'], null | undefined | 'none'>
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, getPos, updateAttributes }: NoticeNodeViewProps = $props()
+  let { node, editable, subtextRange, updateAttributes }: NoticeNodeViewProps = $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => editor.subscribe(update))
   const variants = [
     { value: 'info', label: 'Info', icon: Info },
     { value: 'success', label: 'Success', icon: CircleCheck },
@@ -30,31 +28,9 @@
   ]
 
   // Derived -------------------------------------------------------------------
-  const editable = $derived.by(() => {
-    subscribe()
-    return editor.isEditable && editor.isInsertMode
-  })
   const variant = $derived((node.attrs.variant as NoticeType | undefined) ?? 'info')
 
   const title = $derived((node.attrs.title as string | undefined) ?? 'Note')
-
-  const modalSubtext = $derived.by(() => {
-    subscribe()
-    const st = editor.getSubtextCursor()
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (!st || st.kind !== 'noticeTitle' || st.pos !== pos) return null
-    return st
-  })
-
-  const modalCharRange = $derived.by(() => {
-    if (!modalSubtext) return null
-    if (typeof modalSubtext.anchorOffset === 'number') {
-      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
-      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
-      return { from, to: Math.max(from + 1, to) }
-    }
-    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
-  })
 
   const empty = $derived(
     node.childCount === 1 &&
@@ -100,13 +76,13 @@
             {/each}
           </SelectContent>
         </Select>
-      {:else if modalCharRange}
+      {:else if subtextRange}
         <span data-notice-title-text class="font-semibold tracking-tight"
-          >{title.slice(0, modalCharRange.from)}<span
+          >{title.slice(0, subtextRange.from)}<span
             class="pm-modal-cursor"
             data-pm-modal-cursor="normal"
-            >{title.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
-          >{title.slice(modalCharRange.to)}</span
+            >{title.slice(subtextRange.from, subtextRange.to) || '\u00a0'}</span
+          >{title.slice(subtextRange.to)}</span
         >
       {:else}
         <span data-notice-title-text class="font-semibold tracking-tight">{title}</span>

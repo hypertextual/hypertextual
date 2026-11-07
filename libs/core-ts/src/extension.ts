@@ -14,8 +14,8 @@ export interface EditorExtensionSpec<
   priority?: number
   defaultOptions?: () => TOptions
   createStorage?: (options: TOptions) => TStorage
-  commands?: (ctx: { options: TOptions; storage: TStorage }) => TCommands
-  keymap?: (ctx: { options: TOptions; storage: TStorage }) => Keymap<TCtx>
+  commands?: (ctx: { options: TOptions; storage: TStorage }, parent?: TCommands) => TCommands
+  keymap?: (ctx: { options: TOptions; storage: TStorage }, parent?: Keymap<TCtx>) => Keymap<TCtx>
   onCreate?: (ctx: { editor: TCtx; options: TOptions; storage: TStorage }) => void
   onDestroy?: (ctx: { options: TOptions; storage: TStorage }) => void
 }
@@ -101,19 +101,21 @@ function createExtensionInstance<
           const parentCommands = spec.commands
             ? (spec.commands(
                 ctx as unknown as { options: TOptions; storage: TStorage },
+                {} as TCommands,
               ) as unknown as TNextCommands)
             : ({} as TNextCommands)
           const overrideCommands = overrides.commands
-            ? overrides.commands(ctx)
+            ? overrides.commands(ctx, parentCommands)
             : ({} as TNextCommands)
           return { ...parentCommands, ...overrideCommands }
         },
         keymap: (ctx) => {
           const parentKeymap = spec.keymap
-            ? spec.keymap(ctx as unknown as { options: TOptions; storage: TStorage })
+            ? spec.keymap(ctx as unknown as { options: TOptions; storage: TStorage }, {})
             : {}
-          const overrideKeymap = overrides.keymap ? overrides.keymap(ctx) : {}
-          return { ...parentKeymap, ...overrideKeymap }
+          const overrideKeymap = overrides.keymap ? overrides.keymap(ctx, parentKeymap) : {}
+          const optionKeymap = (ctx?.options as { keymap?: Keymap<TCtx> } | undefined)?.keymap ?? {}
+          return { ...parentKeymap, ...overrideKeymap, ...optionKeymap }
         },
       }
       return createExtensionInstance(nextSpec)

@@ -1,13 +1,19 @@
-import type { HtmdEditor, HtmdNodeViewContext, HtmdNodeViewFactory } from 'htmd-ts'
+import type { HtmdEditor, HtmdNodeViewContext, NodeViewRenderer } from 'htmd-ts'
 import { getAllContexts, mount, unmount, type Component } from 'svelte'
-import { SvelteMap } from 'svelte/reactivity'
+import { createSubscriber, SvelteMap } from 'svelte/reactivity'
+
+export interface SvelteNodeViewProps<TEditor = HtmdEditor>
+  extends HtmdNodeViewContext<TEditor> {
+  readonly editable: boolean
+  readonly subtextRange: { from: number; to: number } | null
+}
 
 export function createSvelteNodeView<
-  TProps extends HtmdNodeViewContext<HtmdEditor> = HtmdNodeViewContext<HtmdEditor>,
+  TProps extends SvelteNodeViewProps<HtmdEditor> = SvelteNodeViewProps<HtmdEditor>,
 >(
   component: Component<TProps>,
   options?: { as?: string; context?: Map<unknown, unknown> },
-): HtmdNodeViewFactory<HtmdEditor> {
+): NodeViewRenderer<HtmdEditor> {
   let capturedContext: Map<unknown, unknown> | undefined
   try {
     capturedContext = getAllContexts()
@@ -18,6 +24,9 @@ export function createSvelteNodeView<
   return () => (ctx) => {
     const tag = options?.as ?? (ctx.node.isInline ? 'span' : 'div')
     const target = document.createElement(tag)
+    const subscribe = createSubscriber((update) =>
+      typeof ctx.editor?.subscribe === 'function' ? ctx.editor.subscribe(update) : () => {},
+    )
 
     let currentNode = $state.raw(ctx.node)
     let currentDecorations = $state.raw(ctx.decorations)
@@ -39,6 +48,22 @@ export function createSvelteNodeView<
       },
       get selected() {
         return currentSelected
+      },
+      get editable() {
+        subscribe()
+        return Boolean(ctx.editor?.isEditable && ctx.editor?.isInsertMode)
+      },
+      get subtextRange() {
+        subscribe()
+        const st = ctx.editor?.getSubtextCursor?.()
+        const pos = typeof ctx.getPos === 'function' ? ctx.getPos() : undefined
+        if (!st || st.pos !== pos) return null
+        if (typeof st.anchorOffset === 'number') {
+          const from = Math.min(st.anchorOffset, st.offset)
+          const to = Math.max(st.anchorOffset, st.offset)
+          return { from, to: Math.max(from + 1, to) }
+        }
+        return { from: st.offset, to: st.offset + 1 }
       },
       get HTMLAttributes() {
         return ctx.HTMLAttributes
@@ -75,3 +100,5 @@ export function createSvelteNodeView<
     }
   }
 }
+
+export const svelteNodeView = createSvelteNodeView

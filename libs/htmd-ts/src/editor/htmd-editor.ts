@@ -18,7 +18,7 @@ import type { SuggestionProps } from '@tiptap/suggestion'
 import { parse, serialize, validateDocument } from '../lib.js'
 import type { JSONContent } from '../types.js'
 import { buildExtensions, type CompiledExtensionKeymap } from './build-extensions.js'
-import type { HtmdCommandContext, HtmdInternalEditor } from './define-htmd-extension.js'
+import type { HtmdCommandContext } from './define-htmd-extension.js'
 import { editorOverlaysKey, type EditorOverlaysStorage } from './extensions/editor-overlays.js'
 import type { LinkPreviewStorage } from './extensions/link-preview.js'
 import {
@@ -26,7 +26,7 @@ import {
   isEditorInInsertMode,
   modalKeymapPluginKey,
   type ModalKeymapStorage,
-} from './extensions/modal-keymap.js'
+} from './extensions/modal-editing.js'
 import { HtmdDocument } from './htmd-document.js'
 import type {
   HtmdCommandMap,
@@ -388,7 +388,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
             // Ignore
           }
           const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-          getEditorModalTarget(this.internalEditor)?.setModalState({
+          getEditorModalTarget(this.tiptap)?.setModalState({
             mode: 'insert',
             preset,
           })
@@ -416,7 +416,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
       storage.clickToInsert = this.clickToEdit
     }
 
-    const target = getEditorModalTarget(this.internalEditor)
+    const target = getEditorModalTarget(this.tiptap)
     if (target) {
       const preset = this.services.hotkeys?.getPreset() ?? 'helix'
       target.setModalState({
@@ -430,10 +430,6 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     this.registerScopes()
     this.syncModalDomRegistration()
     this.notifySubscribers()
-  }
-
-  private get internalEditor(): HtmdInternalEditor {
-    return this.tiptap as unknown as HtmdInternalEditor
   }
 
   private get modalStorage(): ModalKeymapStorage | undefined {
@@ -505,7 +501,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
 
     this.scopeCleanups.push(
       hotkeys.subscribe(({ preset }) => {
-        const target = getEditorModalTarget(this.internalEditor)
+        const target = getEditorModalTarget(this.tiptap)
         const currentMode = this.mode
         if (target) {
           target.setModalState({ mode: currentMode, preset: preset as EditorPreset })
@@ -518,7 +514,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     for (const cleanup of this.modalDomCleanups) cleanup()
     this.modalDomCleanups = []
 
-    const target = getEditorModalTarget(this.internalEditor)
+    const target = getEditorModalTarget(this.tiptap)
     if (!target) return
 
     const registerEl = (el: HTMLElement) => {
@@ -693,7 +689,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
 
   get isInsertMode(): boolean {
     if (!this.tiptap?.state) return this.options.editable ?? true
-    return isEditorInInsertMode(this.internalEditor)
+    return isEditorInInsertMode(this.tiptap)
   }
 
   get mode(): EditorMode {
@@ -771,7 +767,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         // Ignore if view is not yet mounted
       }
     }
-    const target = getEditorModalTarget(this.internalEditor)
+    const target = getEditorModalTarget(this.tiptap)
     const currentMode = modalKeymapPluginKey.getState(this.tiptap.state)?.mode ?? 'insert'
     const preset = this.services.hotkeys?.getPreset() ?? 'helix'
     const storage = this.modalStorage
@@ -872,11 +868,17 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   }
 
   openOverlay(name: string, options?: HtmdOverlayOpenOptions): boolean {
-    return this.internalEditor.commands.openOverlay(name, options)
+    const cmds = this.tiptap.commands as unknown as {
+      openOverlay: (name: string, options?: HtmdOverlayOpenOptions) => boolean
+    }
+    return cmds.openOverlay(name, options)
   }
 
   closeOverlay(name?: string): boolean {
-    return this.internalEditor.commands.closeOverlay(name)
+    const cmds = this.tiptap.commands as unknown as {
+      closeOverlay: (name?: string) => boolean
+    }
+    return cmds.closeOverlay(name)
   }
 
   insertOrReplaceBookmark(
@@ -896,11 +898,14 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         return true
       }
     }
-    return this.internalEditor
+    return this.tiptap
       .chain()
       .focus()
       .setTextSelection(position)
-      .insertLinkPreview({ ...attrs, type: 'bookmark' })
+      .insertContent({
+        type: 'linkPreview',
+        attrs: { ...attrs, type: 'bookmark' },
+      })
       .run()
   }
 
@@ -921,21 +926,24 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         return true
       }
     }
-    return this.internalEditor
+    return this.tiptap
       .chain()
       .focus()
       .setTextSelection(position)
-      .insertImage({
-        src: attrs.src,
-        srcset: attrs.srcset,
-        alt: attrs.alt ?? '',
-        caption: attrs.caption ?? '',
+      .insertContent({
+        type: 'imageNode',
+        attrs: {
+          src: attrs.src,
+          srcset: attrs.srcset,
+          alt: attrs.alt ?? '',
+          caption: attrs.caption ?? '',
+        },
       })
       .run()
   }
 
   insertYouTubeEmbed(position: number, url: string): boolean {
-    return this.internalEditor
+    return this.tiptap
       .chain()
       .focus()
       .insertContentAt(position, {
@@ -1013,7 +1021,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     }
     this.tiptap.setEditable(true)
     const preset = this.services.hotkeys?.getPreset() ?? 'helix'
-    getEditorModalTarget(this.internalEditor)?.setModalState({ mode: 'insert', preset })
+    getEditorModalTarget(this.tiptap)?.setModalState({ mode: 'insert', preset })
     this.services.hotkeys?.setMode('insert')
     try {
       this.tiptap.view.dispatch(this.tiptap.state.tr.setMeta('editableChanged', true))
@@ -1038,6 +1046,17 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     ...args: Parameters<HtmdCommandMap[K]>
   ): boolean {
     const chain = () => this.tiptap.chain().focus()
+    const customCmds = this.tiptap.commands as unknown as {
+      insertNotice: (attrs?: NoticeAttributes) => boolean
+      insertImage: (attrs: {
+        src: string
+        srcset?: string
+        alt?: string
+        caption?: string
+      }) => boolean
+      insertLinkPreview: (attrs: LinkPreviewAttributes) => boolean
+      insertUrlMention: (attrs: UrlMentionAttributes) => boolean
+    }
     switch (name) {
       case 'toggleBold':
         return chain().toggleBold().run()
@@ -1088,15 +1107,15 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
       case 'unsetLink':
         return chain().unsetLink().run()
       case 'insertNotice':
-        return this.internalEditor.commands.insertNotice(args[0] as NoticeAttributes | undefined)
+        return customCmds.insertNotice(args[0] as NoticeAttributes | undefined)
       case 'insertImage':
-        return this.internalEditor.commands.insertImage(
+        return customCmds.insertImage(
           args[0] as { src: string; srcset?: string; alt?: string; caption?: string },
         )
       case 'insertLinkPreview':
-        return this.internalEditor.commands.insertLinkPreview(args[0] as LinkPreviewAttributes)
+        return customCmds.insertLinkPreview(args[0] as LinkPreviewAttributes)
       case 'insertUrlMention':
-        return this.internalEditor.commands.insertUrlMention(args[0] as UrlMentionAttributes)
+        return customCmds.insertUrlMention(args[0] as UrlMentionAttributes)
       case 'openOverlay':
         return this.openOverlay(args[0] as string, args[1] as HtmdOverlayOpenOptions | undefined)
       case 'closeOverlay':

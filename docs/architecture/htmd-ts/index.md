@@ -30,69 +30,47 @@ The host application owns filesystem access, media storage, autosave scheduling,
 
 ```mermaid
 flowchart TD
-    App["App EditorService & WorkspaceService"] --> EditorAPI["Public Editor Plugin API: HtmdEditor + HtmdDocument"]
-    UI["libs/ui HtmdEditor.svelte & Svelte NodeViews"] --> EditorAPI
-    CoreTS["core-ts: Editor, EditorFormatAdapter, EditorDocument, defineEditorExtension, KeyScope, EditorHostServices"] -.->|"implemented by"| EditorAPI
+    Consumers["App EditorService & libs/ui HtmdEditor.svelte"]
+    CoreTS["libs/core-ts Contracts<br/>Editor, EditorDocument, defineEditorExtension, KeyScope"]
+    EditorAPI["Public API (src/index.ts)<br/>HtmdEditor + HtmdDocument + defineHtmdExtension"]
 
-    subgraph HTMD["libs/htmd-ts"]
-        EditorAPI --> HE["editor/htmd-editor.ts<br/>kind='htmd', formats: htmd, md, scopeId='editor:htmd'"]
-        EditorAPI --> HD["editor/htmd-document.ts<br/>HtmdDocument implements EditorDocument"]
-        HD --> Core["lib.ts internal conversion & schema validation"]
-        HE --> Core
-        Core --> Nodes["nodes.ts"]
-        Core --> Marks["marks.ts"]
-        Core --> Syntax["syntax.ts recovery & attributes"]
-        Core --> MdEngine["Private Tiptap MarkdownManager & isolated Marked"]
-
-        HE --> DEF["editor/define-htmd-extension.ts"]
-        HE --> EXT["editor/extensions/*<br/>15 extensions via defineHtmdExtension"]
-        HE --> BE["editor/build-extensions.ts<br/>Sole Tiptap/ProseMirror compiler"]
-        EXT --> DEF
-        BE --> EXT
-        BE --> PmEngine["Private Tiptap Editor & ProseMirror View"]
+    subgraph HTMD["libs/htmd-ts Internal Modules"]
+        HE["editor/htmd-editor.ts<br/>Interactive Editor Controller"]
+        HD["editor/htmd-document.ts<br/>Document & Asset Transform"]
+        EXT["editor/define-htmd-extension.ts & extensions/*<br/>21 Interactive Extensions"]
+        BE["editor/build-extensions.ts<br/>Extension Bridge & KeyScope Compiler"]
+        Schema["nodes.ts, marks.ts, syntax.ts, lib.ts<br/>Canonical HTMD Schema & Markdown Codec"]
+        Engines["Private Engines<br/>ProseMirror View/State + Tiptap + Marked"]
     end
+
+    Consumers & CoreTS --> EditorAPI
+    EditorAPI --> HE & HD
+    HE --> EXT --> BE
+    HD & BE --> Schema
+    BE & Schema --> Engines
 ```
 
 - `index.ts` exports `HtmdEditor`, `HtmdDocument`, `htmdCodec`, `defineHtmdExtension`, `createHtmdEditorKeymap`, editor types, and error classes.
 - `editor/htmd-document.ts` implements `HtmdDocument` (`EditorDocument<JSONContent>` from `core-ts`). It parses and serializes Markdown, extracts the first level-1 heading as the title, and maps `imageNode` URLs between portable paths and display URLs.
-- `lib.ts`, `nodes.ts`, `marks.ts`, and `syntax.ts` compose the private Markdown engine, validate documents against the HTMD schema, collect recoverable issues, and guard serialization.
+- `lib.ts`, `nodes.ts`, `marks.ts`, and `syntax.ts` compose the private Markdown engine, own the canonical HTMD node and mark schemas (`group`, `content`, `inline`, `atom`, `addAttributes`, `parseHTML`, `renderHTML`, `parseMarkdown`, `renderMarkdown`), validate documents against the HTMD schema, collect recoverable issues, and guard serialization.
 - `editor/htmd-editor.ts` implements `HtmdEditor` (`Editor<JSONContent, HtmdCommandMap>` and `EditorFormatAdapter<JSONContent>` for `htmd` and `md`). It manages the private Tiptap and ProseMirror instance, registers the `editor:htmd` and extension key scopes, forwards notifications and media writes to host services, and exposes engine-free methods to UI wrappers.
-- `editor/define-htmd-extension.ts` specializes `defineEditorExtension` from `core-ts` for HTMD nodes, marks, commands, keymaps, and ProseMirror plugins.
-- `editor/build-extensions.ts` translates `HtmdExtension` definitions and `HtmdNodeViews` into private Tiptap `Node`, `Mark`, and `Extension` instances.
+- `editor/define-htmd-extension.ts` specializes `defineEditorExtension` from `core-ts` for interactive HTMD editor behavior (`keymap`, `commands`, `nodeView`, and `pmPlugins`) without duplicating node schema fields.
+- `editor/build-extensions.ts` adapts `HtmdExtension` definitions by extending the canonical node schemas from `nodes.ts` and attaching `HtmdNodeViews`, commands, keymaps, and ProseMirror plugins.
 
 ### Data and Control Flow
 
 #### Format Deserialization, Editing, and Serialization Lifecycle
 
 ```mermaid
-sequenceDiagram
-    participant App as Host App (EditorService)
-    participant HE as HtmdEditor (formats: htmd/md, scopeId: editor:htmd)
-    participant HD as HtmdDocument (EditorDocument)
-    participant Codec as Internal lib.ts (parse / serialize / validateDocument)
-    participant Hotkeys as EditorHotkeyService (core-ts / HotkeyService)
-    participant UI as HtmdEditor.svelte & NodeViews
+flowchart TD
+    Step1["1. Format Check & Deserialization<br/>HtmdEditor.supportsFile(name) -> HtmdEditor.deserialize(source)"]
+    Step2["2. Parse & Schema Validation (lib.ts)<br/>parse(source) + validateDocument(content) -> HtmdDocument { content, title, issues }"]
+    Step3["3. Resolve Display Asset URLs<br/>document.displayImages(resolveAssetUrl)"]
+    Step4["4. Mount Editor & Register KeyScopes<br/>new HtmdEditor({ content, services, nodeViews })<br/>Registers editor:htmd + extension:* scopes & modalTarget"]
+    Step5["5. Interactive Editing & Transactions<br/>ProseMirror transactions emit onchange(updatedContent)"]
+    Step6["6. Portable Image Transform & Serialization<br/>document.transformImages(toPortablePath) -> document.serialize() -> UTF-8 Markdown"]
 
-    App->>HE: HtmdEditor.supportsFile(entry.name)
-    HE-->>App: true (.md / .htmd)
-    App->>HE: HtmdEditor.deserialize(source)
-    HE->>Codec: parse(source) + validateDocument(content)
-    Codec-->>HE: { content, issues }
-    HE-->>App: HtmdDocument { content, title, imageSources, issues }
-    App->>HD: document.displayImages(resolveAssetUrl)
-    App->>UI: mount with document.content + EditorHostServices
-    UI->>HE: new HtmdEditor({ content, editable, services, nodeViews, ... })
-    HE->>Hotkeys: registerKeyScope({ id: 'editor:htmd', priority: 'editor', ... })
-    HE->>Hotkeys: registerKeyScope({ id: 'ext:*', priority: 'extension', ... })
-    HE->>Hotkeys: registerModalTarget(element, modalTarget)
-    UI->>Hotkeys: useKeyScope({ id: 'widget:*', priority: 'widget', ... })
-    HE-->>UI: onchange(updated content)
-    UI-->>App: onchange(updated content)
-    App->>HD: document.transformImages(content, toPortablePath)
-    App->>HD: document.update(portableContent)
-    HD->>Codec: serialize(portableContent, { originalSource })
-    Codec-->>HD: UTF-8 Markdown string
-    HD-->>App: { source, title }
+    Step1 --> Step2 --> Step3 --> Step4 --> Step5 --> Step6
 ```
 
 ### Interfaces and Contracts
@@ -166,10 +144,10 @@ Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` no
 
 ### Engine Adapters and Extension System
 
-- `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own Markdown parsing, serialization, and schema validation.
-- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` on top of `defineEditorExtension` from `core-ts`.
-- `src/editor/extensions/*` contains the 15 HTMD editor extensions (including consolidated keyboard navigation for both ProseMirror bodies and NodeView controls). None of these files import `@tiptap/core`.
-- `src/editor/build-extensions.ts` is the only editor module that imports `@tiptap/core` and `@tiptap/extension-*` to compile `HtmdExtension` definitions into Tiptap extensions. See [HTMD editor extensions and compiler](htmd-ts/editor-extensions.md).
+- `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own the canonical HTMD node/mark schemas, Markdown parsing, serialization, and schema validation.
+- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` on top of `defineEditorExtension` from `core-ts` for interactive editor behavior (`keymap`, `commands`, `nodeView`, and `pmPlugins`).
+- `src/editor/extensions/*` contains the 21 HTMD editor extensions (9 node extensions including `UnparsableBlockFallback` and `UnparsableInlineFallback`, 5 document behavior extensions, and 7 modal editing extensions: `ModalEditing`, `NormalMode`, `SelectMode`, `InsertMode`, `HelixPreset`, `VimPreset`, `KakounePreset`).
+- `src/editor/build-extensions.ts` extends the canonical node schemas from `src/nodes.ts` and attaches interactive extension behavior. See [HTMD editor extensions and compiler](editor-extensions.md).
 - `src/editor/htmd-editor.ts` owns `HtmdEditor` and wraps the private Tiptap `Editor` and ProseMirror `EditorView`.
 
 ### Testing
@@ -180,17 +158,17 @@ Unsupported or malformed fragments become `unparsedBlock` or `unparsedInline` no
 
 ## References
 
-- [core-ts editor plugin architecture](core-ts.md)
-- [HTMD editor extensions and compiler](htmd-ts/editor-extensions.md)
-- [Library entry point](../../libs/htmd-ts/README.md)
-- [Public API exports](../../libs/htmd-ts/src/index.ts)
-- [Public types](../../libs/htmd-ts/src/types.ts)
-- [Conversion and validation](../../libs/htmd-ts/src/lib.ts)
-- [Node definitions and examples](../../libs/htmd-ts/src/nodes.test.ts)
-- [Mark examples](../../libs/htmd-ts/src/marks.test.ts)
-- [Complete Markdown fixture](../../libs/htmd-ts/fixtures/editor-roundtrip.md)
-- [Expected fixture JSON](../../libs/htmd-ts/fixtures/editor-roundtrip.json)
-- [System architecture](index.md)
-- [HtmdEditor Svelte component](ui/htmd-editor.md)
+- [core-ts editor plugin architecture](../core-ts.md)
+- [HTMD editor extensions and compiler](editor-extensions.md)
+- [Library entry point](../../../libs/htmd-ts/README.md)
+- [Public API exports](../../../libs/htmd-ts/src/index.ts)
+- [Public types](../../../libs/htmd-ts/src/types.ts)
+- [Conversion and validation](../../../libs/htmd-ts/src/lib.ts)
+- [Node definitions and examples](../../../libs/htmd-ts/src/nodes.test.ts)
+- [Mark examples](../../../libs/htmd-ts/src/marks.test.ts)
+- [Complete Markdown fixture](../../../libs/htmd-ts/fixtures/editor-roundtrip.md)
+- [Expected fixture JSON](../../../libs/htmd-ts/fixtures/editor-roundtrip.json)
+- [System architecture](../index.md)
+- [HtmdEditor Svelte component](../ui/htmd-editor.md)
 - [Editor source ownership](ui/editor-source.md)
 - [Development commands](../development.md)

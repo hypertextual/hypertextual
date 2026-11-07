@@ -3,21 +3,16 @@
   import { YouTube, YoutubeTimestamps } from '@cloudvoyant/helical-svelte'
   import { youtubeSurface } from './styles'
   import { Link, X } from 'lucide-svelte'
-  import { createSubscriber } from 'svelte/reactivity'
 
   // Props ---------------------------------------------------------------------
-  let { node, editor, getPos, updateAttributes, deleteNode }: LinkPreviewCardProps = $props()
+  let { node, editable, subtextRange, editor, getPos, updateAttributes, deleteNode }: LinkPreviewCardProps =
+    $props()
 
   // State ---------------------------------------------------------------------
-  const subscribe = createSubscriber((update) => editor.subscribe(update))
   let imageError = $state(false)
   let faviconError = $state(false)
 
   // Derived -------------------------------------------------------------------
-  const editable = $derived.by(() => {
-    subscribe()
-    return editor.isEditable && editor.isInsertMode
-  })
   const url = $derived((node.attrs.url as string | undefined) ?? '')
   const title = $derived((node.attrs.title as string | undefined) ?? '')
   const description = $derived((node.attrs.description as string | undefined) ?? '')
@@ -33,24 +28,6 @@
     } catch {
       return String(url ?? '')
     }
-  })
-
-  const modalSubtext = $derived.by(() => {
-    subscribe()
-    const st = editor.getSubtextCursor()
-    const pos = typeof getPos === 'function' ? getPos() : undefined
-    if (!st || st.kind !== 'linkPreviewUrl' || st.pos !== pos) return null
-    return st
-  })
-
-  const modalCharRange = $derived.by(() => {
-    if (!modalSubtext) return null
-    if (typeof modalSubtext.anchorOffset === 'number') {
-      const from = Math.min(modalSubtext.anchorOffset, modalSubtext.offset)
-      const to = Math.max(modalSubtext.anchorOffset, modalSubtext.offset)
-      return { from, to: Math.max(from + 1, to) }
-    }
-    return { from: modalSubtext.offset, to: modalSubtext.offset + 1 }
   })
 
   const chapters = $derived.by(() => {
@@ -188,13 +165,13 @@
               onblur={commitBookmarkUrl}
               class="w-full min-w-0 bg-transparent text-xs text-muted-foreground outline-none focus:text-foreground"
             />
-          {:else if modalCharRange}
+          {:else if subtextRange}
             <span data-bookmark-url-text class="truncate text-xs opacity-80"
-              >{draftUrl.slice(0, modalCharRange.from)}<span
+              >{draftUrl.slice(0, subtextRange.from)}<span
                 class="pm-modal-cursor"
                 data-pm-modal-cursor="normal"
-                >{draftUrl.slice(modalCharRange.from, modalCharRange.to) || '\u00a0'}</span
-              >{draftUrl.slice(modalCharRange.to)}</span
+                >{draftUrl.slice(subtextRange.from, subtextRange.to) || '\u00a0'}</span
+              >{draftUrl.slice(subtextRange.to)}</span
             >
           {:else}
             <span data-bookmark-url-text class="truncate text-xs opacity-80">{hostname}</span>

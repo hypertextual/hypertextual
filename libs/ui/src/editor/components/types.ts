@@ -1,7 +1,6 @@
 import type { EditorHostServices } from 'core-ts'
 import type {
   HtmdEditor,
-  HtmdNodeViewContext,
   HtmdOverlayDefinition,
   ImageUploadResult,
   JSONContent,
@@ -11,8 +10,9 @@ import type {
   SlashCommandItem,
 } from 'htmd-ts'
 import type { Snippet } from 'svelte'
+import type { SvelteNodeViewProps } from './svelte-node-view.svelte'
 
-export type UrlMentionPillProps = HtmdNodeViewContext<HtmdEditor>
+export type UrlMentionPillProps = SvelteNodeViewProps<HtmdEditor>
 
 export interface BubbleMenuProps {
   editor: HtmdEditor
@@ -75,7 +75,7 @@ export interface EditorProps {
   services?: EditorHostServices
 }
 
-export type ImageNodeViewProps = HtmdNodeViewContext<HtmdEditor>
+export type ImageNodeViewProps = SvelteNodeViewProps<HtmdEditor>
 
 export interface LinkEditPopoverProps {
   editor: HtmdEditor
@@ -85,15 +85,15 @@ export interface LinkEditPopoverProps {
   onClose: () => void
 }
 
-export type LinkPreviewCardProps = HtmdNodeViewContext<HtmdEditor>
+export type LinkPreviewCardProps = SvelteNodeViewProps<HtmdEditor>
 
-export type CodeBlockComponentProps = HtmdNodeViewContext<HtmdEditor>
+export type CodeBlockComponentProps = SvelteNodeViewProps<HtmdEditor>
 
 export interface ImageInputProps extends EditorOverlayInputProps {
   onUpload?: (file: File) => Promise<ImageUploadResult>
 }
 
-export type NoticeNodeViewProps = HtmdNodeViewContext<HtmdEditor>
+export type NoticeNodeViewProps = SvelteNodeViewProps<HtmdEditor>
 
 export interface MentionListProps {
   items: MentionItem[]

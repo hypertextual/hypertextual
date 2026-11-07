@@ -2,22 +2,39 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { defineHtmdExtension } from '../define-htmd-extension.js'
 
+// types ---------------------------------------------------------------------
+
 const pasteUrlKey = new PluginKey('pasteUrl')
 
-/** Paste a bare HTTP(S) URL as linked text before the default Link paste handler runs. */
+// api -----------------------------------------------------------------------
+
+/**
+ * Intercepts bare HTTP(S) URLs pasted from the clipboard and inserts them as
+ * linked text nodes before the default Link paste handler runs:
+ *
+ * ```text
+ * Paste "https://example.com"  -->  [https://example.com](https://example.com)|
+ * ```
+ */
 export const PasteUrl = defineHtmdExtension({
   name: 'pasteUrl',
   kind: 'behavior',
   priority: 1100,
   pmPlugins() {
-    return [
-      new Plugin({
-        key: pasteUrlKey,
-        props: { handlePaste: insertPastedUrlAsLink },
-      }),
-    ]
+    return [createPasteUrlPlugin()]
   },
 })
+
+// pm ------------------------------------------------------------------------
+
+function createPasteUrlPlugin(): Plugin {
+  return new Plugin({
+    key: pasteUrlKey,
+    props: { handlePaste: insertPastedUrlAsLink },
+  })
+}
+
+// helpers -------------------------------------------------------------------
 
 function insertPastedUrlAsLink(view: EditorView, event: ClipboardEvent): boolean {
   const value = event.clipboardData?.getData('text/plain').trim() ?? ''
