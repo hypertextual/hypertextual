@@ -12,6 +12,7 @@
     WhichKey,
   } from '@cloudvoyant/helical-svelte'
   import { FilePlus2, FolderPlus } from 'lucide-svelte'
+  import { provideEditorHostServices } from '@hypertextual/ui'
   import { invoke, isTauri } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -35,6 +36,7 @@
   const editor = workspace.editor
   const settings = workspace.settings
   const hotkeys = workspace.hotkeys
+  provideEditorHostServices(() => workspace.editorServices)
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => hotkeys.mountControllerSync())

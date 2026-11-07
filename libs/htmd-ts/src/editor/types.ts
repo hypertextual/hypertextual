@@ -19,10 +19,6 @@ export interface MentionItem {
   title?: string
 }
 
-export interface MentionListElement extends HTMLElement {
-  __mentionListKeyDown?: (event: KeyboardEvent) => boolean
-}
-
 export interface UrlMentionAttributes {
   url: string
   title: string

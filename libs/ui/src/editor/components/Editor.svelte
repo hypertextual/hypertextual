@@ -12,7 +12,6 @@
     type HtmdSuggestionMenuProps,
     type JSONContent,
     type MentionItem,
-    type MentionListElement,
     type SlashCommandItem,
   } from 'htmd-ts'
   import { createSvelteNodeView } from './svelte-node-view.svelte'
@@ -61,8 +60,6 @@
   let mentionMenuProps = $state<HtmdSuggestionMenuProps<MentionItem> | null>(null)
 
   let mentionMenuCoords = $state({ left: 0, top: 0 })
-
-  let mentionMenuEl = $state<HTMLElement | null>(null)
 
   let slashMenuSurface = $state<HTMLDivElement | null>(null)
 
@@ -155,15 +152,6 @@
           const rect = props.clientRect?.()
           if (rect) mentionMenuCoords = { left: rect.left, top: rect.bottom + 8 }
         },
-        onKeyDown: (props) => {
-          if (props.event.key === 'Escape') {
-            props.event.preventDefault()
-            props.event.stopPropagation()
-            return true
-          }
-          const child = mentionMenuEl?.firstElementChild as MentionListElement | null
-          return child?.__mentionListKeyDown?.(props.event) ?? false
-        },
         onExit: () => {
           mentionMenuProps = null
         },
@@ -251,7 +239,6 @@
     {/if}
     {#if mentionMenuProps}
       <div
-        bind:this={mentionMenuEl}
         class="fixed z-50"
         style="left: {mentionMenuCoords.left}px; top: {mentionMenuCoords.top}px;"
       >

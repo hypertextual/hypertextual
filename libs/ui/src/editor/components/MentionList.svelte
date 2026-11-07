@@ -1,15 +1,11 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
-  import type { MentionListElement } from 'htmd-ts'
   import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import type { MentionListProps } from './types'
   import { suggestionSurface, suggestionContent, suggestionItem } from './styles'
 
   // Props ---------------------------------------------------------------------
   let { items = [], command }: MentionListProps = $props()
-
-  // State ---------------------------------------------------------------------
-  let element = $state<HTMLElement | null>(null)
 
   // Derived -------------------------------------------------------------------
   const collection = $derived(
@@ -37,15 +33,6 @@
   }))
 
   // Lifecycle -----------------------------------------------------------------
-  $effect(() => {
-    if (!element) return
-    const target = element as MentionListElement
-    target.__mentionListKeyDown = onKeyDown
-    return () => {
-      delete target.__mentionListKeyDown
-    }
-  })
-
   $effect(() => {
     if (items.length && !items.some((item) => item.id === listbox().highlightedValue))
       listbox().highlightFirst()
@@ -92,7 +79,7 @@
 
   // Methods -------------------------------------------------------------------
   function onKeyDown(event: KeyboardEvent) {
-    if (!items.length) return false
+    if (!items.length || event.isComposing) return false
     if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey))
       listbox().highlightPrevious()
     else if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey))
@@ -101,17 +88,11 @@
       const value = listbox().highlightedValue
       if (value) listbox().selectValue(value)
     } else return false
-    event.preventDefault()
-    event.stopPropagation()
     return true
-  }
-
-  export function ref() {
-    return { onKeyDown }
   }
 </script>
 
-<div bind:this={element}>
+<div>
   <Listbox.RootProvider value={listbox} class={suggestionSurface}>
     <Listbox.Content aria-label="Mentions" class={suggestionContent}>
       {#if items.length === 0}

@@ -43,7 +43,6 @@ export {
   type LinkPreviewAttributes,
   type LinkPreviewFetcher,
   type MentionItem,
-  type MentionListElement,
   type NodeView,
   type NodeViewProps,
   type NodeViewRenderer,
