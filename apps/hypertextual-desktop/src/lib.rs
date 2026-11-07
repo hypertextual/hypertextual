@@ -14,12 +14,8 @@ struct FrontendReady(
 );
 
 #[tauri::command]
-fn workspace_frontend_ready(app: tauri::AppHandle, state: tauri::State<'_, FrontendReady>) {
+fn workspace_frontend_ready(state: tauri::State<'_, FrontendReady>) {
     state.0.store(true, Ordering::Relaxed);
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
 }
 
 #[tauri::command]
@@ -32,8 +28,6 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
     tauri::Builder::default()
         .manage(FrontendReady::default())
         .setup(move |app| {
-            #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Regular);
             let home = match workspace_home {
                 Some(home) => home,
                 None => app.path().home_dir()?,
@@ -42,7 +36,6 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
                 hyped_fs::WorkspaceService::from_home(home),
             ))));
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
                 let _ = window.set_focus();
             }
             Ok(())
@@ -74,16 +67,26 @@ pub fn commands(invoke: tauri::ipc::Invoke) -> bool {
 
 /// User-requested quit waits for the frontend to drain its autosave queue.
 pub fn handle_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
-    if let tauri::RunEvent::ExitRequested {
-        code: None, api, ..
-    } = event
-    {
-        if app.state::<FrontendReady>().0.load(Ordering::Relaxed)
-            && !app.webview_windows().is_empty()
-        {
-            api.prevent_exit();
-            let _ = app.emit("workspace-quit-requested", ());
+    match event {
+        tauri::RunEvent::Ready => {
+            #[cfg(target_os = "macos")]
+            let _ = app.show();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
         }
+        tauri::RunEvent::ExitRequested {
+            code: None, api, ..
+        } => {
+            if app.state::<FrontendReady>().0.load(Ordering::Relaxed)
+                && !app.webview_windows().is_empty()
+            {
+                api.prevent_exit();
+                let _ = app.emit("workspace-quit-requested", ());
+            }
+        }
+        _ => {}
     }
 }
 

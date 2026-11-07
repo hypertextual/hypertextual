@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: { dedupe: ['svelte', '@tiptap/core', '@tiptap/pm'] },
   server: {
     host: '127.0.0.1',
-    port: 1420,
+    port: Number(process.env.HYPERTEXTUAL_WEB_PORT ?? 1420),
     strictPort: true,
   },
   build: {

@@ -14,7 +14,6 @@
       {
         "label": "main",
         "title": "Hypertextual",
-        "focus": true,
         "width": 1120,
         "height": 720,
         "titleBarStyle": "Overlay",
