@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  createWhichKeyController,
+  type KeymapMode,
+  type WhichKeyNode,
+} from '@cloudvoyant/helical-ui'
+import {
   DefaultEmbeddedEditorRegistry,
-  KeyScopeDispatcher,
   type Editor,
   type EditorHotkeyService,
   type EditorMediaAsset,
@@ -60,40 +64,60 @@ function createKeyEvent(key: string, target?: unknown): KeyboardEvent {
 }
 
 function createTestHotkeyService(initialMode: EditorMode = 'insert') {
-  const dispatcher = new KeyScopeDispatcher()
-  let currentMode: EditorMode = initialMode
-  let currentPreset: EditorPreset = 'helix'
-  const listeners = new Set<
-    (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void
-  >()
-  const emit = () => {
-    for (const listener of listeners) {
-      listener({ mode: currentMode, preset: currentPreset, overlayOpen: false })
-    }
-  }
+  const controller = createWhichKeyController({
+    defaultMode: initialMode as KeymapMode,
+    disableOnMobile: false,
+  })
   const hotkeys: EditorHotkeyService = {
-    registerKeyScope: (scope) => dispatcher.register(scope),
-    registerCommand: () => () => {},
-    focusPane: () => false,
-    dispatchKeyDown: (event) => dispatcher.dispatch(event, currentMode),
-    getActiveBindings: () => dispatcher.getActiveBindings(currentMode),
-    getMode: () => currentMode,
-    setMode: (mode) => {
-      currentMode = mode
-      emit()
-    },
-    getPreset: () => currentPreset,
-    setPreset: (preset) => {
-      currentPreset = preset
-      emit()
-    },
+    registerKeyScope: (scope) =>
+      controller.registerKeymap(
+        scope.id,
+        () => {
+          const resolved = typeof scope.keymap === 'function' ? scope.keymap() : scope.keymap
+          const nodes: Record<string, WhichKeyNode> = {}
+          for (const [rawKey, binding] of Object.entries(resolved)) {
+            if (!binding) continue
+            const mode: KeymapMode | KeymapMode[] = binding.mode
+              ? Array.isArray(binding.mode)
+                ? ([...binding.mode] as KeymapMode[])
+                : (binding.mode as KeymapMode)
+              : ['normal', 'select', 'insert']
+            nodes[rawKey] = {
+              key: rawKey,
+              label: binding.label,
+              mode,
+              when: binding.when
+                ? (ctx) => (ctx.event ? binding.when!(scope.getContext(), ctx.event) : false)
+                : undefined,
+              action: (ctx) => (ctx.event ? binding.run(scope.getContext(), ctx.event) : false),
+            }
+          }
+          return nodes
+        },
+        {
+          priority: scope.priority,
+          enabled: scope.enabled,
+          ...((typeof scope.element === 'function' ? scope.element() : scope.element)
+            ? { element: scope.element }
+            : {}),
+        },
+      ),
+    dispatchKeyDown: (event) => controller.handleKeyDown(event),
+    getMode: () => controller.getState().mode as EditorMode,
+    setMode: (mode) => controller.setMode(mode as KeymapMode),
+    getPreset: () => controller.getState().preset as EditorPreset,
+    setPreset: (preset) => controller.setPreset(preset),
     isOverlayOpen: () => false,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
+    subscribe: (listener) =>
+      controller.subscribe((state) => {
+        listener({
+          mode: state.mode as EditorMode,
+          preset: state.preset as EditorPreset,
+          overlayOpen: Boolean(state.isOpen || state.explorerOpen),
+        })
+      }),
   }
-  return { dispatcher, hotkeys }
+  return { controller, hotkeys }
 }
 
 // integration ---------------------------------------------------------------
@@ -243,11 +267,15 @@ describe('Given an HtmdEditor with a mounted embedded child editor', () => {
       const { hotkeys } = createTestHotkeyService('insert')
       const embedRegistry = new DefaultEmbeddedEditorRegistry()
       const parentTarget = {
+        nodeType: 1,
+        parentElement: null,
         contains(node: unknown) {
           return node === parentTarget || node === childTarget
         },
       } as unknown as HTMLElement
       const childTarget = {
+        nodeType: 1,
+        parentElement: parentTarget,
         contains(node: unknown) {
           return node === childTarget
         },
@@ -351,11 +379,15 @@ describe('Given an HtmdEditor with a mounted embedded child editor', () => {
       const { hotkeys } = createTestHotkeyService('insert')
       const embedRegistry = new DefaultEmbeddedEditorRegistry()
       const parentTarget = {
+        nodeType: 1,
+        parentElement: null,
         contains(node: unknown) {
           return node === parentTarget || node === childTarget
         },
       } as unknown as HTMLElement
       const childTarget = {
+        nodeType: 1,
+        parentElement: parentTarget,
         contains(node: unknown) {
           return node === childTarget
         },

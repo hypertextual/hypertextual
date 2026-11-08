@@ -39,8 +39,6 @@
   provideEditorHostServices(() => workspace.editorServices)
 
   // Lifecycle -----------------------------------------------------------------
-  $effect(() => hotkeys.mountControllerSync())
-
   onMount(() => {
     let active = true
     const isActive = () => active

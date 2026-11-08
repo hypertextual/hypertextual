@@ -7,39 +7,34 @@ import {
   type ModalEditorTarget,
 } from '@cloudvoyant/helical-ui'
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
-import {
-  type EditorCommandDefinition,
-  type EditorHotkeyService,
-  type EditorMode,
-  type EditorPreset,
-  type KeyBinding,
-  type KeyScopeOptions,
-} from 'core-ts'
+import type { EditorHotkeyService, EditorMode, EditorPreset, KeyScopeOptions } from 'core-ts'
 import { registerKeyScopeWithWhichKey, themeService } from '@hypertextual/ui'
 import type { WorkspaceService } from './workspaceService.svelte'
+
+function leaf(
+  key: string,
+  label: string,
+  category: string,
+  commandId: string,
+  description: string,
+  mode?: KeymapMode[],
+): WhichKeyNode {
+  return { key, label, category, commandId, description, ...(mode ? { mode } : {}) }
+}
 
 /** Application keyboard shortcuts, leader menu, and pane focus navigation. */
 export class HotkeyService implements EditorHotkeyService {
   sidebarOpen = $state(true)
 
-  private readonly scopes = new Map<string, KeyScopeOptions<unknown>>()
-  private readonly registeredCommands = new Map<string, EditorCommandDefinition>()
-  private readonly listeners = new Set<
-    (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void
-  >()
-  private currentMode: EditorMode = 'normal'
-  private currentPreset: EditorPreset = 'helix'
-  private currentOverlayOpen = false
-
   readonly keymap: Record<string, WhichKeyNode> = {
-    'Control+e': {
-      key: 'Control+e',
-      label: 'Toggle Explorer',
-      description: 'Toggle the Workspace Explorer sidebar open or closed',
-      category: 'Workspace',
-      mode: ['normal', 'select'],
-      commandId: 'workspace.toggleExplorer',
-    },
+    'Control+e': leaf(
+      'Control+e',
+      'Toggle Explorer',
+      'Workspace',
+      'workspace.toggleExplorer',
+      'Toggle the Workspace Explorer sidebar open or closed',
+      ['normal', 'select'],
+    ),
     Space: {
       key: 'Space',
       label: '+leader',
@@ -47,40 +42,36 @@ export class HotkeyService implements EditorHotkeyService {
       category: 'Leader',
       mode: ['normal', 'select'],
       expand: () => {
-        const viewKey =
-          typeof document !== 'undefined' &&
-          getDocumentWhichKeyController(document)?.getState().preset === 'kakoune'
-            ? 'v'
-            : 'z'
+        const viewKey = this.getPreset() === 'kakoune' ? 'v' : 'z'
         return {
-          '?': {
-            key: '?',
-            label: 'Keybind Help',
-            description: 'Open searchable keybinding exploration menu (<leader>?)',
-            category: 'Leader',
-            commandId: 'whichKey.openExplorer',
-          },
-          e: {
-            key: 'e',
-            label: 'Toggle Explorer',
-            description: 'Toggle the Workspace Explorer sidebar open or closed',
-            category: 'Workspace',
-            commandId: 'workspace.toggleExplorer',
-          },
-          n: {
-            key: 'n',
-            label: 'New Article',
-            description: 'Create a new article in the workspace',
-            category: 'Workspace',
-            commandId: 'workspace.newArticle',
-          },
-          N: {
-            key: 'N',
-            label: 'New Folder',
-            description: 'Create a new folder in the workspace',
-            category: 'Workspace',
-            commandId: 'workspace.newFolder',
-          },
+          '?': leaf(
+            '?',
+            'Keybind Help',
+            'Leader',
+            'whichKey.openExplorer',
+            'Open searchable keybinding exploration menu (<leader>?)',
+          ),
+          e: leaf(
+            'e',
+            'Toggle Explorer',
+            'Workspace',
+            'workspace.toggleExplorer',
+            'Toggle the Workspace Explorer sidebar open or closed',
+          ),
+          n: leaf(
+            'n',
+            'New Article',
+            'Workspace',
+            'workspace.newArticle',
+            'Create a new article in the workspace',
+          ),
+          N: leaf(
+            'N',
+            'New Folder',
+            'Workspace',
+            'workspace.newFolder',
+            'Create a new folder in the workspace',
+          ),
           f: {
             key: 'f',
             label: '+file',
@@ -88,50 +79,50 @@ export class HotkeyService implements EditorHotkeyService {
             description: 'Workspace file operations',
             category: 'Workspace',
             children: {
-              n: {
-                key: 'n',
-                label: 'New Article',
-                description: 'Create a new article in the workspace',
-                category: 'Workspace',
-                commandId: 'workspace.newArticle',
-              },
-              N: {
-                key: 'N',
-                label: 'New Folder',
-                description: 'Create a new folder in the workspace',
-                category: 'Workspace',
-                commandId: 'workspace.newFolder',
-              },
-              r: {
-                key: 'r',
-                label: 'Rename File',
-                description: 'Rename the selected file in the Workspace Explorer',
-                category: 'Workspace',
-                commandId: 'workspace.renameSelected',
-              },
-              d: {
-                key: 'd',
-                label: 'Move to Trash',
-                description: 'Move the selected file to Trash',
-                category: 'Workspace',
-                commandId: 'workspace.deleteSelected',
-              },
-              o: {
-                key: 'o',
-                label: 'Open In Default App',
-                description: 'Open the selected file in the default desktop application',
-                category: 'Workspace',
-                commandId: 'workspace.openInDefaultApp',
-              },
+              n: leaf(
+                'n',
+                'New Article',
+                'Workspace',
+                'workspace.newArticle',
+                'Create a new article in the workspace',
+              ),
+              N: leaf(
+                'N',
+                'New Folder',
+                'Workspace',
+                'workspace.newFolder',
+                'Create a new folder in the workspace',
+              ),
+              r: leaf(
+                'r',
+                'Rename File',
+                'Workspace',
+                'workspace.renameSelected',
+                'Rename the selected file in the Workspace Explorer',
+              ),
+              d: leaf(
+                'd',
+                'Move to Trash',
+                'Workspace',
+                'workspace.deleteSelected',
+                'Move the selected file to Trash',
+              ),
+              o: leaf(
+                'o',
+                'Open In Default App',
+                'Workspace',
+                'workspace.openInDefaultApp',
+                'Open the selected file in the default desktop application',
+              ),
             },
           },
-          '/': {
-            key: '/',
-            label: 'Search',
-            description: 'Search commands and keybindings',
-            category: 'Leader',
-            commandId: 'whichKey.openExplorer',
-          },
+          '/': leaf(
+            '/',
+            'Search',
+            'Leader',
+            'whichKey.openExplorer',
+            'Search commands and keybindings',
+          ),
           g: {
             key: 'g',
             label: '+goto',
@@ -140,13 +131,13 @@ export class HotkeyService implements EditorHotkeyService {
             category: 'Goto',
             proxy: ['g'],
           },
-          j: {
-            key: 'j',
-            label: 'Jump to Element',
-            description: 'Show 2D home-row jump labels over visible controls',
-            category: 'Navigation',
-            commandId: 'jump.start',
-          },
+          j: leaf(
+            'j',
+            'Jump to Element',
+            'Navigation',
+            'jump.start',
+            'Show 2D home-row jump labels over visible controls',
+          ),
           w: {
             key: 'w',
             label: '+window',
@@ -169,27 +160,27 @@ export class HotkeyService implements EditorHotkeyService {
             group: 'Toggles',
             category: 'Workspace',
             children: {
-              o: {
-                key: 'o',
-                label: 'Toggle Pane Outline',
-                description: 'Toggle the focus outline on the active workspace or editor pane',
-                category: 'Workspace',
-                commandId: 'settings.togglePaneOutline',
-              },
-              c: {
-                key: 'c',
-                label: 'Toggle Click to Insert',
-                description: 'Toggle whether clicking the article enters insert mode',
-                category: 'Workspace',
-                commandId: 'settings.toggleClickToInsert',
-              },
-              d: {
-                key: 'd',
-                label: 'Cycle Theme Mode',
-                description: 'Cycle between system, light, and dark theme modes',
-                category: 'Workspace',
-                commandId: 'settings.cycleThemeMode',
-              },
+              o: leaf(
+                'o',
+                'Toggle Pane Outline',
+                'Workspace',
+                'settings.togglePaneOutline',
+                'Toggle the focus outline on the active workspace or editor pane',
+              ),
+              c: leaf(
+                'c',
+                'Toggle Click to Insert',
+                'Workspace',
+                'settings.toggleClickToInsert',
+                'Toggle whether clicking the article enters insert mode',
+              ),
+              d: leaf(
+                'd',
+                'Cycle Theme Mode',
+                'Workspace',
+                'settings.cycleThemeMode',
+                'Cycle between system, light, and dark theme modes',
+              ),
             },
           },
           k: {
@@ -199,27 +190,27 @@ export class HotkeyService implements EditorHotkeyService {
             description: 'Switch modal grammar (Helix / Vim / Kakoune)',
             category: 'Leader',
             children: {
-              h: {
-                key: 'h',
-                label: 'Helix Preset',
-                description: 'Switch to Helix selection-first grammar (default)',
-                category: 'Preset',
-                commandId: 'preset.helix',
-              },
-              v: {
-                key: 'v',
-                label: 'Vim Preset',
-                description: 'Switch to Vim operator-motion grammar',
-                category: 'Preset',
-                commandId: 'preset.vim',
-              },
-              k: {
-                key: 'k',
-                label: 'Kakoune Preset',
-                description: 'Switch to Kakoune object-verb grammar',
-                category: 'Preset',
-                commandId: 'preset.kakoune',
-              },
+              h: leaf(
+                'h',
+                'Helix Preset',
+                'Preset',
+                'preset.helix',
+                'Switch to Helix selection-first grammar (default)',
+              ),
+              v: leaf(
+                'v',
+                'Vim Preset',
+                'Preset',
+                'preset.vim',
+                'Switch to Vim operator-motion grammar',
+              ),
+              k: leaf(
+                'k',
+                'Kakoune Preset',
+                'Preset',
+                'preset.kakoune',
+                'Switch to Kakoune object-verb grammar',
+              ),
             },
           },
         }
@@ -251,7 +242,7 @@ export class HotkeyService implements EditorHotkeyService {
           editor.selected.path !== previousPath &&
           editor.setEditable(true)
         ) {
-          getDocumentWhichKeyController(document)?.setMode('insert')
+          this.setMode('insert')
           void tick().then(() => {
             document.querySelector<HTMLElement>('.ProseMirror')?.focus()
           })
@@ -294,73 +285,62 @@ export class HotkeyService implements EditorHotkeyService {
 
   constructor(private readonly workspace: WorkspaceService) {}
 
+  private get controller() {
+    return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null
+  }
+
   getMode(): EditorMode {
-    this.syncFromController()
-    return this.currentMode
+    return (this.controller?.getState().mode as EditorMode) ?? 'normal'
   }
 
   setMode(mode: EditorMode): void {
-    this.currentMode = mode
-    if (typeof document !== 'undefined') {
-      const controller = getDocumentWhichKeyController(document)
-      if (controller && controller.getState().mode !== mode) {
-        controller.setMode(mode as KeymapMode)
-      }
+    const controller = this.controller
+    if (controller && controller.getState().mode !== mode) {
+      controller.setMode(mode as KeymapMode)
     }
-    this.emit()
   }
 
   getPreset(): EditorPreset {
-    this.syncFromController()
-    return this.currentPreset
+    return (this.controller?.getState().preset as EditorPreset) ?? 'helix'
   }
 
   setPreset(preset: EditorPreset): void {
-    this.currentPreset = preset
-    if (typeof document !== 'undefined') {
-      const controller = getDocumentWhichKeyController(document)
-      if (controller && controller.getState().preset !== preset) {
-        controller.setPreset(preset)
-      }
+    const controller = this.controller
+    if (controller && controller.getState().preset !== preset) {
+      controller.setPreset(preset)
     }
-    this.emit()
   }
 
   isOverlayOpen(): boolean {
-    this.syncFromController()
-    return this.currentOverlayOpen
+    const state = this.controller?.getState()
+    return Boolean(state?.isOpen || state?.explorerOpen)
   }
 
   subscribe(
     listener: (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void,
   ): () => void {
-    this.listeners.add(listener)
+    if (typeof document === 'undefined') return () => {}
+    let unsubController: (() => void) | undefined
+    const attach = () => {
+      unsubController?.()
+      unsubController = this.controller?.subscribe((state) => {
+        listener({
+          mode: state.mode as EditorMode,
+          preset: state.preset as EditorPreset,
+          overlayOpen: Boolean(state.isOpen || state.explorerOpen),
+        })
+      })
+    }
+    attach()
+    const unsubDoc = subscribeDocumentWhichKeyController(document, attach)
     return () => {
-      this.listeners.delete(listener)
+      unsubDoc()
+      unsubController?.()
     }
   }
 
   registerKeyScope<TCtx>(options: KeyScopeOptions<TCtx>): () => void {
-    this.scopes.set(options.id, options as KeyScopeOptions<unknown>)
-    const unsubWhichKey = registerKeyScopeWithWhichKey(options)
-    return () => {
-      if (this.scopes.get(options.id) === (options as KeyScopeOptions<unknown>)) {
-        this.scopes.delete(options.id)
-      }
-      unsubWhichKey()
-    }
-  }
-
-  registerCommand(command: EditorCommandDefinition): () => void {
-    this.registeredCommands.set(command.id, command)
-    const unsubController =
-      typeof document !== 'undefined'
-        ? getDocumentWhichKeyController(document)?.registerCommand(command.id, () => command.run())
-        : undefined
-    return () => {
-      this.registeredCommands.delete(command.id)
-      unsubController?.()
-    }
+    return registerKeyScopeWithWhichKey(options)
   }
 
   registerModalTarget(element: HTMLElement, target: unknown): () => void {
@@ -368,33 +348,11 @@ export class HotkeyService implements EditorHotkeyService {
   }
 
   focusPane(paneId: string): boolean {
-    if (typeof document === 'undefined') return false
-    return getDocumentWhichKeyController(document)?.focusPane(paneId) ?? false
+    return this.controller?.focusPane(paneId) ?? false
   }
 
   dispatchKeyDown(event: KeyboardEvent): boolean {
-    if (typeof document === 'undefined') return false
-    return getDocumentWhichKeyController(document)?.handleKeyDown(event) ?? false
-  }
-
-  getActiveBindings(): KeyBinding<unknown>[] {
-    this.syncFromController()
-    const result: KeyBinding<unknown>[] = []
-    for (const scope of this.scopes.values()) {
-      if (scope.enabled && !scope.enabled()) continue
-      const keymap = typeof scope.keymap === 'function' ? scope.keymap() : scope.keymap
-      for (const binding of Object.values(keymap)) {
-        if (!binding) continue
-        if (binding.mode) {
-          const matches = Array.isArray(binding.mode)
-            ? binding.mode.includes(this.currentMode)
-            : binding.mode === this.currentMode
-          if (!matches) continue
-        }
-        result.push(binding)
-      }
-    }
-    return result
+    return this.controller?.handleKeyDown(event) ?? false
   }
 
   setSidebarOpen(open: boolean): void {
@@ -408,7 +366,7 @@ export class HotkeyService implements EditorHotkeyService {
     // Wait for Sidebar's pane registration effect to settle before focusing (see CLO-209).
     void tick().then(() => {
       requestAnimationFrame(() => {
-        getDocumentWhichKeyController(document)?.focusPane(targetPane)
+        this.focusPane(targetPane)
       })
     })
     return true
@@ -416,17 +374,14 @@ export class HotkeyService implements EditorHotkeyService {
 
   focusArticlePane(): void {
     if (typeof document === 'undefined') return
-    if (!getDocumentWhichKeyController(document)?.focusPane('article')) {
+    if (!this.focusPane('article')) {
       document.querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')?.focus()
     }
   }
 
   handleModeChange(nextMode: KeymapMode): void {
-    this.currentMode = nextMode as EditorMode
-    this.emit()
     if (typeof document === 'undefined') return
-    const controller = getDocumentWhichKeyController(document)
-    if (controller?.getState().explorerOpen) return
+    if (this.controller?.getState().explorerOpen) return
     if (nextMode === 'insert') {
       const active = document.activeElement
       if (
@@ -438,64 +393,6 @@ export class HotkeyService implements EditorHotkeyService {
       }
     } else {
       this.workspace.editor.setEditable(false)
-    }
-  }
-
-  mountControllerSync(): () => void {
-    if (typeof document === 'undefined') return () => {}
-
-    let cleanupSub: (() => void) | undefined
-    const attachSub = () => {
-      cleanupSub?.()
-      const controller = getDocumentWhichKeyController(document)
-      if (!controller) return
-      this.syncFromController()
-      let prevExplorerOpen = controller.getState().explorerOpen
-      cleanupSub = controller.subscribe((state) => {
-        this.currentMode = state.mode as EditorMode
-        this.currentPreset = state.preset as EditorPreset
-        this.currentOverlayOpen = Boolean(state.isOpen || state.explorerOpen)
-        this.emit()
-
-        if (prevExplorerOpen && !state.explorerOpen && !this.workspace.editor.editable) {
-          prevExplorerOpen = false
-          queueMicrotask(() => controller.setMode('normal'))
-          requestAnimationFrame(() => {
-            if (!this.workspace.editor.editable && controller.getState().mode === 'insert') {
-              controller.setMode('normal')
-            }
-          })
-          return
-        }
-        prevExplorerOpen = state.explorerOpen
-      })
-    }
-    attachSub()
-    const unsubRoot = subscribeDocumentWhichKeyController(document, attachSub)
-    return () => {
-      cleanupSub?.()
-      unsubRoot()
-    }
-  }
-
-  private syncFromController(): void {
-    if (typeof document === 'undefined') return
-    const controller = getDocumentWhichKeyController(document)
-    if (!controller) return
-    const state = controller.getState()
-    this.currentMode = state.mode as EditorMode
-    this.currentPreset = state.preset as EditorPreset
-    this.currentOverlayOpen = Boolean(state.isOpen || state.explorerOpen)
-  }
-
-  private emit(): void {
-    const snapshot = {
-      mode: this.currentMode,
-      preset: this.currentPreset,
-      overlayOpen: this.currentOverlayOpen,
-    }
-    for (const listener of this.listeners) {
-      listener(snapshot)
     }
   }
 }

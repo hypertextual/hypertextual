@@ -6,7 +6,7 @@ Engine- and framework-neutral TypeScript contracts for Hypertextual editor plugi
 
 - Abstract `Editor`, `EditorFormatAdapter`, and `EditorDocument` contracts for multi-format editors.
 - `defineEditorExtension` builder for options, storage, commands, and scoped keymaps.
-- `KeyScopeDispatcher` with DOM containment and priority ordering (`overlay` -> `widget` -> `extension` -> `editor` -> `pane` -> `global`).
+- `KeyBinding`, `Keymap`, and `KeyScopeOptions` contracts with priority ordering (`overlay` -> `widget` -> `extension` -> `editor` -> `pane` -> `global`) and `matchesKeyBinding`.
 - `EditorHostServices` for hotkeys, notifications, media reading/writing, and recursive editor embedding.
 
 ## Quick start

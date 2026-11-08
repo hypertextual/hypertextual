@@ -57,14 +57,6 @@ export interface KeyScopeOptions<TCtx = unknown> {
   keymap: Keymap<TCtx> | (() => Keymap<TCtx>)
 }
 
-export interface EditorCommandDefinition {
-  id: string
-  label?: string
-  description?: string
-  category?: string
-  run: () => boolean
-}
-
 export interface EditorHotkeyService {
   getMode(): EditorMode
   setMode(mode: EditorMode): void
@@ -75,11 +67,8 @@ export interface EditorHotkeyService {
     listener: (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void,
   ): () => void
   registerKeyScope<TCtx>(options: KeyScopeOptions<TCtx>): () => void
-  registerCommand(command: EditorCommandDefinition): () => void
   registerModalTarget?(element: HTMLElement, target: unknown): () => void
-  focusPane(paneId: string): boolean
   dispatchKeyDown(event: KeyboardEvent): boolean
-  getActiveBindings(): KeyBinding<unknown>[]
 }
 
 export interface EmbeddedEditorMountOptions<TDoc = unknown> {
