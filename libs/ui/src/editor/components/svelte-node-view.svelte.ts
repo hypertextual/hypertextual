@@ -2,8 +2,7 @@ import type { HtmdEditor, HtmdNodeViewContext, NodeViewRenderer } from 'htmd-ts'
 import { getAllContexts, mount, unmount, type Component } from 'svelte'
 import { createSubscriber, SvelteMap } from 'svelte/reactivity'
 
-export interface SvelteNodeViewProps<TEditor = HtmdEditor>
-  extends HtmdNodeViewContext<TEditor> {
+export interface SvelteNodeViewProps<TEditor = HtmdEditor> extends HtmdNodeViewContext<TEditor> {
   readonly editable: boolean
   readonly subtextRange: { from: number; to: number } | null
 }

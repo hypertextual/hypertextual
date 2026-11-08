@@ -717,9 +717,9 @@ describe('Given an HtmdEditor in select mode', () => {
       const yanked = target.execOperator('yank', { preset: 'helix', mode: 'select', count: 1 })
       expect(typeof yanked === 'object' && yanked.yankedText).toContain('Paragraph to transform')
 
-      expect(
-        target.execOperator('pasteAfter', { preset: 'helix', mode: 'normal', count: 1 }),
-      ).toBe(true)
+      expect(target.execOperator('pasteAfter', { preset: 'helix', mode: 'normal', count: 1 })).toBe(
+        true,
+      )
       target.move('lineSelect', { preset: 'helix', mode: 'normal', count: 1 })
       expect(
         Boolean(target.execOperator('delete', { preset: 'helix', mode: 'select', count: 1 })),

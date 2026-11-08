@@ -8,7 +8,6 @@ import {
 } from '@cloudvoyant/helical-ui'
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
 import {
-  KeyScopeDispatcher,
   type EditorCommandDefinition,
   type EditorHotkeyService,
   type EditorMode,
@@ -16,18 +15,14 @@ import {
   type KeyBinding,
   type KeyScopeOptions,
 } from 'core-ts'
-import { themeService } from '@hypertextual/ui'
+import { registerKeyScopeWithWhichKey, themeService } from '@hypertextual/ui'
 import type { WorkspaceService } from './workspaceService.svelte'
 
 /** Application keyboard shortcuts, leader menu, and pane focus navigation. */
 export class HotkeyService implements EditorHotkeyService {
   sidebarOpen = $state(true)
 
-  // TODO(HYPE-170): Delegate scoped keymap registration and dispatch directly to
-  // `@cloudvoyant/helical-ui`'s `WhichKeyController.registerKeymap` and remove
-  // the separate `KeyScopeDispatcher` capture-phase listener once upstream
-  // supports priority tiers, DOM containment, insert-mode layers, and fallthrough.
-  private readonly dispatcher = new KeyScopeDispatcher()
+  private readonly scopes = new Map<string, KeyScopeOptions<unknown>>()
   private readonly registeredCommands = new Map<string, EditorCommandDefinition>()
   private readonly listeners = new Set<
     (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void
@@ -35,7 +30,6 @@ export class HotkeyService implements EditorHotkeyService {
   private currentMode: EditorMode = 'normal'
   private currentPreset: EditorPreset = 'helix'
   private currentOverlayOpen = false
-  private currentPrefixActive = false
 
   readonly keymap: Record<string, WhichKeyNode> = {
     'Control+e': {
@@ -347,7 +341,14 @@ export class HotkeyService implements EditorHotkeyService {
   }
 
   registerKeyScope<TCtx>(options: KeyScopeOptions<TCtx>): () => void {
-    return this.dispatcher.register(options)
+    this.scopes.set(options.id, options as KeyScopeOptions<unknown>)
+    const unsubWhichKey = registerKeyScopeWithWhichKey(options)
+    return () => {
+      if (this.scopes.get(options.id) === (options as KeyScopeOptions<unknown>)) {
+        this.scopes.delete(options.id)
+      }
+      unsubWhichKey()
+    }
   }
 
   registerCommand(command: EditorCommandDefinition): () => void {
@@ -372,16 +373,28 @@ export class HotkeyService implements EditorHotkeyService {
   }
 
   dispatchKeyDown(event: KeyboardEvent): boolean {
-    this.syncFromController()
-    return this.dispatcher.dispatch(event, this.currentMode, {
-      overlayOpen: this.currentOverlayOpen,
-      prefixActive: this.currentPrefixActive,
-    })
+    if (typeof document === 'undefined') return false
+    return getDocumentWhichKeyController(document)?.handleKeyDown(event) ?? false
   }
 
   getActiveBindings(): KeyBinding<unknown>[] {
     this.syncFromController()
-    return this.dispatcher.getActiveBindings(this.currentMode)
+    const result: KeyBinding<unknown>[] = []
+    for (const scope of this.scopes.values()) {
+      if (scope.enabled && !scope.enabled()) continue
+      const keymap = typeof scope.keymap === 'function' ? scope.keymap() : scope.keymap
+      for (const binding of Object.values(keymap)) {
+        if (!binding) continue
+        if (binding.mode) {
+          const matches = Array.isArray(binding.mode)
+            ? binding.mode.includes(this.currentMode)
+            : binding.mode === this.currentMode
+          if (!matches) continue
+        }
+        result.push(binding)
+      }
+    }
+    return result
   }
 
   setSidebarOpen(open: boolean): void {
@@ -430,10 +443,6 @@ export class HotkeyService implements EditorHotkeyService {
 
   mountControllerSync(): () => void {
     if (typeof document === 'undefined') return () => {}
-    const handleWindowKeyDown = (event: KeyboardEvent) => {
-      this.dispatchKeyDown(event)
-    }
-    window.addEventListener('keydown', handleWindowKeyDown, true)
 
     let cleanupSub: (() => void) | undefined
     const attachSub = () => {
@@ -446,7 +455,6 @@ export class HotkeyService implements EditorHotkeyService {
         this.currentMode = state.mode as EditorMode
         this.currentPreset = state.preset as EditorPreset
         this.currentOverlayOpen = Boolean(state.isOpen || state.explorerOpen)
-        this.currentPrefixActive = state.activePath.length > 0 || state.countBuffer.length > 0
         this.emit()
 
         if (prevExplorerOpen && !state.explorerOpen && !this.workspace.editor.editable) {
@@ -465,7 +473,6 @@ export class HotkeyService implements EditorHotkeyService {
     attachSub()
     const unsubRoot = subscribeDocumentWhichKeyController(document, attachSub)
     return () => {
-      window.removeEventListener('keydown', handleWindowKeyDown, true)
       cleanupSub?.()
       unsubRoot()
     }
@@ -479,7 +486,6 @@ export class HotkeyService implements EditorHotkeyService {
     this.currentMode = state.mode as EditorMode
     this.currentPreset = state.preset as EditorPreset
     this.currentOverlayOpen = Boolean(state.isOpen || state.explorerOpen)
-    this.currentPrefixActive = state.activePath.length > 0 || state.countBuffer.length > 0
   }
 
   private emit(): void {

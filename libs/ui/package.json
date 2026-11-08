@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@ark-ui/svelte": "5.24.3",
-    "@cloudvoyant/helical-svelte": "0.21.1-rc.202611031218.5085f0d",
-    "@cloudvoyant/helical-ui": "0.21.1-rc.202611031218.5085f0d",
+    "@cloudvoyant/helical-svelte": "0.22.0-rc.202611081006.d29db68",
+    "@cloudvoyant/helical-ui": "0.22.0-rc.202611081006.d29db68",
     "class-variance-authority": "0.7.1",
     "core-ts": "workspace:*",
     "htmd-ts": "workspace:*",

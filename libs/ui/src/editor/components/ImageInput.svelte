@@ -48,7 +48,6 @@
     priority: 'overlay',
     element: () => dialogElement,
     enabled: () => Boolean(dialogElement),
-    hotkeys: () => editor.services.hotkeys,
     getContext: () => null,
     keymap: {
       Enter: {

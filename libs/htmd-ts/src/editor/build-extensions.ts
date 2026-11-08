@@ -286,6 +286,13 @@ export function compileHtmdExtension<
                 return null
               }
             },
+            matchesTarget: (target, activeElement) =>
+              (typeof Element !== 'undefined' &&
+                target instanceof Element &&
+                Boolean(target.closest('[data-editor-controls]'))) ||
+              (typeof Element !== 'undefined' &&
+                activeElement instanceof Element &&
+                Boolean(activeElement.closest('[data-editor-controls]'))),
             enabled: () => Boolean(editorRef?.schema),
             getContext: () => toCommandContext(editorRef),
             keymap: () => getExtensionKeymap(editorRef, optionsRef, storageRef),
@@ -318,8 +325,8 @@ export function compileHtmdExtension<
               if (scopeEl && targetNode && !scopeEl.contains(targetNode)) return
               const ctx = toCommandContext(editorRef)
               const mode: EditorMode =
-                (modalKeymapPluginKey.getState(editorRef.state)?.mode as
-                  EditorMode | undefined) ?? (editorRef.isEditable ? 'insert' : 'normal')
+                (modalKeymapPluginKey.getState(editorRef.state)?.mode as EditorMode | undefined) ??
+                (editorRef.isEditable ? 'insert' : 'normal')
               const keymap = getExtensionKeymap(editorRef, optionsRef, storageRef)
               for (const [key, binding] of Object.entries(keymap)) {
                 if (!matchesKeyBinding(event, key)) continue

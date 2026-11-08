@@ -5,6 +5,7 @@ export { default as HtmdEditor } from './editor/HtmdEditor.svelte'
 export type { EditorImageUploadResult, EditorHandle, HtmdEditorProps } from './editor/types'
 export {
   useKeyScope,
+  registerKeyScopeWithWhichKey,
   provideEditorHostServices,
   useOptionalEditorHostServices,
   type UseKeyScopeOptions,
