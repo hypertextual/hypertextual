@@ -19,7 +19,8 @@ mise run //libs/htmd-ts:test
 
 ## Docs
 
-- [Architecture and public API](../../docs/architecture/htmd-ts.md): package boundaries, Markdown syntax, conversion, and recovery.
+- [Architecture and public API](../../docs/architecture/htmd-ts/index.md): package boundaries, Markdown syntax, conversion, and recovery.
+- [Editor extensions and ProseMirror/Tiptap architecture](../../docs/architecture/htmd-ts/editor-extensions.md): extension compiler, Svelte NodeViews, and modal editing.
 - [Development](../../docs/development.md): setup, commands, and test suites.
 - [System architecture](../../docs/architecture/index.md): app orchestration and package relationships.
 

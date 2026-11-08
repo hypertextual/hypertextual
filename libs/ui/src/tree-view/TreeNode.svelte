@@ -32,6 +32,10 @@
   const id = $props.id()
   const renameErrorId = `${id}-rename-error`
   const rowClass = treeViewRowVariants()
+  // Derived -------------------------------------------------------------------
+  const isDefaultFocusTarget = $derived(
+    indexPath.length === 1 && indexPath[0] === 0 && (tree().selectedValue?.length ?? 0) === 0,
+  )
 
   // Methods -------------------------------------------------------------------
   function action(value: string) {
@@ -69,7 +73,7 @@
                 class={rowClass}
                 title={node.description ?? node.value}
                 data-which-key-target=""
-                data-pane-focus-target={state().selected ? '' : undefined}
+                data-pane-focus-target={state().selected || isDefaultFocusTarget ? '' : undefined}
                 data-tree-node-value={node.value}
                 data-tree-node-branch="true"
               >
@@ -122,7 +126,7 @@
                 : (node.displayLabel ?? node.label)}
               title={node.value}
               data-which-key-target=""
-              data-pane-focus-target={state().selected ? '' : undefined}
+              data-pane-focus-target={state().selected || isDefaultFocusTarget ? '' : undefined}
               data-tree-node-value={node.value}
               data-tree-node-branch="false"
             >

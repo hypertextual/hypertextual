@@ -29,6 +29,10 @@ mise run //apps/hypertextual-svelte:build
 mise run //apps/hypertextual-svelte:test
 mise run //libs/ui:lint
 mise run //libs/ui:build
+mise run //libs/core-ts:build
+mise run //libs/core-ts:lint
+mise run //libs/core-ts:test
+mise run //libs/core-ts:format:check
 mise run //libs/htmd-ts:build
 mise run //libs/htmd-ts:lint
 mise run //libs/htmd-ts:test

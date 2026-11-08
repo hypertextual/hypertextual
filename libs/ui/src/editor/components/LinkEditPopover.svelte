@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { LinkEditPopoverProps } from './types'
   import { onMount, onDestroy } from 'svelte'
   import { Trash2, Globe, ExternalLink } from 'lucide-svelte'
@@ -7,6 +8,7 @@
   let { editor, initialUrl = '', onSave, onRemove, onClose }: LinkEditPopoverProps = $props()
 
   // State ---------------------------------------------------------------------
+  let rootElement = $state<HTMLDivElement | null>(null)
   let inputElement: HTMLInputElement
 
   let isFocused = $state(false)
@@ -21,6 +23,35 @@
 
   onDestroy(() => clearTimeout(blurTimer))
 
+  useKeymap(
+    {
+      Enter: {
+        key: 'Enter',
+        label: 'Save Link',
+        hidden: true,
+        action: () => {
+          saveAndClose()
+          return true
+        },
+      },
+      Escape: {
+        key: 'Escape',
+        label: 'Close Link Editor',
+        hidden: true,
+        action: () => {
+          saveAndClose()
+          editor.execCommand('exitToNormal')
+          return true
+        },
+      },
+    },
+    {
+      priority: 'overlay',
+      element: () => rootElement,
+      enabled: () => Boolean(rootElement),
+    },
+  )
+
   // Methods -------------------------------------------------------------------
   function saveAndClose() {
     clearTimeout(blurTimer)
@@ -28,13 +59,12 @@
       if (onSave) {
         void onSave(linkUrl.trim())
       } else {
-        editor.chain().focus().setLink({ href: linkUrl.trim() }).run()
+        editor.execCommand('setLink', linkUrl.trim())
       }
     } else if (onRemove) {
       onRemove()
     } else {
-      // If empty, remove the link
-      editor.chain().focus().unsetLink().run()
+      editor.execCommand('unsetLink')
     }
     onClose()
   }
@@ -44,17 +74,9 @@
     if (onRemove) {
       onRemove()
     } else {
-      editor.chain().focus().unsetLink().run()
+      editor.execCommand('unsetLink')
     }
     onClose()
-  }
-
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      saveAndClose()
-    }
   }
 
   function handleBlur() {
@@ -65,6 +87,7 @@
 </script>
 
 <div
+  bind:this={rootElement}
   data-link-editor
   role="dialog"
   aria-label="Edit link"
@@ -88,7 +111,6 @@
         isFocused ? 'bg-background' : 'bg-muted',
       ]}
       style="padding-top: 0.25rem !important; padding-bottom: 0.25rem !important;"
-      onkeydown={handleKeydown}
       onfocus={() => (isFocused = true)}
       onblur={handleBlur}
     />

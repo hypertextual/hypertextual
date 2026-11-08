@@ -8,7 +8,7 @@ The content pane presents the selected document, image, or empty workspace previ
 
 ### Public API
 
-`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. DocumentEditor receives native document JSON and emits JSON changes. The app editor service passes those changes through `ArticleViewModel` and `htmd-ts`. Unsupported nodes stay editable in the document as raw-source wrappers. `ContentFallback` renders loading, opening errors, unsupported file types (such as PDFs with an `Open In Default App` button), image previews, read-only source previews after an unrecoverable parser failure, and the unselected workspace state.
+`ContentPaneProps` is declared inside the component and contains a `WorkspaceService`. `HtmdEditor` receives the deserialized document content from `editor.document`, `services={workspace.editorServices}` (`EditorHostServices`), and emits content changes. `EditorService` delegates format matching (`supportsFile`), deserialization (`deserialize(source) -> EditorDocument`), and serialization (`document.update(portable)`) to the registered `EditorFormatAdapter` (`HtmdEditor`) so the app never directly parses, validates, or traverses format ASTs. Unsupported nodes stay editable in the document as raw-source wrappers. `ContentFallback` renders loading, opening errors, unsupported file types (such as PDFs with an `Open In Default App` button), image previews, read-only source previews after an unrecoverable parser failure, and the unselected workspace state.
 
 ```svelte
 <ContentPane {workspace} />
@@ -81,7 +81,7 @@ Unsupported source, rendered by this app pane:
 +------------------------------------------------------------------------+
 ```
 
-The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. DocumentEditor owns scroll-region focus and keyboard reactions. ContentPane passes the editor service’s `editable` flag and accepts editability requests through that service. Arrow keys use native browser scrolling while editing is disabled. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
+The article has no heading bar. Only the document body scrolls. The footer uses the Ark-based Breadcrumb component. Its final item shows the article title, and its tooltip shows the saved path. `HtmdEditor` owns scroll-region focus and delegates `editor:htmd` and extension keyscopes to `workspace.editorServices.hotkeys`. ContentPane passes the editor service’s `editable` flag and accepts editability requests through that service. Arrow keys use native browser scrolling while editing is disabled. Its reading area is centered, with a maximum width of 820 px and 48 px horizontal padding. Padding reduces to 24 px below a 700 px viewport width.
 
 ### State and Data Flow
 
@@ -120,4 +120,4 @@ stateDiagram-v2
 - Key the editor by `editor.version`, not the selected path. Saving a new title can rename the file without replacing the editing session.
 - Wait for `tick()` before forwarding a focus request to a newly mounted editor.
 - Keep original-source previews here. The reusable editor receives document JSON and upload callbacks, without source sessions or format errors.
-- `EditorService` asks its workspace-aware `MediaService` to batch-get local and remote images, then uses a method-local map to substitute portable references with blob URLs in the displayed `ArticleViewModel`. Save transformations restore portable origins, including newly uploaded assets. The media service retains origin records for the workspace window and revokes its blob URLs and clears the records when disposed; failed local or remote reads retain the original reference.
+- `EditorService` asks its workspace-aware `MediaService` to batch-get local and remote images, then uses a method-local map to substitute portable references with blob URLs in the displayed `EditorDocument` (`document.displayImages`). Save transformations restore portable origins (`document.transformImages`), including newly uploaded assets. The media service retains origin records for the workspace window and revokes its blob URLs and clears the records when disposed; failed local or remote reads retain the original reference.

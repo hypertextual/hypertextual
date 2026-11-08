@@ -1,6 +1,5 @@
+import { DefaultEmbeddedEditorRegistry, type EditorHostServices } from 'core-ts'
 import type { TreeNode, ContextMenuItem } from '@hypertextual/ui'
-import { parse } from 'htmd-ts'
-import { ArticleViewModel } from '../models/articleViewModel'
 import { WorkspaceNodeViewModel } from '../models/workspaceNodeViewModel'
 import {
   errorMessage,
@@ -35,6 +34,7 @@ export class WorkspaceService {
   readonly editor: EditorService
   readonly settings = new SettingsService()
   readonly hotkeys: HotkeyService
+  readonly editorServices: EditorHostServices
 
   constructor(private client: WorkspaceClient) {
     this.editor = new EditorService(client, {
@@ -42,6 +42,10 @@ export class WorkspaceService {
       saved: (path, saved, title) => this.saved(path, saved, title),
     })
     this.hotkeys = new HotkeyService(this)
+    this.editorServices = {
+      media: this.editor.mediaService,
+      embedRegistry: new DefaultEmbeddedEditorRegistry(),
+    }
   }
 
   get blocked() {
@@ -261,15 +265,12 @@ export class WorkspaceService {
   private async loadTitles(items: WorkspaceNode[]) {
     await Promise.all(
       items
-        .filter((entry) => entry.kind === 'file' && /\.(md|htmd)$/i.test(entry.name))
+        .filter((entry) => entry.kind === 'file' && this.editor.supportsFile(entry.name))
         .map(async (entry) => {
           try {
             const read = await this.client.read(entry.path)
             if (this.active && this.editor.selected?.path !== entry.path)
-              this.updateTitle(
-                entry.path,
-                new ArticleViewModel(read.content, parse(read.content).content).title,
-              )
+              this.updateTitle(entry.path, this.editor.extractTitle(read.content))
           } catch {
             /* Keep unreadable entries visible under their filenames. */
           }

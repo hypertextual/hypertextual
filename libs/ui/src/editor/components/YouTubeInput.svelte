@@ -1,5 +1,5 @@
-<!-- libs/helical-svelte/src/editor/YouTubeInput.svelte -->
 <script lang="ts">
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { YouTubeInputProps } from './types'
   import { Play, X } from 'lucide-svelte'
 
@@ -7,9 +7,43 @@
   let { editor, position, onClose }: YouTubeInputProps = $props()
 
   // State ---------------------------------------------------------------------
+  let dialogElement = $state<HTMLDivElement | null>(null)
+  let inputElement = $state<HTMLInputElement | null>(null)
+
   let url = $state('')
 
   let error = $state('')
+
+  // Lifecycle -----------------------------------------------------------------
+  useKeymap(
+    {
+      Enter: {
+        key: 'Enter',
+        label: 'Embed YouTube Video',
+        hidden: true,
+        when: ({ event }) => Boolean(inputElement && event?.target === inputElement),
+        action: () => {
+          insert()
+          return true
+        },
+      },
+      Escape: {
+        key: 'Escape',
+        label: 'Close YouTube Dialog',
+        hidden: true,
+        action: () => {
+          onClose()
+          editor.execCommand('exitToNormal')
+          return true
+        },
+      },
+    },
+    {
+      priority: 'overlay',
+      element: () => dialogElement,
+      enabled: () => Boolean(dialogElement),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function isYouTubeUrl(value: string): boolean {
@@ -27,19 +61,13 @@
       error = 'Enter a valid YouTube URL.'
       return
     }
-    editor
-      .chain()
-      .focus()
-      .insertContentAt(position, {
-        type: 'linkPreview',
-        attrs: { url: value, description: '', image: '', type: 'embed' },
-      })
-      .run()
+    editor.insertYouTubeEmbed(position, value)
     onClose()
   }
 </script>
 
 <div
+  bind:this={dialogElement}
   role="dialog"
   aria-label="Embed YouTube video"
   class="w-80 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
@@ -59,16 +87,11 @@
     </button>
   </div>
   <input
+    bind:this={inputElement}
     value={url}
     oninput={(event) => {
       url = event.currentTarget.value
       error = ''
-    }}
-    onkeydown={(event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        insert()
-      } else if (event.key === 'Escape') onClose()
     }}
     placeholder="https://youtube.com/watch?v=…"
     aria-label="YouTube URL"

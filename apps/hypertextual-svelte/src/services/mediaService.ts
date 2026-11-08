@@ -1,3 +1,4 @@
+import type { EditorMediaService } from 'core-ts'
 import type { ImageAsset, WorkspaceClient } from '../clients/workspaceClient'
 
 /** Resolve media within one workspace window and retain portable asset origins. */
@@ -10,6 +11,18 @@ export class MediaService {
     private client: Pick<WorkspaceClient, 'readImage' | 'importImage'>,
     private fetchImage: (url: string) => Promise<Response> = fetch,
   ) {}
+
+  forArticle(getArticlePath: () => string): EditorMediaService {
+    return {
+      get: (source) => this.get(getArticlePath(), source),
+      batchGet: (sources) => this.batchGet(getArticlePath(), sources),
+      write: async (data) => {
+        const file = data instanceof File ? data : new File([data], 'upload')
+        return this.upload(getArticlePath(), file)
+      },
+      toPortableSource: (displayUrl) => this.portableSource(getArticlePath(), displayUrl),
+    }
+  }
 
   async get(articlePath: string, source: string): Promise<ImageAsset> {
     let asset: ImageAsset

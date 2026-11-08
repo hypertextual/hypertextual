@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
-  import { onMount } from 'svelte'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import * as LucideIcons from 'lucide-svelte'
   import type { Component } from 'svelte'
   import type { SlashMenuProps } from './types'
@@ -35,24 +35,65 @@
       listbox().highlightFirst()
   })
 
-  onMount(() => {
-    // Tiptap keeps text focus; forward only suggestion keys to Ark's selection state.
-    const handleKey = (event: KeyboardEvent) => {
-      if (!items.length || event.isComposing) return
-      if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey))
-        listbox().highlightPrevious()
-      else if (event.key === 'ArrowDown' || (event.key === 'Tab' && !event.shiftKey))
-        listbox().highlightNext()
-      else if (event.key === 'Enter') {
-        const value = listbox().highlightedValue
-        if (value) listbox().selectValue(value)
-      } else return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    document.addEventListener('keydown', handleKey, true)
-    return () => document.removeEventListener('keydown', handleKey, true)
-  })
+  useKeymap(
+    () => ({
+      ArrowUp: {
+        key: 'ArrowUp',
+        label: 'Previous Command',
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
+          listbox().highlightPrevious()
+          return true
+        },
+      },
+      'Shift+Tab': {
+        key: 'Shift+Tab',
+        label: 'Previous Command',
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
+          listbox().highlightPrevious()
+          return true
+        },
+      },
+      ArrowDown: {
+        key: 'ArrowDown',
+        label: 'Next Command',
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
+          listbox().highlightNext()
+          return true
+        },
+      },
+      Tab: {
+        key: 'Tab',
+        label: 'Next Command',
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
+          listbox().highlightNext()
+          return true
+        },
+      },
+      Enter: {
+        key: 'Enter',
+        label: 'Select Command',
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
+          const value = listbox().highlightedValue
+          if (value) listbox().selectValue(value)
+          return true
+        },
+      },
+    }),
+    {
+      priority: 'overlay',
+      enabled: () => items.length > 0,
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function getIcon(iconName: string): Component | undefined {

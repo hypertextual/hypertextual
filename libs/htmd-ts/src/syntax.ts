@@ -7,6 +7,7 @@ import {
 import type { MarkdownToken, MarkdownTokenizer } from '@tiptap/core'
 import type { JSONContent } from './types.js'
 
+/** Escapes HTML special characters and control whitespace in `value`. */
 export function escape(value: unknown): string {
   return String(value ?? '').replace(
     /[&<>"\r\n\t]/g,
@@ -23,12 +24,14 @@ export function escape(value: unknown): string {
   )
 }
 
+/** Wraps a flat record of default values into Tiptap `addAttributes()` descriptors. */
 export function attributeDefaults(values: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(values).map(([name, value]) => [name, { default: value }]),
   )
 }
 
+/** Builds an `unparsedBlock` or `unparsedInline` fallback node from `token`. */
 export function rawNode(token: MarkdownToken, inline: boolean, reason: string): JSONContent {
   const source = String(token.raw ?? token.text ?? '').replace(/\n+$/, '')
   return {
@@ -38,6 +41,7 @@ export function rawNode(token: MarkdownToken, inline: boolean, reason: string): 
   }
 }
 
+/** Parses directive attribute syntax (`key="value"`) and decodes HTML entities. */
 export function parseAttributes(source: string) {
   return Object.fromEntries(
     Object.entries(parseNativeAttributes(source)).map(([key, value]) => [
@@ -46,6 +50,8 @@ export function parseAttributes(source: string) {
     ]),
   )
 }
+
+/** Serializes non-null directive attributes into `key="value"` form. */
 export function renderAttributes(attrs: Record<string, unknown>) {
   return Object.entries(attrs)
     .filter(([, value]) => value != null)

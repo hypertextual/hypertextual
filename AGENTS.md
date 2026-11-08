@@ -3,7 +3,7 @@
 ## Hard Rules
 
 - Use the published npm packages `@cloudvoyant/helical-svelte` and `@cloudvoyant/helical-ui`. Reference `~/Projects/helical-ui` for composition and style; never replace npm dependencies with local paths.
-- Develop the Svelte editor and framework-neutral core in `libs/ui/src/editor`. Record upstream provenance in [the editor source guide](docs/architecture/ui/editor-source.md).
+- Define engine-neutral editor and keyscope contracts in `libs/core-ts`, develop the HTMD editor core and extensions in `libs/htmd-ts/src/editor`, and keep Svelte editor presentation (`HtmdEditor.svelte` and NodeViews) in `libs/ui/src/editor`. Record upstream provenance in [the editor source guide](docs/architecture/ui/editor-source.md).
 - Prefer existing [Mise tasks](mise.toml). See [development commands](docs/development.md).
 - Commit or publish only when requested.
 - Fill every section of `~/.difflab/templates/pull-request-description.md` with actual changes and verified evidence.
@@ -26,10 +26,11 @@ hypertextual/
 │           ├── models/         # Stateful view models and document transforms
 │           └── services/       # Stateful application services (workspace, editor, hotkeys, settings, media)
 ├── libs/
-│   ├── htmd-ts/                # Markdown <-> ProseMirror JSON codec and validation
+│   ├── core-ts/                # Engine- and framework-neutral editor and keyscope contracts
+│   ├── htmd-ts/                # Markdown <-> HTMD JSON codec, validation, and HtmdEditor core
 │   ├── htmd-rs/                # Deferred Rust Markdown codec
 │   ├── hyped-fs/               # Rust workspace, article, and media domain models and services
-│   └── ui/                     # Private reusable Svelte components and editor core
+│   └── ui/                     # Private reusable Svelte components and HtmdEditor wrapper
 ├── docs/                       # Architecture, UI component, and keybinding docs
 └── e2e/
     └── hypertextual-desktop/   # Playwright end-to-end suite and fixtures
@@ -55,6 +56,7 @@ let { ... }: ComponentProps = $props()
 ```
 
 - Declare UI-library prop contracts in `types.ts` and app-only prop interfaces inside their owning `.svelte` file before destructuring `$props()`.
+- Order HTMD editor extension files in `libs/htmd-ts/src/editor/extensions` with column-80 section dividers (`// types ---`, `// api ---`, `// pm ---`, `// helpers ---`), omitting empty sections.
 - Order TypeScript test files with column-80 section dividers (`// integration ---` then `// unit ---`), omitting empty sections.
 
 ## Style
@@ -71,12 +73,21 @@ let { ... }: ComponentProps = $props()
 - Delegate behavior, accessibility, keyboard navigation, and interaction state to Ark UI and Helical controllers rather than custom DOM handlers.
 - Define framework-neutral base classes and CVA variants in `styles.ts`, derive variant types with `VariantProps`, and merge caller classes with Helical `cn`.
 - Use semantic theme tokens for colors, borders, focus, disabled, invalid, and Ark data-attribute states. Avoid component-specific global CSS and hard-coded palette colors.
-- Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`.
+- Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`, and register scoped widget, extension, and editor keymaps through `WhichKeyController.registerKeymap` (`useKeymap` in Svelte components).
 - Keep theme state and toggle controls (`ThemeService`, `ThemeToggle`) in `libs/ui`, with `SettingsService` only syncing persisted preferences when needed.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
-- Exchange native Tiptap `JSONContent` with `libs/ui`. Keep Markdown parsing, serialization, and format SDK dependencies inside `libs/htmd-ts`.
-- Keep HTMD node definitions in `nodes.ts` and mark definitions in `marks.ts`. Do not add legacy format shims; keep parsing fault-tolerant by recovering unsupported or malformed fragments as editable `unparsedBlock` / `unparsedInline` wrappers.
+- Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
+- Keep HTMD node and mark schemas (`group`, `content`, `inline`, `atom`, `addAttributes`, `parseHTML`, `renderHTML`, `parseMarkdown`, `renderMarkdown`) in `nodes.ts` and `marks.ts`, and author interactive editor extensions in `libs/htmd-ts/src/editor/extensions` via `defineHtmdExtension` (`keymap`, `commands`, `nodeView`, and `// pm ---` ProseMirror plugins). Do not add legacy format shims; keep parsing fault-tolerant by recovering unsupported or malformed fragments as editable `UnparsableBlockFallback` / `UnparsableInlineFallback` (`unparsedBlock` / `unparsedInline`) wrappers.
+- Prefer built-in Tiptap extension capabilities over custom implementations when supported.
+- Document every exported TypeScript function with a JSDoc comment, and document every HTMD editor extension with a JSDoc comment that explains its editor usage and includes a brief ASCII visual example of its expected behavior.
+- Extract extension keymap handlers into named helper functions (`handleTab`, `handleShiftTab`, `handleArrowUp`, `handleArrowDown`, `handleEnter`) under `// helpers ---`.
+- Decompose modal editing in `libs/htmd-ts/src/editor/extensions` into dedicated mode (`NormalMode`, `SelectMode`, `InsertMode`) and preset (`Helix`, `Vim`, `Kakoune`) extensions composed by a parent `ModalEditing` extension.
+- [Proposed] Name HTMD extensions after their node or behavior without superfluous suffixes like `Custom`.
+- [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
+- [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
+- [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
+- [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
 
 ### Documentation
 
@@ -90,7 +101,7 @@ let { ... }: ComponentProps = $props()
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
-- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`). Do not place tests inside `libs/ui/src/editor/core/extensions`.
+- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`) and `htmd-ts` editor integration and unit tests in `libs/htmd-ts/src/editor/htmd-editor.test.ts`. Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:
 
 ```ts

@@ -42,6 +42,11 @@ workspace:
       path: libs/htmd-rs
       answers:
         name: htmd-rs
+    - name: core-ts
+      template: cloudvoyant/premise-bun:premise-ts-lib
+      path: libs/core-ts
+      answers:
+        name: core-ts
     - name: htmd-ts
       template: cloudvoyant/premise-bun:premise-ts-lib
       path: libs/htmd-ts

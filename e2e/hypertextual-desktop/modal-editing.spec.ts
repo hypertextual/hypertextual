@@ -367,17 +367,43 @@ test.describe(
           prose.locator('.editor-notice-node p [data-pm-modal-cursor="normal"]'),
         ).toHaveText('o')
 
-        // k back to Notice title -> i edits Notice title -> Tab to Notice type -> Tab to Notice body
+        // k back to Notice title -> i edits Notice title -> Tab/Shift+Tab/ArrowUp/ArrowDown across Notice
         await page.keyboard.press('k')
         await expect(
           prose.locator('[data-pm-modal-notice-title="normal"]:has(.editor-notice-node)'),
         ).toHaveCount(1)
         await page.keyboard.press('i')
         const titleInput = page.getByLabel('Notice title')
+        const noticeTypeSelect = page.getByRole('combobox', { name: 'Notice type' })
+        const replaceImageBtn = page.getByRole('button', { name: 'Replace image' })
+        const removeImageBtn = page.getByRole('button', { name: 'Remove image' })
+        await expect(titleInput).toBeFocused()
+        // In insert mode, image Replace and Remove buttons are visible even when not hovered or focused
+        await expect(replaceImageBtn).toBeVisible()
+        await expect(removeImageBtn).toBeVisible()
+        await expect(replaceImageBtn).toHaveCSS('opacity', '1')
+        await expect(removeImageBtn).toHaveCSS('opacity', '1')
+        // Exit Notice upward to preceding paragraph, then re-enter Notice downward into Notice title
+        await page.keyboard.press('ArrowUp')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(titleInput).toBeFocused()
+        // Tab / Shift+Tab between Notice title, Notice type, and Notice body
+        await page.keyboard.press('Tab')
+        await expect(noticeTypeSelect).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
         await expect(titleInput).toBeFocused()
         await page.keyboard.press('Tab')
-        await expect(page.getByRole('combobox', { name: 'Notice type' })).toBeFocused()
+        await expect(noticeTypeSelect).toBeFocused()
         await page.keyboard.press('Tab')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(noticeTypeSelect).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(titleInput).toBeFocused()
+        await page.keyboard.press('ArrowDown')
         await expect(prose).toBeFocused()
         await page.keyboard.press('Escape')
         await expect(prose).toHaveAttribute('contenteditable', 'false')
@@ -407,16 +433,39 @@ test.describe(
         await page.keyboard.press('i')
         await expect(prose).toHaveAttribute('contenteditable', 'true')
         await expect(prose).toBeFocused()
-        // ArrowUp from line 2 -> line 1 -> language selector (closed); ArrowUp again -> preceding block
+        // ArrowUp from line 2 -> line 1 -> language selector (closed); Tab/Shift+Tab to Copy button; ArrowUp -> preceding block
         await page.keyboard.press('ArrowUp')
         await page.keyboard.press('ArrowUp')
         const langSelect = page.getByRole('combobox', { name: 'Code language' })
         await expect(langSelect).toBeFocused()
         await expect(langSelect).toHaveAttribute('aria-expanded', 'false')
+        await page.keyboard.press('Tab')
+        const copyCodeBtn = page.getByRole('button', { name: 'Copy code' })
+        await expect(copyCodeBtn).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(langSelect).toBeFocused()
         await page.keyboard.press('ArrowUp')
         await expect(prose).toBeFocused()
         await expect(langSelect).toHaveAttribute('aria-expanded', 'false')
+        // Navigating down from outside in insert mode directly selects Code language
         await page.keyboard.press('ArrowDown')
+        await expect(langSelect).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(langSelect).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(copyCodeBtn).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(prose).toBeFocused()
+        // Traverse down through CodeBlock lines and exit into Image caption, then ArrowUp back through CodeBlock to langSelect and body
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('ArrowDown')
+        const imageCaptionInput = page.getByLabel('Image caption')
+        await expect(imageCaptionInput).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('ArrowUp')
         await page.keyboard.press('ArrowUp')
         await expect(langSelect).toBeFocused()
         await page.keyboard.press('ArrowDown')
@@ -435,13 +484,48 @@ test.describe(
           prose.locator('[data-image-caption-text] [data-pm-modal-cursor="normal"]'),
         ).toHaveText('h')
         await page.keyboard.press('i')
-        await expect(page.getByLabel('Image caption')).toBeFocused()
+        await expect(imageCaptionInput).toBeFocused()
+        const unfocusedReplaceShadow = await replaceImageBtn.evaluate(
+          (el) => getComputedStyle(el).boxShadow,
+        )
+        const unfocusedRemoveShadow = await removeImageBtn.evaluate(
+          (el) => getComputedStyle(el).boxShadow,
+        )
         await page.keyboard.press('Tab')
-        await expect(page.getByRole('button', { name: 'Replace image' })).toBeFocused()
+        await expect(replaceImageBtn).toBeFocused()
+        await expect
+          .poll(() => replaceImageBtn.evaluate((el) => getComputedStyle(el).boxShadow))
+          .not.toBe(unfocusedReplaceShadow)
         await page.keyboard.press('Tab')
-        await expect(page.getByRole('button', { name: 'Remove image' })).toBeFocused()
+        await expect(removeImageBtn).toBeFocused()
+        await expect
+          .poll(() => removeImageBtn.evaluate((el) => getComputedStyle(el).boxShadow))
+          .not.toBe(unfocusedRemoveShadow)
+        await page.keyboard.press('Shift+Tab')
+        await expect(replaceImageBtn).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(imageCaptionInput).toBeFocused()
         await page.keyboard.press('Tab')
-        await expect(page.getByLabel('Image caption')).toBeFocused()
+        await expect(replaceImageBtn).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(removeImageBtn).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(imageCaptionInput).toBeFocused()
+        // ArrowDown from Image caption enters YouTube LinkPreview URL input; ArrowDown again exits to paragraph below; ArrowUp traverses back
+        await page.keyboard.press('ArrowDown')
+        const youtubeUrlInput = page.getByLabel('YouTube URL')
+        const removePreviewBtn = page.getByRole('button', { name: 'Remove preview' })
+        await expect(youtubeUrlInput).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(removePreviewBtn).toBeFocused()
+        await page.keyboard.press('Shift+Tab')
+        await expect(youtubeUrlInput).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(prose).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(youtubeUrlInput).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(imageCaptionInput).toBeFocused()
         await page.keyboard.press('Escape')
 
         // Move j onto YouTube embed in normal mode -> Enter/i focuses overlaying YouTube URL input -> Tab focuses Remove preview
@@ -449,12 +533,12 @@ test.describe(
         await expect(
           prose.locator('[data-pm-modal-node-selection="normal"] [data-type="embed"]'),
         ).toHaveCount(1)
-        await expect(page.getByLabel('YouTube URL')).toHaveCount(0)
+        await expect(youtubeUrlInput).toHaveCount(0)
         await page.keyboard.press('Enter')
-        await expect(page.getByLabel('YouTube URL')).toBeFocused()
+        await expect(youtubeUrlInput).toBeFocused()
         await expect(page.getByRole('toolbar', { name: 'Text formatting' })).toHaveCount(0)
         await page.keyboard.press('Tab')
-        await expect(page.getByRole('button', { name: 'Remove preview' })).toBeFocused()
+        await expect(removePreviewBtn).toBeFocused()
         await page.keyboard.press('Escape')
 
         // Assert

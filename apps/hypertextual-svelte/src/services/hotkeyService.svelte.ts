@@ -1,26 +1,33 @@
 import { tick } from 'svelte'
-import {
-  getDocumentWhichKeyController,
-  subscribeDocumentWhichKeyController,
-  type KeymapMode,
-} from '@cloudvoyant/helical-ui'
+import { getDocumentWhichKeyController, type KeymapMode } from '@cloudvoyant/helical-ui'
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
 import { themeService } from '@hypertextual/ui'
 import type { WorkspaceService } from './workspaceService.svelte'
+
+function leaf(
+  key: string,
+  label: string,
+  category: string,
+  commandId: string,
+  description: string,
+  mode?: KeymapMode[],
+): WhichKeyNode {
+  return { key, label, category, commandId, description, ...(mode ? { mode } : {}) }
+}
 
 /** Application keyboard shortcuts, leader menu, and pane focus navigation. */
 export class HotkeyService {
   sidebarOpen = $state(true)
 
   readonly keymap: Record<string, WhichKeyNode> = {
-    'Control+e': {
-      key: 'Control+e',
-      label: 'Toggle Explorer',
-      description: 'Toggle the Workspace Explorer sidebar open or closed',
-      category: 'Workspace',
-      mode: ['normal', 'select'],
-      commandId: 'workspace.toggleExplorer',
-    },
+    'Control+e': leaf(
+      'Control+e',
+      'Toggle Explorer',
+      'Workspace',
+      'workspace.toggleExplorer',
+      'Toggle the Workspace Explorer sidebar open or closed',
+      ['normal', 'select'],
+    ),
     Space: {
       key: 'Space',
       label: '+leader',
@@ -28,40 +35,36 @@ export class HotkeyService {
       category: 'Leader',
       mode: ['normal', 'select'],
       expand: () => {
-        const viewKey =
-          typeof document !== 'undefined' &&
-          getDocumentWhichKeyController(document)?.getState().preset === 'kakoune'
-            ? 'v'
-            : 'z'
+        const viewKey = this.controller?.getState().preset === 'kakoune' ? 'v' : 'z'
         return {
-          '?': {
-            key: '?',
-            label: 'Keybind Help',
-            description: 'Open searchable keybinding exploration menu (<leader>?)',
-            category: 'Leader',
-            commandId: 'whichKey.openExplorer',
-          },
-          e: {
-            key: 'e',
-            label: 'Toggle Explorer',
-            description: 'Toggle the Workspace Explorer sidebar open or closed',
-            category: 'Workspace',
-            commandId: 'workspace.toggleExplorer',
-          },
-          n: {
-            key: 'n',
-            label: 'New Article',
-            description: 'Create a new article in the workspace',
-            category: 'Workspace',
-            commandId: 'workspace.newArticle',
-          },
-          N: {
-            key: 'N',
-            label: 'New Folder',
-            description: 'Create a new folder in the workspace',
-            category: 'Workspace',
-            commandId: 'workspace.newFolder',
-          },
+          '?': leaf(
+            '?',
+            'Keybind Help',
+            'Leader',
+            'whichKey.openExplorer',
+            'Open searchable keybinding exploration menu (<leader>?)',
+          ),
+          e: leaf(
+            'e',
+            'Toggle Explorer',
+            'Workspace',
+            'workspace.toggleExplorer',
+            'Toggle the Workspace Explorer sidebar open or closed',
+          ),
+          n: leaf(
+            'n',
+            'New Article',
+            'Workspace',
+            'workspace.newArticle',
+            'Create a new article in the workspace',
+          ),
+          N: leaf(
+            'N',
+            'New Folder',
+            'Workspace',
+            'workspace.newFolder',
+            'Create a new folder in the workspace',
+          ),
           f: {
             key: 'f',
             label: '+file',
@@ -69,50 +72,50 @@ export class HotkeyService {
             description: 'Workspace file operations',
             category: 'Workspace',
             children: {
-              n: {
-                key: 'n',
-                label: 'New Article',
-                description: 'Create a new article in the workspace',
-                category: 'Workspace',
-                commandId: 'workspace.newArticle',
-              },
-              N: {
-                key: 'N',
-                label: 'New Folder',
-                description: 'Create a new folder in the workspace',
-                category: 'Workspace',
-                commandId: 'workspace.newFolder',
-              },
-              r: {
-                key: 'r',
-                label: 'Rename File',
-                description: 'Rename the selected file in the Workspace Explorer',
-                category: 'Workspace',
-                commandId: 'workspace.renameSelected',
-              },
-              d: {
-                key: 'd',
-                label: 'Move to Trash',
-                description: 'Move the selected file to Trash',
-                category: 'Workspace',
-                commandId: 'workspace.deleteSelected',
-              },
-              o: {
-                key: 'o',
-                label: 'Open In Default App',
-                description: 'Open the selected file in the default desktop application',
-                category: 'Workspace',
-                commandId: 'workspace.openInDefaultApp',
-              },
+              n: leaf(
+                'n',
+                'New Article',
+                'Workspace',
+                'workspace.newArticle',
+                'Create a new article in the workspace',
+              ),
+              N: leaf(
+                'N',
+                'New Folder',
+                'Workspace',
+                'workspace.newFolder',
+                'Create a new folder in the workspace',
+              ),
+              r: leaf(
+                'r',
+                'Rename File',
+                'Workspace',
+                'workspace.renameSelected',
+                'Rename the selected file in the Workspace Explorer',
+              ),
+              d: leaf(
+                'd',
+                'Move to Trash',
+                'Workspace',
+                'workspace.deleteSelected',
+                'Move the selected file to Trash',
+              ),
+              o: leaf(
+                'o',
+                'Open In Default App',
+                'Workspace',
+                'workspace.openInDefaultApp',
+                'Open the selected file in the default desktop application',
+              ),
             },
           },
-          '/': {
-            key: '/',
-            label: 'Search',
-            description: 'Search commands and keybindings',
-            category: 'Leader',
-            commandId: 'whichKey.openExplorer',
-          },
+          '/': leaf(
+            '/',
+            'Search',
+            'Leader',
+            'whichKey.openExplorer',
+            'Search commands and keybindings',
+          ),
           g: {
             key: 'g',
             label: '+goto',
@@ -121,13 +124,13 @@ export class HotkeyService {
             category: 'Goto',
             proxy: ['g'],
           },
-          j: {
-            key: 'j',
-            label: 'Jump to Element',
-            description: 'Show 2D home-row jump labels over visible controls',
-            category: 'Navigation',
-            commandId: 'jump.start',
-          },
+          j: leaf(
+            'j',
+            'Jump to Element',
+            'Navigation',
+            'jump.start',
+            'Show 2D home-row jump labels over visible controls',
+          ),
           w: {
             key: 'w',
             label: '+window',
@@ -150,27 +153,27 @@ export class HotkeyService {
             group: 'Toggles',
             category: 'Workspace',
             children: {
-              o: {
-                key: 'o',
-                label: 'Toggle Pane Outline',
-                description: 'Toggle the focus outline on the active workspace or editor pane',
-                category: 'Workspace',
-                commandId: 'settings.togglePaneOutline',
-              },
-              c: {
-                key: 'c',
-                label: 'Toggle Click to Insert',
-                description: 'Toggle whether clicking the article enters insert mode',
-                category: 'Workspace',
-                commandId: 'settings.toggleClickToInsert',
-              },
-              d: {
-                key: 'd',
-                label: 'Cycle Theme Mode',
-                description: 'Cycle between system, light, and dark theme modes',
-                category: 'Workspace',
-                commandId: 'settings.cycleThemeMode',
-              },
+              o: leaf(
+                'o',
+                'Toggle Pane Outline',
+                'Workspace',
+                'settings.togglePaneOutline',
+                'Toggle the focus outline on the active workspace or editor pane',
+              ),
+              c: leaf(
+                'c',
+                'Toggle Click to Insert',
+                'Workspace',
+                'settings.toggleClickToInsert',
+                'Toggle whether clicking the article enters insert mode',
+              ),
+              d: leaf(
+                'd',
+                'Cycle Theme Mode',
+                'Workspace',
+                'settings.cycleThemeMode',
+                'Cycle between system, light, and dark theme modes',
+              ),
             },
           },
           k: {
@@ -180,27 +183,27 @@ export class HotkeyService {
             description: 'Switch modal grammar (Helix / Vim / Kakoune)',
             category: 'Leader',
             children: {
-              h: {
-                key: 'h',
-                label: 'Helix Preset',
-                description: 'Switch to Helix selection-first grammar (default)',
-                category: 'Preset',
-                commandId: 'preset.helix',
-              },
-              v: {
-                key: 'v',
-                label: 'Vim Preset',
-                description: 'Switch to Vim operator-motion grammar',
-                category: 'Preset',
-                commandId: 'preset.vim',
-              },
-              k: {
-                key: 'k',
-                label: 'Kakoune Preset',
-                description: 'Switch to Kakoune object-verb grammar',
-                category: 'Preset',
-                commandId: 'preset.kakoune',
-              },
+              h: leaf(
+                'h',
+                'Helix Preset',
+                'Preset',
+                'preset.helix',
+                'Switch to Helix selection-first grammar (default)',
+              ),
+              v: leaf(
+                'v',
+                'Vim Preset',
+                'Preset',
+                'preset.vim',
+                'Switch to Vim operator-motion grammar',
+              ),
+              k: leaf(
+                'k',
+                'Kakoune Preset',
+                'Preset',
+                'preset.kakoune',
+                'Switch to Kakoune object-verb grammar',
+              ),
             },
           },
         }
@@ -232,7 +235,7 @@ export class HotkeyService {
           editor.selected.path !== previousPath &&
           editor.setEditable(true)
         ) {
-          getDocumentWhichKeyController(document)?.setMode('insert')
+          this.controller?.setMode('insert')
           void tick().then(() => {
             document.querySelector<HTMLElement>('.ProseMirror')?.focus()
           })
@@ -275,8 +278,8 @@ export class HotkeyService {
 
   constructor(private readonly workspace: WorkspaceService) {}
 
-  setSidebarOpen(open: boolean): void {
-    this.sidebarOpen = open
+  private get controller() {
+    return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null
   }
 
   toggleExplorer(): boolean {
@@ -286,7 +289,7 @@ export class HotkeyService {
     // Wait for Sidebar's pane registration effect to settle before focusing (see CLO-209).
     void tick().then(() => {
       requestAnimationFrame(() => {
-        getDocumentWhichKeyController(document)?.focusPane(targetPane)
+        this.controller?.focusPane(targetPane)
       })
     })
     return true
@@ -294,15 +297,14 @@ export class HotkeyService {
 
   focusArticlePane(): void {
     if (typeof document === 'undefined') return
-    if (!getDocumentWhichKeyController(document)?.focusPane('article')) {
+    if (!this.controller?.focusPane('article')) {
       document.querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')?.focus()
     }
   }
 
   handleModeChange(nextMode: KeymapMode): void {
     if (typeof document === 'undefined') return
-    const controller = getDocumentWhichKeyController(document)
-    if (controller?.getState().explorerOpen) return
+    if (this.controller?.getState().explorerOpen) return
     if (nextMode === 'insert') {
       const active = document.activeElement
       if (
@@ -314,36 +316,6 @@ export class HotkeyService {
       }
     } else {
       this.workspace.editor.setEditable(false)
-    }
-  }
-
-  mountControllerSync(): () => void {
-    if (typeof document === 'undefined') return () => {}
-    let cleanupSub: (() => void) | undefined
-    const attachSub = () => {
-      cleanupSub?.()
-      const controller = getDocumentWhichKeyController(document)
-      if (!controller) return
-      let prevExplorerOpen = controller.getState().explorerOpen
-      cleanupSub = controller.subscribe((state) => {
-        if (prevExplorerOpen && !state.explorerOpen && !this.workspace.editor.editable) {
-          prevExplorerOpen = false
-          queueMicrotask(() => controller.setMode('normal'))
-          requestAnimationFrame(() => {
-            if (!this.workspace.editor.editable && controller.getState().mode === 'insert') {
-              controller.setMode('normal')
-            }
-          })
-          return
-        }
-        prevExplorerOpen = state.explorerOpen
-      })
-    }
-    attachSub()
-    const unsubRoot = subscribeDocumentWhichKeyController(document, attachSub)
-    return () => {
-      cleanupSub?.()
-      unsubRoot()
     }
   }
 }
