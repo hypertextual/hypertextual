@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Portal } from '@ark-ui/svelte/portal'
   import { cn } from '@cloudvoyant/helical-ui'
   import { Maximize2, Minimize2, Minus } from 'lucide-svelte'
   import {
@@ -83,10 +84,12 @@
     const container =
       boundaryEl ?? (scope === 'container' ? (rootEl?.offsetParent as HTMLElement | null) : null)
     if (container && rootEl) {
-      const maxDx = Math.max(0, container.clientWidth - rootEl.offsetWidth)
-      const maxDy = Math.max(0, container.clientHeight - rootEl.offsetHeight)
-      nextX = Math.max(-maxDx, Math.min(maxDx, nextX))
-      nextY = Math.max(-maxDy, Math.min(maxDy, nextY))
+      const minX = -rootEl.offsetLeft
+      const maxX = Math.max(minX, container.clientWidth - rootEl.offsetLeft - rootEl.offsetWidth)
+      const minY = -rootEl.offsetTop
+      const maxY = Math.max(minY, container.clientHeight - rootEl.offsetTop - rootEl.offsetHeight)
+      nextX = Math.max(minX, Math.min(maxX, nextX))
+      nextY = Math.max(minY, Math.min(maxY, nextY))
     }
     dragOffset = { x: nextX, y: nextY }
   }
@@ -99,66 +102,68 @@
 </script>
 
 {#if open}
-  <div
-    bind:this={rootEl}
-    role="region"
-    aria-label={title}
-    contenteditable={false}
-    data-pip-window=""
-    data-pip-scope={scope}
-    data-pip-placement={placement}
-    data-pip-minimized={minimized ? 'true' : 'false'}
-    data-modal-ignore-pointer=""
-    class={rootClass}
-    style={transformStyle}
-  >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <Portal disabled={scope !== 'viewport'}>
     <div
-      data-pip-header=""
-      data-minimized={minimized ? 'true' : 'false'}
-      class={cn(pipWindowHeader, draggable ? 'cursor-grab active:cursor-grabbing' : undefined)}
-      onpointerdown={handleHeaderPointerDown}
-      onpointermove={handleHeaderPointerMove}
-      onpointerup={handleHeaderPointerUp}
+      bind:this={rootEl}
+      role="region"
+      aria-label={title}
+      contenteditable={false}
+      data-pip-window=""
+      data-pip-scope={scope}
+      data-pip-placement={placement}
+      data-pip-minimized={minimized ? 'true' : 'false'}
+      data-modal-ignore-pointer=""
+      class={rootClass}
+      style={transformStyle}
     >
-      <span class={pipWindowTitle}>{title}</span>
-      <div class={pipWindowControls} data-editor-controls>
-        {#if actions}
-          {@render actions()}
-        {/if}
-        <button
-          type="button"
-          data-pip-minimize=""
-          aria-label={minimized ? `Expand ${title}` : `Minimize ${title}`}
-          title={minimized ? `Expand ${title}` : `Minimize ${title}`}
-          class={pipWindowControlButton}
-          onclick={handleToggleMinimize}
-        >
-          {#if minimized}
-            <Maximize2 class="size-3" />
-          {:else}
-            <Minus class="size-3" />
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        data-pip-header=""
+        data-minimized={minimized ? 'true' : 'false'}
+        class={cn(pipWindowHeader, draggable ? 'cursor-grab active:cursor-grabbing' : undefined)}
+        onpointerdown={handleHeaderPointerDown}
+        onpointermove={handleHeaderPointerMove}
+        onpointerup={handleHeaderPointerUp}
+      >
+        <span class={pipWindowTitle}>{title}</span>
+        <div class={pipWindowControls} data-editor-controls>
+          {#if actions}
+            {@render actions()}
           {/if}
-        </button>
-        {#if onfullscreen}
           <button
             type="button"
-            data-pip-fullscreen=""
-            aria-label={`Fullscreen ${title}`}
-            title={`Fullscreen ${title}`}
+            data-pip-minimize=""
+            aria-label={minimized ? `Expand ${title}` : `Minimize ${title}`}
+            title={minimized ? `Expand ${title}` : `Minimize ${title}`}
             class={pipWindowControlButton}
-            onclick={handleFullscreen}
+            onclick={handleToggleMinimize}
           >
-            <Minimize2 class="size-3 rotate-45" />
+            {#if minimized}
+              <Maximize2 class="size-3" />
+            {:else}
+              <Minus class="size-3" />
+            {/if}
           </button>
-        {/if}
+          {#if onfullscreen}
+            <button
+              type="button"
+              data-pip-fullscreen=""
+              aria-label={`Fullscreen ${title}`}
+              title={`Fullscreen ${title}`}
+              class={pipWindowControlButton}
+              onclick={handleFullscreen}
+            >
+              <Minimize2 class="size-3 rotate-45" />
+            </button>
+          {/if}
+        </div>
       </div>
-    </div>
 
-    {#if !minimized}
-      <div data-pip-body="" class={pipWindowBody}>
-        {@render children()}
-      </div>
-    {/if}
-  </div>
+      {#if !minimized}
+        <div data-pip-body="" class={pipWindowBody}>
+          {@render children()}
+        </div>
+      {/if}
+    </div>
+  </Portal>
 {/if}

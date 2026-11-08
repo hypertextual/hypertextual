@@ -9,8 +9,6 @@ export {
   CursorManager,
   DEFAULT_MERMAID_SOURCE,
   defineHtmdExtension,
-  findActiveMermaidPos,
-  getMermaidViewportState,
   getNodeNavigation,
   HtmdDocument,
   HtmdEditor,

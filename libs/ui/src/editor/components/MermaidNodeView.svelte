@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import {
     cn,
     codeBlockBodyBase,
@@ -91,7 +91,7 @@
       renderError = null
       return
     }
-    const delay = isCodeMode && lastValidSvg ? 120 : 0
+    const delay = untrack(() => (isCodeMode && lastValidSvg ? 120 : 0))
     const timer = setTimeout(() => {
       void renderDiagram(code)
     }, delay)
@@ -532,52 +532,62 @@
     return false
   }
 
+  function handleCtrlViewportShortcut(event: KeyboardEvent): boolean {
+    if (!event.ctrlKey || event.altKey || event.metaKey) return false
+    if (event.key === 'h') {
+      event.preventDefault()
+      event.stopPropagation()
+      panBy(-PAN_STEP, 0)
+      return true
+    }
+    if (event.key === 'j') {
+      event.preventDefault()
+      event.stopPropagation()
+      panBy(0, PAN_STEP)
+      return true
+    }
+    if (event.key === 'k') {
+      event.preventDefault()
+      event.stopPropagation()
+      panBy(0, -PAN_STEP)
+      return true
+    }
+    if (event.key === 'l') {
+      event.preventDefault()
+      event.stopPropagation()
+      panBy(PAN_STEP, 0)
+      return true
+    }
+    if (event.key === '=' || event.key === '+') {
+      event.preventDefault()
+      event.stopPropagation()
+      zoomBy(ZOOM_STEP)
+      return true
+    }
+    if (event.key === '-') {
+      event.preventDefault()
+      event.stopPropagation()
+      zoomBy(-ZOOM_STEP)
+      return true
+    }
+    if (event.key === '0') {
+      event.preventDefault()
+      event.stopPropagation()
+      resetViewport()
+      return true
+    }
+    return false
+  }
+
   function handleSplitTextareaKeyDown(event: KeyboardEvent) {
     if (handleSplitWindowPrefix(event)) return
-    if (event.ctrlKey && !event.altKey && !event.metaKey) {
-      if (event.key === 'h') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(-PAN_STEP, 0)
-        return
-      }
-      if (event.key === 'j') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(0, PAN_STEP)
-        return
-      }
-      if (event.key === 'k') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(0, -PAN_STEP)
-        return
-      }
-      if (event.key === 'l') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(PAN_STEP, 0)
-        return
-      }
-      if (event.key === '=' || event.key === '+') {
-        event.preventDefault()
-        event.stopPropagation()
-        zoomBy(ZOOM_STEP)
-        return
-      }
-      if (event.key === '-') {
-        event.preventDefault()
-        event.stopPropagation()
-        zoomBy(-ZOOM_STEP)
-        return
-      }
-      if (event.key === '0') {
-        event.preventDefault()
-        event.stopPropagation()
-        resetViewport()
-        return
-      }
+    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      focusSplitPane('preview')
+      return
     }
+    if (handleCtrlViewportShortcut(event)) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -595,50 +605,7 @@
       }
       return
     }
-    if (event.ctrlKey && !event.altKey && !event.metaKey) {
-      if (event.key === 'h') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(-PAN_STEP, 0)
-        return
-      }
-      if (event.key === 'j') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(0, PAN_STEP)
-        return
-      }
-      if (event.key === 'k') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(0, -PAN_STEP)
-        return
-      }
-      if (event.key === 'l') {
-        event.preventDefault()
-        event.stopPropagation()
-        panBy(PAN_STEP, 0)
-        return
-      }
-      if (event.key === '=' || event.key === '+') {
-        event.preventDefault()
-        event.stopPropagation()
-        zoomBy(ZOOM_STEP)
-        return
-      }
-      if (event.key === '-') {
-        event.preventDefault()
-        event.stopPropagation()
-        zoomBy(-ZOOM_STEP)
-        return
-      }
-      if (event.key === '0') {
-        event.preventDefault()
-        event.stopPropagation()
-        resetViewport()
-        return
-      }
-    }
+    if (handleCtrlViewportShortcut(event)) return
     if (!event.ctrlKey && !event.metaKey && !event.altKey) {
       if (event.key === 'i' && isCodeMode) {
         event.preventDefault()
@@ -937,6 +904,16 @@
             onclick={handleZoomInClick}
           >
             <Plus class="size-3" />
+          </button>
+          <button
+            type="button"
+            data-pip-zoom-reset=""
+            aria-label="Reset preview zoom"
+            title="Reset zoom & pan"
+            class={mermaidToolbarButton}
+            onclick={handleZoomResetClick}
+          >
+            <RotateCcw class="size-3" />
           </button>
         {/snippet}
 

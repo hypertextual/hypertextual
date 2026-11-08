@@ -49,8 +49,6 @@ export { InternalMention } from './extensions/internal-mention.js'
 export { LinkPreview } from './extensions/link-preview.js'
 export {
   DEFAULT_MERMAID_SOURCE,
-  findActiveMermaidPos,
-  getMermaidViewportState,
   MermaidNode,
   type MermaidNodeCommands,
   type MermaidNodeOptions,

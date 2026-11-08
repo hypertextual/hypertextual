@@ -1,5 +1,4 @@
 import type { Snippet } from 'svelte'
-import type { PipWindowVariants } from './styles'
 
 export type PipWindowScope = 'container' | 'viewport'
 
@@ -32,6 +31,4 @@ export interface PipWindowProps {
   children: Snippet
   /** Optional caller class overrides merged via `cn`. */
   class?: string
-  /** Derived CVA variant props. */
-  variants?: PipWindowVariants
 }

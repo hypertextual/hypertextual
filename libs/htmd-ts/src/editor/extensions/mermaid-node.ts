@@ -346,13 +346,7 @@ export const MermaidNode = defineHtmdExtension<
 
 // helpers -------------------------------------------------------------------
 
-/**
- * Resolves the document position of the active or selected `mermaid` block.
- */
-export function findActiveMermaidPos(
-  ctx: HtmdCommandContext,
-  event?: KeyboardEvent,
-): number | null {
+function findActiveMermaidPos(ctx: HtmdCommandContext, event?: KeyboardEvent): number | null {
   const { state } = ctx
   if (event) {
     const ctrl = findNodeViewControl(state, event, 'mermaid')
@@ -369,17 +363,6 @@ export function findActiveMermaidPos(
     }
   }
   return null
-}
-
-/**
- * Returns the current `MermaidViewportState` for the `mermaid` block at `pos`.
- */
-export function getMermaidViewportState(
-  editor: TiptapEditor,
-  pos: number,
-): MermaidViewportState | undefined {
-  const storage = (editor.storage as unknown as { mermaid?: MermaidNodeStorage })?.mermaid
-  return storage?.viewports.get(pos)
 }
 
 function whenMermaidActiveOrSelected(ctx: HtmdCommandContext, event: KeyboardEvent): boolean {

@@ -174,16 +174,7 @@ stateDiagram-v2
 
 - **Default (`normal` mode):** Renders the diagram SVG centered in its block container. Moving the cursor onto the block highlights the whole block (`NodeSelection`).
 - **Keyboard Pan, Zoom, and Fullscreen Across Modes:**
-  `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` (pan) and `Ctrl+=` / `Ctrl+-` / `Ctrl+0` (zoom in / zoom out / reset) work uniformly across **all** modes (`normal`, `select`, and `insert`, both inline and fullscreen) when the cursor or selection is inside a `mermaid` block. Non-insert diagram views also accept single-key shortcuts:
-
-| Context | Pan Shortcuts | Zoom & Reset Shortcuts | Mode / Pane Transitions |
-| --- | --- | --- | --- |
-| **Inline `normal` mode** (when `mermaid` block is selected) | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` or `H` / `J` / `K` / `L` (leaves `j`/`k` free for article block motion) | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` or `+` / `=` / `-` / `0` | `f` or `Space m f`: open Fullscreen Viewer; `Enter` / `i`: enter `insert` mode; `v` / `x`: enter `select` mode |
-| **Fullscreen Viewer (`normal` mode)** (`overlay` priority) | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l`, `h` / `j` / `k` / `l`, `H` / `J` / `K` / `L`, or Arrow keys | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` or `+` / `=` / `-` / `0` | `Escape`, `f`, or `q`: close fullscreen and restore inline `NodeSelection` |
-| **Inline `select` mode** (`v` or `x`) | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | `j` / `k` / `x` select lines of Mermaid code; `y` / `d` / `c` operate on selected lines; `Escape` returns to `normal` mode |
-| **Inline `insert` mode** | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` | `Ctrl+=` (zoom in), `Ctrl+-` (zoom out), `Ctrl+0` (reset) | `Mod+Enter` or `Ctrl+Shift+f`: open Fullscreen Split-Pane; `Tab` / `Shift+Tab`: cycle header/PiP controls; `Escape`: return to `normal` mode |
-| **Fullscreen Split-Pane — Code Pane focused (`insert` mode)** | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` without interrupting typing | `Ctrl+=` (zoom in), `Ctrl+-` (zoom out), `Ctrl+0` (reset) | `Ctrl+w l`, `Ctrl+w w`, or `Tab`: focus Preview Pane; `Escape` or `Mod+Enter`: exit fullscreen |
-| **Fullscreen Split-Pane — Preview Pane focused (`insert` mode)** | `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l`, `h` / `j` / `k` / `l`, `H` / `J` / `K` / `L`, or Arrow keys | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` or `+` / `=` / `-` / `0` | `Ctrl+w h`, `Ctrl+w w`, `i`, or `Tab`: focus Code Pane; `Escape`: exit fullscreen |
+  `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` (pan) and `Ctrl+=` / `Ctrl+-` / `Ctrl+0` (zoom in / zoom out / reset) work uniformly across **all** modes (`normal`, `select`, and `insert`, both inline and fullscreen) when the cursor or selection is inside a `mermaid` block. Non-insert diagram views (`normal` mode inline/fullscreen and the focused `Preview` pane in fullscreen split view) also accept single-key `h`/`j`/`k`/`l` or `H`/`J`/`K`/`L` pan and `+`/`=`/`-`/`0` zoom/reset shortcuts, while `f` / `Space m f` (`normal` mode) and `Mod+Enter` / `Ctrl+Shift+f` (`insert` mode) toggle fullscreen and `Ctrl+w l` / `Ctrl+w h` / `Ctrl+w w` / `Tab` switch between the split-pane `Code` and `Preview` panes. See the [Mermaid block keybinding table](../../../keybindings/index.md#mermaid-blocks-mermaidnode--mermaidnodeview) for the complete per-mode shortcut matrix.
 
 - **Loading, empty, and error:**
   - Empty `mermaid` blocks show an empty-state placeholder in `normal` mode (`Empty Mermaid diagram — press Enter to edit`) and a starter hint in `insert` mode.
@@ -196,7 +187,7 @@ stateDiagram-v2
 
 ### Styling and Responsiveness
 
-- Define CVA variants and base classes in `libs/ui/src/editor/components/styles.ts` (`mermaidBlockSurface`, `mermaidToolbar`, `mermaidViewport`, `mermaidFullscreenSplit`) using semantic theme tokens (`bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, `ring-ring`) and Helical's `renderMermaidSource` / `resolveMermaidThemeVariables` so diagrams automatically adapt to light/dark mode and all 54 Helical themes.
+- Define CVA variants and base classes in `libs/ui/src/editor/components/styles.ts` (`mermaidRootVariants`, `mermaidToolbar`, `mermaidViewerCanvas`, `mermaidFullscreenOverlay`) using semantic theme tokens (`bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, `ring-ring`) and Helical's `renderMermaidSource` / `resolveMermaidThemeVariables` so diagrams automatically adapt to light/dark mode and all 54 Helical themes.
 - Compose [`PipWindow`](../pip-window.md) (`libs/ui/src/pip-window/PipWindow.svelte`) with `scope="container"` (confined to the `.node-mermaid` relative wrapper by default, or switchable to `scope="viewport"`) and `placement="bottom-right"` so the preview floats over the bottom-right corner and can be minimized to a compact header pill (`Preview [-] [100%] [+] [+] [Full]`).
 
 ### Maintainer Notes
