@@ -60,15 +60,21 @@ export function executeSelectLines(editor: TiptapEditor, count: number): boolean
   const sel = state.selection
   const steps = Math.max(1, count)
   const pluginState = modalKeymapPluginKey.getState(state)
-  const blocks = collectLeafBlocks(doc)
+  const blocks = collectLeafBlocks(doc, 'select')
   if (blocks.length === 0) return false
 
+  const isMermaidNodeSelection =
+    !pluginState?.extendedRange && sel instanceof NodeSelection && sel.node.type.name === 'mermaid'
   const currentFrom = pluginState?.extendedRange
     ? Math.min(pluginState.extendedRange.anchor, pluginState.extendedRange.head)
-    : sel.from
+    : isMermaidNodeSelection
+      ? sel.from + 1
+      : sel.from
   const currentTo = pluginState?.extendedRange
     ? Math.max(pluginState.extendedRange.anchor, pluginState.extendedRange.head)
-    : sel.to
+    : isMermaidNodeSelection
+      ? sel.from + 1
+      : sel.to
 
   const currentBlockIdx = blocks.findIndex((b) =>
     b.isTextblock
@@ -189,7 +195,7 @@ export function executeSelectModeExtend(
     const cursorPos = getCursorCharPos(doc, sel, pluginState?.extendedRange)
     const $head = doc.resolve(cursorPos)
     if (!$head.parent.isTextblock) return false
-    const blocks = collectLeafBlocks(doc)
+    const blocks = collectLeafBlocks(doc, 'select')
     const lineBlock = blocks.find(
       (b) => !b.subtextKind && b.isTextblock && cursorPos >= b.start && cursorPos <= b.end,
     )
@@ -236,7 +242,7 @@ export function executeSelectModeExtend(
 
   if (motion === 'paragraphForward' || motion === 'paragraphBackward') {
     const dir = motion === 'paragraphForward' ? 1 : -1
-    const blocks = collectLeafBlocks(doc)
+    const blocks = collectLeafBlocks(doc, 'select')
     if (blocks.length === 0) return false
     const currentIdx = findCurrentBlockIndex(
       blocks,
@@ -329,7 +335,7 @@ export function executeSelectModeExtend(
 
   if (motion === 'down' || motion === 'up') {
     const dir = motion === 'down' ? 1 : -1
-    const blocks = collectLeafBlocks(doc)
+    const blocks = collectLeafBlocks(doc, 'select')
     if (blocks.length === 0) return false
 
     const cursorPos = getCursorCharPos(doc, sel, pluginState?.extendedRange)
@@ -416,10 +422,21 @@ export function executeSelectionTransform(
   const currentSecondary = pluginState?.secondaryRanges ?? []
 
   if (action === 'collapse') {
-    const nextSelection =
+    let nextSelection: Selection =
       sel instanceof NodeSelection ? sel : TextSelection.create(doc, getCursorCharPos(doc, sel))
+    const $from = nextSelection.$from
+    for (let d = $from.depth; d >= 1; d -= 1) {
+      if ($from.node(d).type.name === 'mermaid') {
+        const mermaidPos = $from.before(d)
+        const mermaidNode = doc.nodeAt(mermaidPos)
+        if (mermaidNode && NodeSelection.isSelectable(mermaidNode)) {
+          nextSelection = NodeSelection.create(doc, mermaidPos)
+        }
+        break
+      }
+    }
     let tr = state.tr.setSelection(nextSelection)
-    tr = updateModalMeta(editor, tr, { secondaryRanges: [] })
+    tr = updateModalMeta(editor, tr, { secondaryRanges: [], extendedRange: null })
     dispatchModalTransaction(editor, tr)
     return true
   }
@@ -439,7 +456,7 @@ export function executeSelectionTransform(
 
   if (action === 'addCursorBelow' || action === 'addCursorAbove') {
     const dir = action === 'addCursorBelow' ? 1 : -1
-    const blocks = collectLeafBlocks(doc).filter((b) => b.isTextblock)
+    const blocks = collectLeafBlocks(doc, 'select').filter((b) => b.isTextblock)
     if (blocks.length < 2) return false
 
     const referenceHead =

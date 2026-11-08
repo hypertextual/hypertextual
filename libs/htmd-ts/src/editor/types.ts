@@ -55,6 +55,7 @@ export interface HtmdSlashChain {
   toggleTaskList: () => HtmdSlashChain
   setHorizontalRule: () => HtmdSlashChain
   setCodeBlock: (attrs?: { language?: string }) => HtmdSlashChain
+  insertMermaid: (code?: string) => HtmdSlashChain
   openOverlay: (name: string, options?: HtmdOverlayOpenOptions) => HtmdSlashChain
   run: () => boolean
 }
@@ -139,6 +140,7 @@ export interface HtmdNodeViews<TEditor = unknown> {
   urlMention?: HtmdNodeViewFactory<TEditor>
   linkPreview?: HtmdNodeViewFactory<TEditor>
   codeBlock?: HtmdNodeViewFactory<TEditor>
+  mermaid?: HtmdNodeViewFactory<TEditor>
   notice?: HtmdNodeViewFactory<TEditor>
   unparsedBlock?: HtmdNodeViewFactory<TEditor>
   unparsedInline?: HtmdNodeViewFactory<TEditor>
@@ -224,6 +226,7 @@ export type HtmdCommandMap = {
   setHeading: (level: 1 | 2 | 3 | 4 | 5 | 6) => boolean
   setParagraph: () => boolean
   setCodeBlock: (language?: string) => boolean
+  insertMermaid: (code?: string) => boolean
   setColor: (color: string) => boolean
   unsetColor: () => boolean
   toggleHighlight: (color: string) => boolean

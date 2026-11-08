@@ -42,7 +42,7 @@ flowchart TD
     wrapper -->|"JSONContent changes"| app
     wrapper --> view["Editor.svelte"]
     view -->|"mounts & binds"| controller["htmd-ts: HtmdEditor controller"]
-    view -->|"svelteNodeView (editable + subtextRange)"| nodeViews["Svelte NodeViews: Notice, CodeBlock, Image, LinkPreview, UrlMention, Unparsed"]
+    view -->|"svelteNodeView (editable + mode + subtextRange)"| nodeViews["Svelte NodeViews: Notice, CodeBlock, Mermaid, Image, LinkPreview, UrlMention, Unparsed"]
     view --> surfaces["Svelte Overlays: ImageInput, BookmarkInput, YouTubeInput, SlashMenu, MentionList, BubbleMenu"]
     nodeViews & surfaces & wrapper -->|"useKeymap"| hotkeys["WhichKeyController"]
     controller -->|"editor:htmd & extension scopes"| hotkeys
@@ -105,13 +105,19 @@ stateDiagram-v2
 
 | Layer | Responsibility |
 | --- | --- |
-| `svelte-node-view.svelte.ts` (`svelteNodeView`) | Mounts Svelte 5 `NodeView` components (`mount` / `unmount`), subscribes once per node view to `editor.subscribe()`, and passes reactive `node`, `editable`, and `subtextRange` props to `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, `ImageNodeView.svelte`, and `LinkPreviewCard.svelte`. |
-| Extension `keymap` & `navigation` (`htmd-ts`) | Compound-block extensions (`NoticeNode`, `CodeBlock`, `ImageNode`, `LinkPreview`) own their `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter` navigation via `HtmdNodeNavigation`. |
-| Overlay `useKeymap` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`). |
+| `svelte-node-view.svelte.ts` (`svelteNodeView`) | Mounts Svelte 5 `NodeView` components (`mount` / `unmount`), subscribes once per node view to `editor.subscribe()`, and passes reactive `node`, `editable`, `mode`, and `subtextRange` props to `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, [`MermaidNodeView.svelte`](mermaid.md), `ImageNodeView.svelte`, and `LinkPreviewCard.svelte`. |
+| Extension `keymap` & `navigation` (`htmd-ts`) | Compound-block extensions (`NoticeNode`, `CodeBlock`, `MermaidNode`, `ImageNode`, `LinkPreview`) own their `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter` navigation via `HtmdNodeNavigation`. |
+| Overlay `useKeymap` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`, and fullscreen `MermaidNodeView`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`, pan/zoom). |
+
+## Editor Subcomponents
+
+| Component | Responsibility |
+| --- | --- |
+| [Mermaid editor and viewer (`MermaidNodeView`)](mermaid.md) | Modal diagram viewer (`normal`), line-selectable source view (`select`), live code + PiP preview (`insert`), and fullscreen viewer / split-pane editor with keyboard pan and zoom |
 
 ## Implementation
 
 - Keep `libs/ui` free of `@tiptap/*`, `lowlight`, and `svelte-tiptap`; import `HtmdEditor` and engine-neutral contracts from `htmd-ts` and `core-ts`.
-- Centralize reactive `editable` and `subtextRange` derivation in `libs/ui/src/editor/components/svelte-node-view.svelte.ts` so individual Svelte `NodeView` components remain purely presentational.
+- Centralize reactive `editable`, `mode`, and `subtextRange` derivation in `libs/ui/src/editor/components/svelte-node-view.svelte.ts` so individual Svelte `NodeView` components remain purely presentational.
 - Cover `HtmdEditor` library integration in `libs/htmd-ts/src/editor/htmd-editor.test.ts` and Svelte desktop workflows in `e2e/hypertextual-desktop/{modal-editing,editor}.spec.ts`.
-- See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](../htmd-ts/editor-extensions.md) and [editor source ownership](editor-source.md).
+- See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](../../htmd-ts/editor-extensions.md) and [editor source ownership](../editor-source.md).

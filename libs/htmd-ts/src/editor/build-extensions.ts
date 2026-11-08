@@ -34,6 +34,7 @@ import {
   Image as SchemaImageNode,
   InternalMention as SchemaInternalMentionNode,
   LinkPreview as SchemaLinkPreviewNode,
+  Mermaid as SchemaMermaidNode,
   Notice as SchemaNoticeNode,
   UnparsedBlock as SchemaUnparsedBlockNode,
   UnparsedInline as SchemaUnparsedInlineNode,
@@ -53,6 +54,7 @@ import { ImageNode } from './extensions/image-node.js'
 import { InsertMode } from './extensions/insert-mode.js'
 import { InternalMention } from './extensions/internal-mention.js'
 import { LinkPreview } from './extensions/link-preview.js'
+import { MermaidNode } from './extensions/mermaid-node.js'
 import { ModalEditing, modalKeymapPluginKey } from './extensions/modal-editing.js'
 import { HelixPreset, KakounePreset, VimPreset } from './extensions/modal-presets.js'
 import { NormalMode } from './extensions/normal-mode.js'
@@ -119,6 +121,7 @@ interface TiptapHookThis<TOptions, TStorage> {
 const SCHEMA_NODE_BY_NAME: Readonly<Record<string, AnyExtension>> = {
   heading: HeadingNodeWithId,
   codeBlock: CodeBlockLowlight.extend({ selectable: true }),
+  mermaid: SchemaMermaidNode,
   internalMention: SchemaInternalMentionNode,
   urlMention: SchemaUrlMentionNode,
   notice: SchemaNoticeNode,
@@ -442,7 +445,7 @@ export function buildExtensions<TEditor = unknown>(
     Placeholder.configure({
       showOnlyCurrent: false,
       placeholder: ({ node }) =>
-        node.type.name === 'codeBlock'
+        node.type.name === 'codeBlock' || node.type.name === 'mermaid'
           ? ''
           : options.placeholder
             ? options.placeholder(node.type.name, node.attrs.level)
@@ -474,6 +477,7 @@ export function buildExtensions<TEditor = unknown>(
     TextStyle,
     Color,
     compile(CodeBlock.configure({ lowlight, nodeView: untypedNodeViews.codeBlock })),
+    compile(MermaidNode.configure({ nodeView: untypedNodeViews.mermaid })),
     CharacterCount.configure({ mode: 'textSize' }),
     TaskList,
     TaskItem.configure({ nested: true }),

@@ -48,6 +48,17 @@ export {
 export { InternalMention } from './extensions/internal-mention.js'
 export { LinkPreview } from './extensions/link-preview.js'
 export {
+  DEFAULT_MERMAID_SOURCE,
+  findActiveMermaidPos,
+  getMermaidViewportState,
+  MermaidNode,
+  type MermaidNodeCommands,
+  type MermaidNodeOptions,
+  type MermaidNodeStorage,
+  type MermaidViewportAction,
+  type MermaidViewportState,
+} from './extensions/mermaid-node.js'
+export {
   getEditorModalTarget,
   isEditorInInsertMode,
   ModalEditing,

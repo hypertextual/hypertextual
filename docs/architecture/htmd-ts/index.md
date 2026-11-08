@@ -37,7 +37,7 @@ flowchart TD
     subgraph HTMD["libs/htmd-ts Internal Modules"]
         HE["editor/htmd-editor.ts<br/>Interactive Editor Controller"]
         HD["editor/htmd-document.ts<br/>Document & Asset Transform"]
-        EXT["editor/define-htmd-extension.ts & extensions/*<br/>18 Node, Behavior, & Modal Extensions"]
+        EXT["editor/define-htmd-extension.ts & extensions/*<br/>19 Node, Behavior, & Modal Extensions"]
         BE["editor/build-extensions.ts<br/>Schema Bridge, KeyScope & Navigation Compiler"]
         Schema["nodes.ts, marks.ts, syntax.ts, lib.ts<br/>Canonical HTMD Schema & Markdown Codec"]
         Engines["Private Engines<br/>ProseMirror View/State + Tiptap + Marked"]
@@ -114,6 +114,7 @@ const editor = new HtmdEditor({
   nodeViews: {
     notice: noticeNodeView,
     codeBlock: codeBlockNodeView,
+    mermaid: mermaidNodeView,
     image: imageNodeView,
     linkPreview: linkPreviewNodeView,
     urlMention: urlMentionNodeView,
@@ -136,6 +137,7 @@ editor.mount(containerElement)
 | Syntax Kind | Markdown Representation | Schema Node / Mark |
 | --- | --- | --- |
 | Standard blocks & inline marks | CommonMark & GFM | `heading`, `paragraph`, `codeBlock`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `bold`, `italic`, `strike`, `code`, `link` |
+| Mermaid diagrams | ```` ```mermaid ```` fenced block | `mermaid` (`MermaidNode`; disallowed as a `codeBlock` language) |
 | Callout notices | `> [!NOTE] Title` | `notice` (`NoticeNode`) |
 | Inline HTML marks | `<u>`, `<span style="color:...">`, `<mark>` | `underline`, `textColor`, `highlight` |
 | Mentions & embeds | `[mention ...]`, `[url-mention ...]`, `:::bookmark`, `:::youtube` | `internalMention`, `urlMention`, `linkPreview` |
@@ -154,7 +156,7 @@ editor.mount(containerElement)
 
 - `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own the canonical HTMD node and mark schemas, Markdown parsing, serialization, and schema validation.
 - `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` and the `HtmdNodeNavigation` presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`).
-- `src/editor/extensions/*` contains the 18 HTMD editor extension modules (9 node extensions, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
+- `src/editor/extensions/*` contains the 19 HTMD editor extension modules (10 node extensions including `mermaid-node.ts`, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
 - `src/editor/build-extensions.ts` extends the canonical node schemas from `src/nodes.ts` and attaches interactive extension behavior. See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](editor-extensions.md).
 
 ### Testing
@@ -166,7 +168,7 @@ editor.mount(containerElement)
 
 - [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](editor-extensions.md)
 - [core-ts editor plugin architecture](../core-ts.md)
-- [HtmdEditor Svelte component](../ui/htmd-editor.md)
+- [HtmdEditor Svelte component](../ui/htmd-editor/index.md)
 - [Editor source ownership](../ui/editor-source.md)
 - [System architecture](../index.md)
 - [Development commands](../../development.md)

@@ -182,6 +182,16 @@ function filterSlashCommands(query: string): SlashCommandItem[] {
       },
     },
     {
+      title: 'Mermaid Diagram',
+      description: 'Insert a Mermaid diagram with live preview',
+      icon: 'GitFork',
+      category: 'advanced',
+      shortcut: '```mermaid',
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertMermaid().run()
+      },
+    },
+    {
       title: 'YouTube',
       description: 'Embed a YouTube video',
       icon: 'YouTube',

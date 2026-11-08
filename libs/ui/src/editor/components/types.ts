@@ -89,6 +89,8 @@ export type LinkPreviewCardProps = SvelteNodeViewProps<HtmdEditor>
 
 export type CodeBlockComponentProps = SvelteNodeViewProps<HtmdEditor>
 
+export type MermaidNodeViewProps = SvelteNodeViewProps<HtmdEditor>
+
 export interface ImageInputProps extends EditorOverlayInputProps {
   onUpload?: (file: File) => Promise<ImageUploadResult>
 }

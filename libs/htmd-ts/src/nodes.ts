@@ -488,6 +488,33 @@ export const UnparsedInline = UnparsedBlock.extend({
   },
 })
 
+export const Mermaid = Node.create({
+  name: 'mermaid',
+  group: 'block',
+  content: 'text*',
+  marks: '',
+  code: true,
+  defining: true,
+  selectable: true,
+  parseHTML() {
+    return [{ tag: 'pre[data-type="mermaid"]', preserveWhitespace: 'full' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'pre',
+      mergeHtmlAttributes(HTMLAttributes, {
+        'data-type': 'mermaid',
+        class: 'editor-mermaid my-4',
+      }),
+      ['code', 0],
+    ]
+  },
+  renderMarkdown(node) {
+    const text = (node.content ?? []).map((child) => child.text ?? '').join('')
+    return `\`\`\`mermaid\n${text}\n\`\`\``
+  },
+})
+
 export const HeadingNodeWithId = Heading.extend({
   renderHTML({ node, HTMLAttributes }) {
     const level = node.attrs.level as number
@@ -597,6 +624,9 @@ export function adaptNodes(extensions: AnyExtension[]): AnyExtension[] {
       return extension.configure({ defaultLanguage: 'javascript' }).extend({
         parseMarkdown(token, h) {
           const language = String(token.lang || 'javascript')
+          if (language === 'mermaid') {
+            return h.createNode('mermaid', {}, token.text ? [h.createTextNode(token.text)] : [])
+          }
           if (/\s/.test(language) || ['htmd', 'chart', 'mermaid', 'manim'].includes(language))
             throw new Error('This code fence is reserved for a future format extension.')
           return h.createNode(
@@ -651,6 +681,7 @@ export const customNodes = [
   InternalMention,
   UrlMention,
   LinkPreview,
+  Mermaid,
   UnparsedBlock,
   UnparsedInline,
   YouTubeSyntax,

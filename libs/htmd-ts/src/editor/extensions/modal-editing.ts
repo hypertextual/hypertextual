@@ -126,6 +126,7 @@ const NON_TEXT_MODAL_NODE_TYPES = new Set([
   'notice',
   'blockquote',
   'codeBlock',
+  'mermaid',
   'imageNode',
   'image',
   'linkPreview',
@@ -1064,10 +1065,21 @@ export function getSubtextValue(node: PMNode): string {
  * Collects ordered leaf block descriptors (including subtext and multiline
  * textblock line slices) across `doc` for modal line/paragraph navigation.
  */
-export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
+export function collectLeafBlocks(doc: PMNode, mode: KeymapMode = 'normal'): BlockDescriptor[] {
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
     const nav = getNodeNavigationForType(node.type.name)
+    if (node.type.name === 'mermaid' && mode !== 'select') {
+      blocks.push({
+        node,
+        pos,
+        start: pos,
+        end: pos + node.nodeSize,
+        isTextblock: false,
+        isAtom: true,
+      })
+      return false
+    }
     if (nav?.subtext && (!nav.subtext.enabled || nav.subtext.enabled(node))) {
       const subtextText = getSubtextValue(node)
       if (!node.isAtom) {

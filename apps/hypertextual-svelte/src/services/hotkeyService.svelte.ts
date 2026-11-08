@@ -36,6 +36,13 @@ export class HotkeyService {
       mode: ['normal', 'select'],
       expand: () => {
         const viewKey = this.controller?.getState().preset === 'kakoune' ? 'v' : 'z'
+        const hasMermaidSelected =
+          typeof document !== 'undefined' &&
+          Boolean(
+            document.querySelector(
+              '.ProseMirror [data-pm-modal-node-selection="normal"][data-mermaid-node], .ProseMirror [data-pm-modal-node-selection="normal"] [data-mermaid-node]',
+            ),
+          )
         return {
           '?': leaf(
             '?',
@@ -51,6 +58,26 @@ export class HotkeyService {
             'workspace.toggleExplorer',
             'Toggle the Workspace Explorer sidebar open or closed',
           ),
+          ...(hasMermaidSelected
+            ? {
+                m: {
+                  key: 'm',
+                  label: '+mermaid',
+                  group: 'Mermaid',
+                  description: 'Mermaid diagram actions',
+                  category: 'Mermaid',
+                  children: {
+                    f: leaf(
+                      'f',
+                      'Toggle Mermaid Fullscreen',
+                      'Mermaid',
+                      'mermaid.toggleFullscreen',
+                      'Open or minimize the selected Mermaid diagram in fullscreen',
+                    ),
+                  },
+                },
+              }
+            : {}),
           n: leaf(
             'n',
             'New Article',
@@ -272,6 +299,15 @@ export class HotkeyService {
     'workspace.openInDefaultApp': () => {
       if (!this.workspace.editor.selected) return false
       void this.workspace.editor.openInDefaultApp()
+      return true
+    },
+    'mermaid.toggleFullscreen': () => {
+      if (typeof document === 'undefined') return false
+      const btn = document.querySelector<HTMLElement>(
+        '.ProseMirror [data-pm-modal-node-selection="normal"] button[data-mermaid-fullscreen]',
+      )
+      if (!btn) return false
+      btn.click()
       return true
     },
   }

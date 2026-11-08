@@ -18,6 +18,58 @@ export const editorSurface = cva(
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
+
+export const mermaidRootVariants = cva(
+  'mermaid-node-view relative my-4 overflow-hidden rounded-lg border border-border bg-card text-card-foreground transition-colors',
+  {
+    variants: {
+      mode: {
+        normal: 'select-none',
+        jump: 'select-none',
+        select: 'min-h-56',
+        insert: 'min-h-56',
+      },
+    },
+    defaultVariants: {
+      mode: 'normal',
+    },
+  },
+)
+export type MermaidRootVariants = VariantProps<typeof mermaidRootVariants>
+
+export const mermaidHeader =
+  'flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-1.5 text-xs select-none'
+
+export const mermaidTitle =
+  'inline-flex items-center gap-1.5 font-mono text-xs font-medium text-muted-foreground'
+
+export const mermaidToolbar = 'flex items-center gap-1'
+
+export const mermaidToolbarButton =
+  'inline-flex h-6 items-center justify-center gap-1 rounded px-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none'
+
+export const mermaidZoomBadge =
+  'min-w-11 text-center font-mono text-[11px] tabular-nums text-muted-foreground'
+
+export const mermaidViewerCanvas =
+  'relative flex min-h-48 w-full items-center justify-center overflow-hidden bg-background/60 p-6 outline-none'
+
+export const mermaidCodeContainer = 'relative min-h-52 w-full bg-background/40 pr-76 pb-4'
+
+export const mermaidFullscreenOverlay =
+  'absolute inset-x-0 z-40 flex flex-col overflow-hidden bg-background text-foreground shadow-lg outline-none'
+
+export const mermaidSplitCodePane =
+  'flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-border bg-background data-[pane-focused=true]:ring-2 data-[pane-focused=true]:ring-inset data-[pane-focused=true]:ring-ring/50'
+
+export const mermaidSplitPreviewPane =
+  'relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden bg-muted/20 p-6 outline-none data-[pane-focused=true]:ring-2 data-[pane-focused=true]:ring-inset data-[pane-focused=true]:ring-ring/50'
+
+export const mermaidSplitTextarea =
+  'h-full w-full flex-1 resize-none border-0 bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none focus:ring-0'
+
+export const mermaidErrorBanner =
+  'rounded-md border border-danger/40 bg-danger/10 px-3 py-2 font-mono text-xs text-danger'
 export const youtubeSurface = 'my-0 [&>button]:block [&>iframe]:block [&>button>img]:my-0'
 export const noticeBody =
   "min-h-6 [&_p]:m-0 data-[empty=true]:before:pointer-events-none data-[empty=true]:before:float-left data-[empty=true]:before:h-0 data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:content-['Add_the_notice_body_here.']"

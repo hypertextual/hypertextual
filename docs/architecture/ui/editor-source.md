@@ -68,7 +68,7 @@ The editor exchanges native `JSONContent` with the app. `EditorService` restores
 
 ### Interfaces and Contracts
 
-The public component contract is documented in [HTMD editor](htmd-editor.md), the plugin and extension contract in [htmd-ts](../htmd-ts/index.md), and the abstract editor/key-scope contract in [core-ts](../core-ts.md).
+The public component contract is documented in [HTMD editor](htmd-editor/index.md), the plugin and extension contract in [htmd-ts](../htmd-ts/index.md), and the abstract editor/key-scope contract in [core-ts](../core-ts.md).
 
 #### Extension authoring and compilation (`defineHtmdExtension` -> `build-extensions.ts`)
 
@@ -160,7 +160,7 @@ binding.destroy()
 
 - [core-ts architecture](../core-ts.md)
 - [htmd-ts architecture](../htmd-ts/index.md)
-- [HTMD editor (`HtmdEditor`)](htmd-editor.md)
+- [HTMD editor (`HtmdEditor`)](htmd-editor/index.md)
 - [Development commands](../../development.md)
 - [HYPE-160](https://linear.app/cloudvoyant/issue/HYPE-160/vendor-the-helical-editor-for-development-inside-hypertextual)
 - [HYPE-169](https://linear.app/cloudvoyant/issue/HYPE-169/refactorui-unify-editorextension-system-and-svelte-component)

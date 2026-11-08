@@ -114,7 +114,7 @@ flowchart TD
     subgraph HtmdTS["libs/htmd-ts"]
         NodesMarks["1. Canonical Schema<br/>src/nodes.ts & src/marks.ts"]
         DefineExt["2. defineHtmdExtension<br/>commands, keymap, navigation, nodeView, pmPlugins"]
-        Exts["3. src/editor/extensions/*<br/>18 Node, Behavior, & Modal Extensions"]
+        Exts["3. src/editor/extensions/*<br/>19 Node, Behavior, & Modal Extensions"]
         BuildExts["4. buildExtensions()<br/>Extends nodes.ts + binds Keymaps & Navigation"]
         Controller["5. HtmdEditor & HtmdDocument<br/>Wraps TiptapEditor & ProseMirror EditorView"]
     end
@@ -153,7 +153,7 @@ flowchart TD
 ##### Container vs. Atom `NodeView` Layout
 
 ```text
-1. Container NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte)
+1. Container NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte, MermaidNodeView.svelte)
 +-----------------------------------------------------------------------+
 | .node-notice (NodeView.dom, contenteditable="false" header controls)  |
 | +-------------------------------------------------------------------+ |
@@ -235,11 +235,11 @@ flowchart TD
     Text --> Cont & Atom
 ```
 
-| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `NoticeNode`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
+| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `MermaidNode`, `NoticeNode`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
 | --- | --- | --- | --- |
 | `enterFromAbove` (`ArrowDown` / `Tab`) | Caret at start of block | Focuses `controls[0]` in header | Focuses `controls[0]` (`caption` or `url` input) |
 | `enterFromBelow` (`ArrowUp` / `Shift+Tab`) | Caret at end of block | Caret on last line of `contentDOM` body | Focuses `controls[0]` or last control |
-| `enterCompound` (Normal `Enter` / `i`) | Enters insert mode at caret | `CodeBlock`: body start; `NoticeNode`: `controls[0]` | Focuses `controls[0]` or subtext offset |
+| `enterCompound` (Normal `Enter` / `i`) | Enters insert mode at caret | `CodeBlock` & `MermaidNode`: body start; `NoticeNode`: `controls[0]` | Focuses `controls[0]` or subtext offset |
 | `stepControl` (`Tab` / `Shift+Tab`) | Moves to adjacent block | Cycles `controls` <-> body <-> adjacent block | Cycles `controls` <-> adjacent block |
 | `subtext` | `undefined` | `undefined` (`NoticeNode` uses `noticeTitle` on header) | `{ kind, attr, textSelector, inputSelector }` |
 
@@ -340,5 +340,5 @@ export const NoticeNode = defineHtmdExtension<NoticeNodeOptions>({ ... })
 
 - [htmd-ts software architecture](index.md)
 - [core-ts editor plugin architecture](../core-ts.md)
-- [HTMD editor (`HtmdEditor`)](../ui/htmd-editor.md)
+- [HTMD editor (`HtmdEditor`)](../ui/htmd-editor/index.md)
 - [Editor source ownership](../ui/editor-source.md)

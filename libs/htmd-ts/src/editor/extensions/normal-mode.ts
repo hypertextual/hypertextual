@@ -490,7 +490,7 @@ export function executeNormalModeTextObject(
       case 'p':
         return typeName === 'paragraph' || typeName === 'heading'
       case 'c':
-        return typeName === 'codeBlock'
+        return typeName === 'codeBlock' || typeName === 'mermaid'
       case 'n':
         return typeName === 'notice' || typeName === 'blockquote'
       case 'l':

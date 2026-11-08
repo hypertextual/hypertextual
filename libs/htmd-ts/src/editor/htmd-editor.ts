@@ -69,6 +69,7 @@ const htmdEditorSchema = getSchema(
       urlMention: dummyNodeView,
       linkPreview: dummyNodeView,
       codeBlock: dummyNodeView,
+      mermaid: dummyNodeView,
       notice: dummyNodeView,
     },
   }),
@@ -143,7 +144,7 @@ function createDocumentHotkeyService(): EditorHotkeyService | undefined {
           }
           nodes[normalizedKey] = node
           if (normalizedKey !== rawKey) {
-            nodes[rawKey] = node
+            nodes[rawKey] = { ...node, key: rawKey, hidden: true }
           }
         }
         return nodes
@@ -638,6 +639,21 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
       .run()
   }
 
+  updateMermaidSource(position: number, code: string): boolean {
+    if (!this.tiptap?.state) return false
+    const node = this.tiptap.state.doc.nodeAt(position)
+    if (!node || node.type.name !== 'mermaid') return false
+    if (node.textContent === code) return true
+    const schema = this.tiptap.state.schema
+    const from = position + 1
+    const to = position + node.nodeSize - 1
+    const tr = code
+      ? this.tiptap.state.tr.replaceWith(from, to, schema.text(code))
+      : this.tiptap.state.tr.delete(from, to)
+    dispatchModalTransaction(this.tiptap, tr)
+    return true
+  }
+
   async fetchLinkPreview(url: string): Promise<Omit<LinkPreviewAttributes, 'url' | 'type'> | null> {
     const fetcher =
       this.options.fetchLinkPreview ??
@@ -663,6 +679,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   ): boolean {
     const chain = () => this.chain()
     const customCmds = this.tiptap.commands as unknown as {
+      insertMermaid: (code?: string) => boolean
       insertNotice: (attrs?: NoticeAttributes) => boolean
       insertImage: (attrs: {
         src: string
@@ -704,6 +721,8 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         return chain()
           .setCodeBlock({ language: (args[0] as string | undefined) ?? 'plaintext' })
           .run()
+      case 'insertMermaid':
+        return customCmds.insertMermaid(args[0] as string | undefined)
       case 'setColor':
         return chain()
           .setColor(args[0] as string)
