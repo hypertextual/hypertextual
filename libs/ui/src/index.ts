@@ -11,8 +11,14 @@ export { default as FontSelector } from './font-selector/FontSelector.svelte'
 export { EDITOR_FONTS } from './font-selector/types'
 export type { EditorFont, FontSelectorProps } from './font-selector/types'
 export { default as ThemeToggle } from './theme/ThemeToggle.svelte'
-export { ThemeService, themeService } from './theme/themeService.svelte'
-export type { ThemeMode, ThemeServiceOptions, ThemeToggleProps } from './theme/types'
+export { HYPERTEXTUAL_THEMES, ThemeService, themeService } from './theme/themeService.svelte'
+export type {
+  ThemeMeta,
+  ThemeMode,
+  ThemeName,
+  ThemeServiceOptions,
+  ThemeToggleProps,
+} from './theme/types'
 export {
   WindowInplace,
   WindowInplaceHeader,

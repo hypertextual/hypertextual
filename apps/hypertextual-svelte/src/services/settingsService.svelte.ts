@@ -1,10 +1,18 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { themeService, type ThemeMode } from '@hypertextual/ui'
+import type { CommandStyle } from '@cloudvoyant/helical-ui'
+import { HYPERTEXTUAL_THEMES, themeService, type ThemeMode, type ThemeName } from '@hypertextual/ui'
 
 const PANE_OUTLINE_KEY = 'hypertextual.settings.paneOutline'
 const CLICK_TO_INSERT_KEY = 'hypertextual.settings.clickToInsert'
 const THEME_MODE_KEY = 'hypertextual.settings.themeMode'
+const THEME_KEY = 'hypertextual.settings.theme'
+const COMMAND_STYLE_KEY = 'hypertextual.settings.commandStyle'
+
+const VALID_THEME_NAMES = new Set<string>(HYPERTEXTUAL_THEMES.map((t) => t.name))
+
+/** Normalized application command surface style (`'palette'` or `'menu'`). */
+export type AppCommandStyle = 'palette' | 'menu'
 
 function readBoolean(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') return fallback
@@ -47,17 +55,69 @@ function writeThemeMode(mode: ThemeMode): void {
   }
 }
 
+function readTheme(): ThemeName {
+  if (typeof window === 'undefined') return 'hypertextual'
+  try {
+    const raw = window.localStorage.getItem(THEME_KEY)
+    if (raw && VALID_THEME_NAMES.has(raw)) return raw
+  } catch {
+    // Ignore storage access errors
+  }
+  return 'hypertextual'
+}
+
+function writeTheme(theme: ThemeName): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    // Ignore storage access errors
+  }
+}
+
+function normalizeCommandStyle(style: string | null | undefined): AppCommandStyle {
+  return style === 'menu' || style === 'colon' ? 'menu' : 'palette'
+}
+
+function readCommandStyle(): AppCommandStyle {
+  if (typeof window === 'undefined') return 'palette'
+  try {
+    const raw = window.localStorage.getItem(COMMAND_STYLE_KEY)
+    if (raw === 'palette' || raw === 'menu' || raw === 'colon') {
+      return normalizeCommandStyle(raw)
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+  return 'palette'
+}
+
+function writeCommandStyle(style: AppCommandStyle): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(COMMAND_STYLE_KEY, style)
+  } catch {
+    // Ignore storage access errors
+  }
+}
+
 export class SettingsService {
   paneOutline = $state(readBoolean(PANE_OUTLINE_KEY, true))
   clickToInsert = $state(readBoolean(CLICK_TO_INSERT_KEY, true))
+  commandStyle = $state<AppCommandStyle>(readCommandStyle())
 
   constructor() {
     if (typeof document !== 'undefined') {
       document.documentElement.style.removeProperty('--font-mono')
     }
+    const initialTheme = readTheme()
     const initialMode = readThemeMode()
+    themeService.setTheme(initialTheme, false)
     themeService.setThemeMode(initialMode, false)
     this.syncTauriTheme(initialMode)
+    themeService.onThemeChange((theme) => {
+      writeTheme(theme)
+    })
     themeService.onModeChange((mode) => {
       writeThemeMode(mode)
       this.syncTauriTheme(mode)
@@ -84,6 +144,17 @@ export class SettingsService {
         }
       })
       .catch(() => {})
+  }
+
+  setCommandStyle(style: CommandStyle): AppCommandStyle {
+    const normalized = normalizeCommandStyle(style)
+    this.commandStyle = normalized
+    writeCommandStyle(normalized)
+    return this.commandStyle
+  }
+
+  toggleCommandStyle(): AppCommandStyle {
+    return this.setCommandStyle(this.commandStyle === 'palette' ? 'menu' : 'palette')
   }
 
   togglePaneOutline(): boolean {
