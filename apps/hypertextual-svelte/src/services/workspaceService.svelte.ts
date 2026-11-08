@@ -43,7 +43,6 @@ export class WorkspaceService {
     })
     this.hotkeys = new HotkeyService(this)
     this.editorServices = {
-      hotkeys: this.hotkeys,
       media: this.editor.mediaService,
       embedRegistry: new DefaultEmbeddedEditorRegistry(),
     }

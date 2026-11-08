@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte'
-  import type { KeymapMode } from '@cloudvoyant/helical-ui'
+  import { getDocumentWhichKeyController, type KeymapMode } from '@cloudvoyant/helical-ui'
   import {
     Button,
     Row,
@@ -12,7 +12,6 @@
     WhichKey,
   } from '@cloudvoyant/helical-svelte'
   import { FilePlus2, FolderPlus } from 'lucide-svelte'
-  import { provideEditorHostServices } from '@hypertextual/ui'
   import { invoke, isTauri } from '@tauri-apps/api/core'
   import { listen } from '@tauri-apps/api/event'
   import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -36,7 +35,6 @@
   const editor = workspace.editor
   const settings = workspace.settings
   const hotkeys = workspace.hotkeys
-  provideEditorHostServices(() => workspace.editorServices)
 
   // Lifecycle -----------------------------------------------------------------
   onMount(() => {
@@ -64,7 +62,7 @@
         !workspace.editor.selected &&
         (!document.activeElement || document.activeElement === document.body)
       ) {
-        hotkeys.focusPane('workspace')
+        getDocumentWhichKeyController(document)?.focusPane('workspace')
       }
     })
   }
@@ -99,7 +97,7 @@
   }
 
   function handleSidebarOpenChange(next: boolean): void {
-    hotkeys.setSidebarOpen(next)
+    hotkeys.sidebarOpen = next
   }
 
   function handleRecoveryClose(): void {

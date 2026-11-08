@@ -1,14 +1,7 @@
 import { tick } from 'svelte'
-import {
-  getDocumentWhichKeyController,
-  registerModalEditor,
-  subscribeDocumentWhichKeyController,
-  type KeymapMode,
-  type ModalEditorTarget,
-} from '@cloudvoyant/helical-ui'
+import { getDocumentWhichKeyController, type KeymapMode } from '@cloudvoyant/helical-ui'
 import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
-import type { EditorHotkeyService, EditorMode, EditorPreset, KeyScopeOptions } from 'core-ts'
-import { registerKeyScopeWithWhichKey, themeService } from '@hypertextual/ui'
+import { themeService } from '@hypertextual/ui'
 import type { WorkspaceService } from './workspaceService.svelte'
 
 function leaf(
@@ -23,7 +16,7 @@ function leaf(
 }
 
 /** Application keyboard shortcuts, leader menu, and pane focus navigation. */
-export class HotkeyService implements EditorHotkeyService {
+export class HotkeyService {
   sidebarOpen = $state(true)
 
   readonly keymap: Record<string, WhichKeyNode> = {
@@ -42,7 +35,7 @@ export class HotkeyService implements EditorHotkeyService {
       category: 'Leader',
       mode: ['normal', 'select'],
       expand: () => {
-        const viewKey = this.getPreset() === 'kakoune' ? 'v' : 'z'
+        const viewKey = this.controller?.getState().preset === 'kakoune' ? 'v' : 'z'
         return {
           '?': leaf(
             '?',
@@ -242,7 +235,7 @@ export class HotkeyService implements EditorHotkeyService {
           editor.selected.path !== previousPath &&
           editor.setEditable(true)
         ) {
-          this.setMode('insert')
+          this.controller?.setMode('insert')
           void tick().then(() => {
             document.querySelector<HTMLElement>('.ProseMirror')?.focus()
           })
@@ -289,76 +282,6 @@ export class HotkeyService implements EditorHotkeyService {
     return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null
   }
 
-  getMode(): EditorMode {
-    return (this.controller?.getState().mode as EditorMode) ?? 'normal'
-  }
-
-  setMode(mode: EditorMode): void {
-    const controller = this.controller
-    if (controller && controller.getState().mode !== mode) {
-      controller.setMode(mode as KeymapMode)
-    }
-  }
-
-  getPreset(): EditorPreset {
-    return (this.controller?.getState().preset as EditorPreset) ?? 'helix'
-  }
-
-  setPreset(preset: EditorPreset): void {
-    const controller = this.controller
-    if (controller && controller.getState().preset !== preset) {
-      controller.setPreset(preset)
-    }
-  }
-
-  isOverlayOpen(): boolean {
-    const state = this.controller?.getState()
-    return Boolean(state?.isOpen || state?.explorerOpen)
-  }
-
-  subscribe(
-    listener: (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void,
-  ): () => void {
-    if (typeof document === 'undefined') return () => {}
-    let unsubController: (() => void) | undefined
-    const attach = () => {
-      unsubController?.()
-      unsubController = this.controller?.subscribe((state) => {
-        listener({
-          mode: state.mode as EditorMode,
-          preset: state.preset as EditorPreset,
-          overlayOpen: Boolean(state.isOpen || state.explorerOpen),
-        })
-      })
-    }
-    attach()
-    const unsubDoc = subscribeDocumentWhichKeyController(document, attach)
-    return () => {
-      unsubDoc()
-      unsubController?.()
-    }
-  }
-
-  registerKeyScope<TCtx>(options: KeyScopeOptions<TCtx>): () => void {
-    return registerKeyScopeWithWhichKey(options)
-  }
-
-  registerModalTarget(element: HTMLElement, target: unknown): () => void {
-    return registerModalEditor(element, target as ModalEditorTarget)
-  }
-
-  focusPane(paneId: string): boolean {
-    return this.controller?.focusPane(paneId) ?? false
-  }
-
-  dispatchKeyDown(event: KeyboardEvent): boolean {
-    return this.controller?.handleKeyDown(event) ?? false
-  }
-
-  setSidebarOpen(open: boolean): void {
-    this.sidebarOpen = open
-  }
-
   toggleExplorer(): boolean {
     const nextOpen = !this.sidebarOpen
     this.sidebarOpen = nextOpen
@@ -366,7 +289,7 @@ export class HotkeyService implements EditorHotkeyService {
     // Wait for Sidebar's pane registration effect to settle before focusing (see CLO-209).
     void tick().then(() => {
       requestAnimationFrame(() => {
-        this.focusPane(targetPane)
+        this.controller?.focusPane(targetPane)
       })
     })
     return true
@@ -374,7 +297,7 @@ export class HotkeyService implements EditorHotkeyService {
 
   focusArticlePane(): void {
     if (typeof document === 'undefined') return
-    if (!this.focusPane('article')) {
+    if (!this.controller?.focusPane('article')) {
       document.querySelector<HTMLElement>('[role="region"][aria-label="Article content"]')?.focus()
     }
   }

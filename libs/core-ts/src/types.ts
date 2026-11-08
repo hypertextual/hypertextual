@@ -67,8 +67,6 @@ export interface EditorHotkeyService {
     listener: (state: { mode: EditorMode; preset: EditorPreset; overlayOpen: boolean }) => void,
   ): () => void
   registerKeyScope<TCtx>(options: KeyScopeOptions<TCtx>): () => void
-  registerModalTarget?(element: HTMLElement, target: unknown): () => void
-  dispatchKeyDown(event: KeyboardEvent): boolean
 }
 
 export interface EmbeddedEditorMountOptions<TDoc = unknown> {

@@ -68,7 +68,7 @@ function createTestHotkeyService(initialMode: EditorMode = 'insert') {
     defaultMode: initialMode as KeymapMode,
     disableOnMobile: false,
   })
-  const hotkeys: EditorHotkeyService = {
+  const hotkeys: EditorHotkeyService & { dispatchKeyDown(event: KeyboardEvent): boolean } = {
     registerKeyScope: (scope) =>
       controller.registerKeymap(
         scope.id,

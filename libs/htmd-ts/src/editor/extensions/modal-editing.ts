@@ -918,8 +918,8 @@ export function exitModalToNormal(editor: TiptapEditor): boolean {
 }
 
 /**
- * Synchronizes `registerModalEditor` and `hotkeys.registerModalTarget` bindings
- * across the editor DOM, surface element, and outer region container.
+ * Synchronizes `registerModalEditor` bindings across the editor DOM, surface
+ * element, and outer region container.
  */
 export function syncModalDomRegistration(editor: TiptapEditor): void {
   const storage = getModalStorage(editor)
@@ -931,16 +931,12 @@ export function syncModalDomRegistration(editor: TiptapEditor): void {
   if (!target) return
 
   const cleanups: Array<() => void> = []
-  const hotkeys = storage.options?.getHotkeys?.()
   const registered = new Set<HTMLElement>()
   const registerEl = (el: HTMLElement | null | undefined) => {
     if (!el || typeof HTMLElement === 'undefined' || !(el instanceof HTMLElement)) return
     if (registered.has(el)) return
     registered.add(el)
     cleanups.push(registerModalEditor(el, target))
-    if (hotkeys?.registerModalTarget) {
-      cleanups.push(hotkeys.registerModalTarget(el, target))
-    }
   }
 
   try {

@@ -3,7 +3,6 @@
   import { tick } from 'svelte'
   import { cn } from '@cloudvoyant/helical-ui'
   import { useOptionalWhichKeyController } from '@cloudvoyant/helical-svelte'
-  import { provideEditorHostServices } from '../key-scope/useKeyScope.svelte'
   import { editorViewport } from './styles'
   import type { HtmdEditorProps, EditorHandle } from './types'
 
@@ -22,7 +21,6 @@
 
   // State ---------------------------------------------------------------------
   const whichKeyController = useOptionalWhichKeyController()
-  provideEditorHostServices(() => services)
 
   let view = $state<EditorHandle>()
   let surface = $state<HTMLDivElement>()

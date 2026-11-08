@@ -15,7 +15,6 @@
     type SlashCommandItem,
   } from 'htmd-ts'
   import { createSvelteNodeView } from './svelte-node-view.svelte'
-  import { useOptionalEditorHostServices } from '../../key-scope/useKeyScope.svelte'
   import BubbleMenuContent from './BubbleMenu.svelte'
   import SlashMenu from './SlashMenu.svelte'
   import BookmarkInput from './BookmarkInput.svelte'
@@ -47,7 +46,6 @@
 
   // State ---------------------------------------------------------------------
   const whichKeyController = useOptionalWhichKeyController()
-  const contextServices = useOptionalEditorHostServices()
 
   let editor = $state<HtmdEditor | null>(null)
 
@@ -118,7 +116,7 @@
       clickToEdit,
       enforceTitle,
       editorClass: editorTypography,
-      services: services ?? contextServices,
+      services,
       nodeViews,
       overlays,
       onOverlayChange: (overlay) => {

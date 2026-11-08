@@ -1,3 +1,9 @@
+import {
+  getDocumentWhichKeyController,
+  subscribeDocumentWhichKeyController,
+  type KeymapMode,
+  type WhichKeyNode,
+} from '@cloudvoyant/helical-ui'
 import { Editor as TiptapEditor, getSchema, type EditorOptions } from '@tiptap/core'
 import { NodeSelection, type EditorState } from '@tiptap/pm/state'
 import {
@@ -8,7 +14,9 @@ import {
   type Editor,
   type EditorCounts,
   type EditorHostServices,
+  type EditorHotkeyService,
   type EditorMode,
+  type EditorPreset,
 } from 'core-ts'
 import { parse, serialize, validateDocument } from '../lib.js'
 import type { JSONContent } from '../types.js'
@@ -65,6 +73,127 @@ const htmdEditorSchema = getSchema(
     },
   }),
 )
+
+function createDocumentHotkeyService(): EditorHotkeyService | undefined {
+  if (typeof document === 'undefined') return undefined
+  const getController = () => getDocumentWhichKeyController(document)
+  return {
+    getMode: () => (getController()?.getState().mode as EditorMode) ?? 'normal',
+    setMode: (mode) => {
+      const controller = getController()
+      if (controller && controller.getState().mode !== mode) {
+        controller.setMode(mode as KeymapMode)
+      }
+    },
+    getPreset: () => (getController()?.getState().preset as EditorPreset) ?? 'helix',
+    setPreset: (preset) => {
+      const controller = getController()
+      if (controller && controller.getState().preset !== preset) {
+        controller.setPreset(preset)
+      }
+    },
+    isOverlayOpen: () => {
+      const state = getController()?.getState()
+      return Boolean(state?.isOpen || state?.explorerOpen)
+    },
+    subscribe: (listener) => {
+      let unsubController: (() => void) | undefined
+      const attach = () => {
+        unsubController?.()
+        unsubController = getController()?.subscribe((state) => {
+          listener({
+            mode: state.mode as EditorMode,
+            preset: state.preset as EditorPreset,
+            overlayOpen: Boolean(state.isOpen || state.explorerOpen),
+          })
+        })
+      }
+      attach()
+      const unsubDoc = subscribeDocumentWhichKeyController(document, attach)
+      return () => {
+        unsubDoc()
+        unsubController?.()
+      }
+    },
+    registerKeyScope: (options) => {
+      const nodesGetter = (): Record<string, WhichKeyNode> => {
+        const resolved = typeof options.keymap === 'function' ? options.keymap() : options.keymap
+        const nodes: Record<string, WhichKeyNode> = {}
+        for (const [rawKey, binding] of Object.entries(resolved)) {
+          if (!binding) continue
+          const normalizedKey = rawKey.replace(/-(?=.)/g, '+')
+          const mode: KeymapMode | KeymapMode[] = binding.mode
+            ? Array.isArray(binding.mode)
+              ? ([...binding.mode] as KeymapMode[])
+              : (binding.mode as KeymapMode)
+            : ['normal', 'select', 'insert']
+          const node: WhichKeyNode = {
+            key: normalizedKey,
+            label: binding.label,
+            description: binding.description,
+            category: binding.category,
+            mode,
+            hidden: !binding.category,
+            when: binding.when
+              ? (cmdCtx) =>
+                  cmdCtx.event ? binding.when!(options.getContext(), cmdCtx.event) : false
+              : undefined,
+            action: (cmdCtx) =>
+              cmdCtx.event ? binding.run(options.getContext(), cmdCtx.event) : false,
+          }
+          nodes[normalizedKey] = node
+          if (normalizedKey !== rawKey) {
+            nodes[rawKey] = node
+          }
+        }
+        return nodes
+      }
+      let unregister: (() => void) | undefined
+      const sync = () => {
+        unregister?.()
+        unregister = getController()?.registerKeymap(options.id, nodesGetter, {
+          priority: options.priority,
+          enabled: options.enabled,
+          element: options.element
+            ? () => {
+                const el = options.element!()
+                if (!el || !options.matchesTarget) return el
+                const activeEl = document.activeElement
+                if (
+                  activeEl &&
+                  !el.contains(activeEl) &&
+                  options.matchesTarget(activeEl, activeEl)
+                ) {
+                  return activeEl instanceof HTMLElement ? activeEl : document.body
+                }
+                return el
+              }
+            : undefined,
+          matchesTarget: options.matchesTarget
+            ? (target) => {
+                const el = options.element?.()
+                const activeEl = document.activeElement
+                if (
+                  el &&
+                  ((target instanceof Node && el.contains(target)) ||
+                    (activeEl instanceof Node && el.contains(activeEl)))
+                ) {
+                  return true
+                }
+                return options.matchesTarget!(target, activeEl)
+              }
+            : undefined,
+        })
+      }
+      sync()
+      const unsubDoc = subscribeDocumentWhichKeyController(document, sync)
+      return () => {
+        unsubDoc()
+        unregister?.()
+      }
+    },
+  }
+}
 
 export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   static readonly kind = 'htmd'
@@ -145,7 +274,9 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     this.mountElement = options.element ?? null
 
     this.services = {
-      hotkeys: options.services?.hotkeys,
+      hotkeys:
+        options.services?.hotkeys ??
+        (this.mountElement || this.surfaceElement ? createDocumentHotkeyService() : undefined),
       notifications: options.services?.notifications,
       media: options.services?.media,
       embedRegistry: options.services?.embedRegistry ?? new DefaultEmbeddedEditorRegistry(),
