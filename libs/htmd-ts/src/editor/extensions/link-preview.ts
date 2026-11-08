@@ -62,11 +62,20 @@ export const LinkPreview = defineHtmdExtension<
         URL_INPUT_SELECTOR,
         'button[aria-label="Remove link preview"], button[aria-label="Remove YouTube embed"]',
       ],
+      defaultControl: 'url',
       subtext: {
         kind: 'linkPreviewUrl',
         attr: 'url',
+        control: 'url',
+        enterControl: 'url',
+        decorationAttr: 'data-pm-modal-link-preview-url',
         textSelector: '[data-bookmark-url-text]',
         inputSelector: URL_INPUT_SELECTOR,
+        enabled: (node) => node.attrs.type !== 'embed',
+      },
+      serializeModalText(node) {
+        const label = String(node.attrs.title || node.attrs.url || 'link')
+        return `[${label}](${String(node.attrs.url ?? '')})`
       },
       focusControl(editor, pos, _node, options) {
         const dom = editor.view?.nodeDOM(pos)

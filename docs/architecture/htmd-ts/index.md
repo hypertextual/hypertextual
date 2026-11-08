@@ -160,8 +160,7 @@ editor.mount(containerElement)
 ### Testing
 
 - `src/nodes.test.ts`, `src/marks.test.ts`, and `src/lib.test.ts` test every block, inline node, mark, whitespace rule, and recovery path against `fixtures/editor-roundtrip.md` and `fixtures/editor-roundtrip.json`.
-- `src/editor/htmd-editor.test.ts` tests `HtmdEditor` lifecycle, `HtmdDocument`, `defineHtmdExtension` keymap and navigation inheritance, modal block operations, and host services.
-- `e2e/htmd-ts/` runs Playwright in Chromium and WebKit against a standalone `HtmdEditor` browser fixture.
+- `src/editor/htmd-editor.test.ts` tests `HtmdDocument` round-tripping, `HtmdEditor` commands and overlays, embedded child editor keyscope delegation, modal editing across `insert`, `normal`, and `select` modes, `EditorHostServices`, and `defineHtmdExtension` inheritance.
 
 ## References
 

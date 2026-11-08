@@ -49,11 +49,18 @@ export interface HtmdCommandContext {
   commands: TiptapEditor['commands']
 }
 
+export type HtmdSubtextKind = 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
+
 export interface HtmdSubtextSpec {
-  kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl'
+  kind: HtmdSubtextKind
   attr: string
+  defaultValue?: string
+  control?: string
+  enterControl?: string
+  decorationAttr?: string
   textSelector: string
   inputSelector: string
+  enabled?: (node: PMNode) => boolean
 }
 
 export interface HtmdControlFocusOptions {
@@ -64,6 +71,9 @@ export interface HtmdControlFocusOptions {
 export interface HtmdNodeNavigation {
   kind: 'textblock' | 'container' | 'atom'
   controls?: readonly string[]
+  defaultControl?: string
+  multilineTextblock?: boolean
+  expandSelectionRange?: boolean
   subtext?: HtmdSubtextSpec
   enterFromAbove: (editor: TiptapEditor, pos: number, node: PMNode) => boolean
   enterFromBelow: (editor: TiptapEditor, pos: number, node: PMNode) => boolean
@@ -73,6 +83,7 @@ export interface HtmdNodeNavigation {
     node: PMNode,
     options?: HtmdControlFocusOptions,
   ) => boolean
+  serializeModalText?: (node: PMNode) => string
 }
 
 export interface HtmdExtensionSpec<
@@ -218,9 +229,16 @@ export function defineHtmdExtension<
  * Creates a default `textblock` navigation contract that enters at the start
  * from above and at the end from below.
  */
-export function createTextblockNavigation(): HtmdNodeNavigation {
+export function createTextblockNavigation(config?: {
+  multilineTextblock?: boolean
+  expandSelectionRange?: boolean
+  serializeModalText?: (node: PMNode) => string
+}): HtmdNodeNavigation {
   return {
     kind: 'textblock',
+    multilineTextblock: config?.multilineTextblock,
+    expandSelectionRange: config?.expandSelectionRange,
+    serializeModalText: config?.serializeModalText,
     enterFromAbove(editor, pos) {
       const { doc } = editor.state
       const selection = Selection.findFrom(doc.resolve(Math.min(pos, doc.content.size)), 1, true)
@@ -249,6 +267,10 @@ export function createTextblockNavigation(): HtmdNodeNavigation {
  */
 export function createContainerNodeNavigation(config: {
   controls: readonly string[]
+  defaultControl?: string
+  multilineTextblock?: boolean
+  expandSelectionRange?: boolean
+  subtext?: HtmdSubtextSpec
   bodyOffset?: number
   enterBelowMode?: 'endPos' | 'findFrom'
   focusControl?: (
@@ -257,6 +279,7 @@ export function createContainerNodeNavigation(config: {
     node: PMNode,
     options?: HtmdControlFocusOptions,
   ) => boolean
+  serializeModalText?: (node: PMNode) => string
 }): HtmdNodeNavigation {
   const bodyOffset = config.bodyOffset ?? 1
   const enterBelowMode = config.enterBelowMode ?? 'endPos'
@@ -265,6 +288,11 @@ export function createContainerNodeNavigation(config: {
   return {
     kind: 'container',
     controls: config.controls,
+    defaultControl: config.defaultControl,
+    multilineTextblock: config.multilineTextblock,
+    expandSelectionRange: config.expandSelectionRange ?? true,
+    subtext: config.subtext,
+    serializeModalText: config.serializeModalText,
     enterFromAbove(editor, pos) {
       const { doc } = editor.state
       CursorManager.setActiveCompoundBlockPos(editor, pos)
@@ -310,6 +338,7 @@ export function createContainerNodeNavigation(config: {
  */
 export function createAtomNodeNavigation(config: {
   controls: readonly string[]
+  defaultControl?: string
   subtext?: HtmdSubtextSpec
   focusControl?: (
     editor: TiptapEditor,
@@ -317,6 +346,7 @@ export function createAtomNodeNavigation(config: {
     node: PMNode,
     options?: HtmdControlFocusOptions,
   ) => boolean
+  serializeModalText?: (node: PMNode) => string
 }): HtmdNodeNavigation {
   const primarySelector = config.controls[0] ?? ''
 
@@ -345,7 +375,9 @@ export function createAtomNodeNavigation(config: {
   return {
     kind: 'atom',
     controls: config.controls,
+    defaultControl: config.defaultControl,
     subtext: config.subtext,
+    serializeModalText: config.serializeModalText,
     enterFromAbove(editor, pos, node) {
       return focusPrimaryControl(editor, pos, node, 'down')
     },
@@ -375,24 +407,31 @@ export function createAtomNodeNavigation(config: {
 // helpers -------------------------------------------------------------------
 
 const editorNavigationRegistry = new WeakMap<TiptapEditor, Map<string, HtmdNodeNavigation>>()
+const defaultNavigationRegistry = new Map<string, HtmdNodeNavigation>()
 
 /**
  * Registers a node's `HtmdNodeNavigation` spec on the given Tiptap editor
- * instance.
+ * instance and updates the default node-type registry.
  */
 export function registerNodeNavigation(
-  editor: TiptapEditor,
+  editor: TiptapEditor | undefined,
   nodeName: string,
   navigation: HtmdNodeNavigation,
 ): void {
-  let map = editorNavigationRegistry.get(editor)
-  if (!map) {
-    map = new Map()
-    editorNavigationRegistry.set(editor, map)
+  if (editor) {
+    let map = editorNavigationRegistry.get(editor)
+    if (!map) {
+      map = new Map()
+      editorNavigationRegistry.set(editor, map)
+    }
+    map.set(nodeName, navigation)
+    if (nodeName === 'imageNode' && !map.has('image')) {
+      map.set('image', navigation)
+    }
   }
-  map.set(nodeName, navigation)
-  if (nodeName === 'imageNode' && !map.has('image')) {
-    map.set('image', navigation)
+  defaultNavigationRegistry.set(nodeName, navigation)
+  if (nodeName === 'imageNode' && !defaultNavigationRegistry.has('image')) {
+    defaultNavigationRegistry.set('image', navigation)
   }
 }
 
@@ -400,8 +439,18 @@ export function registerNodeNavigation(
  * Looks up the `HtmdNodeNavigation` spec registered for `nodeName` on `editor`.
  */
 export function getNodeNavigation(
-  editor: TiptapEditor,
+  editor: TiptapEditor | undefined,
   nodeName: string,
 ): HtmdNodeNavigation | undefined {
-  return editorNavigationRegistry.get(editor)?.get(nodeName)
+  return (
+    (editor ? editorNavigationRegistry.get(editor)?.get(nodeName) : undefined) ??
+    defaultNavigationRegistry.get(nodeName)
+  )
+}
+
+/**
+ * Looks up the `HtmdNodeNavigation` spec registered for `nodeName`.
+ */
+export function getNodeNavigationForType(nodeName: string): HtmdNodeNavigation | undefined {
+  return defaultNavigationRegistry.get(nodeName)
 }

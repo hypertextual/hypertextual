@@ -25,6 +25,7 @@ import {
   defineHtmdExtension,
   focusControlAtPos,
   getNodeNavigation,
+  getNodeNavigationForType,
 } from '../define-htmd-extension.js'
 import { editorOverlaysKey } from './editor-overlays.js'
 import { applyModalStateTransition, executeInsertModeEntry, InsertMode } from './insert-mode.js'
@@ -287,7 +288,12 @@ export function getEditorModalTarget(editor: TiptapEditor): ModalEditorTarget | 
   const storage = getModalStorage(editor)
   if (!storage) return undefined
   if (editor.state.plugins.length === 0 && editor.extensionManager?.plugins?.length) {
-    editor.view.updateState(editor.state.reconfigure({ plugins: editor.extensionManager.plugins }))
+    const nextState = editor.state.reconfigure({ plugins: editor.extensionManager.plugins })
+    try {
+      editor.view.updateState(nextState)
+    } catch {
+      ;(editor as unknown as { editorState: typeof nextState }).editorState = nextState
+    }
   }
   if (!storage.target) {
     storage.target = createModalTargetForEditor(editor, { enforceTitle: true })
@@ -382,13 +388,7 @@ function createModalEditingPlugin(
           if (active instanceof HTMLElement && editorView.dom.contains(active)) {
             let foundPos: number | null = null
             editorView.state.doc.descendants((node, pos) => {
-              if (
-                node.type.name === 'notice' ||
-                node.type.name === 'codeBlock' ||
-                node.type.name === 'image' ||
-                node.type.name === 'imageNode' ||
-                node.type.name === 'linkPreview'
-              ) {
+              if (getNodeNavigation(editor, node.type.name)) {
                 const nodeDom = editorView.nodeDOM(pos)
                 if (nodeDom instanceof HTMLElement && nodeDom.contains(active)) {
                   foundPos = pos
@@ -556,13 +556,16 @@ function createModalEditingPlugin(
         const pushNodeDecorationsInRange = (from: number, to: number, isPrimary: boolean) => {
           if (from >= to) return
           doc.nodesBetween(from, to, (node, pos) => {
+            const nav = getNodeNavigationForType(node.type.name)
             const isRichModalNode =
-              NON_TEXT_MODAL_NODE_TYPES.has(node.type.name) || (node.isAtom && !node.isText)
+              Boolean(nav) ||
+              NON_TEXT_MODAL_NODE_TYPES.has(node.type.name) ||
+              (node.isAtom && !node.isText)
             if (!isRichModalNode) return true
 
             const fullyCovered = pos >= from && pos + node.nodeSize <= to
             let innerCovered = false
-            if (!fullyCovered && (node.type.name === 'notice' || node.type.name === 'blockquote')) {
+            if (!fullyCovered && (nav?.expandSelectionRange || node.type.name === 'blockquote')) {
               const { firstTextStart, lastTextEnd } = getContainerInnerTextBounds(node, pos)
               innerCovered =
                 pluginState.mode === 'select' &&
@@ -671,15 +674,12 @@ function createModalEditingPlugin(
           const sub = pluginState.subtextCursor
           const subNode = doc.nodeAt(sub.pos)
           if (subNode) {
+            const decoAttr = getNodeNavigationForType(subNode.type.name)?.subtext?.decorationAttr
             decos.push(
               Decoration.node(sub.pos, sub.pos + subNode.nodeSize, {
                 class: 'pm-modal-node-selection',
                 'data-pm-modal-node-selection': pluginState.mode,
-                ...(sub.kind === 'noticeTitle'
-                  ? { 'data-pm-modal-notice-title': pluginState.mode }
-                  : sub.kind === 'linkPreviewUrl'
-                    ? { 'data-pm-modal-link-preview-url': pluginState.mode }
-                    : { 'data-pm-modal-image-caption': pluginState.mode }),
+                ...(decoAttr ? { [decoAttr]: pluginState.mode } : {}),
               }),
             )
           }
@@ -689,7 +689,7 @@ function createModalEditingPlugin(
           const $head = doc.resolve(Math.min(doc.content.size, Math.max(0, head)))
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
-            if (ancestor.type.name === 'notice' || ancestor.type.name === 'codeBlock') {
+            if (getNodeNavigationForType(ancestor.type.name)?.kind === 'container') {
               const ancestorPos = $head.before(d)
               decos.push(
                 Decoration.node(ancestorPos, ancestorPos + ancestor.nodeSize, {
@@ -706,7 +706,7 @@ function createModalEditingPlugin(
           const $head = doc.resolve(Math.min(doc.content.size, primaryRange.head))
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
-            if (ancestor.type.name === 'notice' || ancestor.type.name === 'codeBlock') {
+            if (getNodeNavigationForType(ancestor.type.name)?.kind === 'container') {
               const ancestorPos = $head.before(d)
               const alreadyDecorated =
                 ancestorPos >= primaryRange.from &&
@@ -807,15 +807,12 @@ export function enterModalCompoundBlock(editor: TiptapEditor): boolean {
   if (pluginState?.subtextCursor) {
     blockPos = pluginState.subtextCursor.pos
     offset = pluginState.subtextCursor.offset
-    control =
-      pluginState.subtextCursor.kind === 'noticeTitle'
-        ? 'type'
-        : pluginState.subtextCursor.kind === 'linkPreviewUrl'
-          ? 'url'
-          : 'caption'
+    const subNode = editor.state.doc.nodeAt(blockPos)
+    const nav = subNode ? getNodeNavigation(editor, subNode.type.name) : undefined
+    control = nav?.subtext?.enterControl ?? nav?.defaultControl
   } else if (sel instanceof NodeSelection && getNodeNavigation(editor, sel.node.type.name)) {
     blockPos = sel.from
-    if (sel.node.type.name === 'codeBlock') control = 'language'
+    control = getNodeNavigation(editor, sel.node.type.name)?.defaultControl
   } else {
     const resolvedFrom = sel.$from
     for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
@@ -823,7 +820,7 @@ export function enterModalCompoundBlock(editor: TiptapEditor): boolean {
       const nav = getNodeNavigation(editor, node.type.name)
       if (nav?.kind === 'container') {
         blockPos = resolvedFrom.before(d)
-        control = node.type.name === 'codeBlock' ? 'language' : 'type'
+        control = nav.defaultControl
         break
       }
     }
@@ -1014,7 +1011,11 @@ export function syncModalEditableState(editor: TiptapEditor): void {
       ) {
         focusModalCompoundBlockControl(editor, sel.from)
       } else {
-        editor.view.focus()
+        try {
+          editor.view.focus()
+        } catch {
+          // Headless editor without a mounted view
+        }
       }
     }
   } else if (pluginState.mode !== 'insert' && editor.isEditable) {
@@ -1054,45 +1055,54 @@ export function updateModalMeta(
 }
 
 /**
- * Returns the plain-text subtext string (`noticeTitle`, `imageCaption`, or
- * `linkPreviewUrl`) stored on `node`.
+ * Returns the plain-text subtext string stored on `node` according to its
+ * extension's `navigation.subtext` spec.
  */
-export function getSubtextValue(
-  node: PMNode,
-  kind: 'noticeTitle' | 'imageCaption' | 'linkPreviewUrl',
-): string {
-  if (kind === 'noticeTitle') {
-    return String(node.attrs.title ?? 'Note')
-  }
-  if (kind === 'linkPreviewUrl') {
-    return String(node.attrs.url ?? '')
-  }
-  return String(node.attrs.caption ?? '')
+export function getSubtextValue(node: PMNode): string {
+  const sub = getNodeNavigationForType(node.type.name)?.subtext
+  if (!sub) return ''
+  return String(node.attrs[sub.attr] ?? sub.defaultValue ?? '')
 }
 
 /**
- * Collects ordered leaf block descriptors (including subtext and code-block line
- * slices) across `doc` for modal line/paragraph navigation.
+ * Collects ordered leaf block descriptors (including subtext and multiline
+ * textblock line slices) across `doc` for modal line/paragraph navigation.
  */
 export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
-    if (node.type.name === 'notice') {
-      const subtextText = getSubtextValue(node, 'noticeTitle')
+    const nav = getNodeNavigationForType(node.type.name)
+    if (nav?.subtext && (!nav.subtext.enabled || nav.subtext.enabled(node))) {
+      const subtextText = getSubtextValue(node)
+      if (!node.isAtom) {
+        const { firstTextStart } = getContainerInnerTextBounds(node, pos)
+        const inlineStart = firstTextStart !== -1 ? firstTextStart : pos
+        blocks.push({
+          node,
+          pos,
+          start: inlineStart,
+          end: inlineStart,
+          isTextblock: true,
+          isAtom: false,
+          subtextKind: nav.subtext.kind,
+          subtextText,
+        })
+        return true
+      }
       blocks.push({
         node,
         pos,
         start: pos,
         end: pos + node.nodeSize,
         isTextblock: true,
-        isAtom: false,
-        subtextKind: 'noticeTitle',
+        isAtom: true,
+        subtextKind: nav.subtext.kind,
         subtextText,
       })
-      return true
+      return false
     }
     if (node.isTextblock) {
-      if (node.type.name === 'codeBlock') {
+      if (nav?.multilineTextblock) {
         const text = node.textContent
         const lines = text.split('\n')
         let offset = pos + 1
@@ -1120,34 +1130,6 @@ export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
       return false
     }
     if (node.isAtom && !node.isText) {
-      if (node.type.name === 'image' || node.type.name === 'imageNode') {
-        const subtextText = getSubtextValue(node, 'imageCaption')
-        blocks.push({
-          node,
-          pos,
-          start: pos,
-          end: pos + node.nodeSize,
-          isTextblock: true,
-          isAtom: true,
-          subtextKind: 'imageCaption',
-          subtextText,
-        })
-        return false
-      }
-      if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
-        const subtextText = getSubtextValue(node, 'linkPreviewUrl')
-        blocks.push({
-          node,
-          pos,
-          start: pos,
-          end: pos + node.nodeSize,
-          isTextblock: true,
-          isAtom: true,
-          subtextKind: 'linkPreviewUrl',
-          subtextText,
-        })
-        return false
-      }
       blocks.push({
         node,
         pos,
@@ -1170,71 +1152,34 @@ export function collectLeafBlocks(doc: PMNode): BlockDescriptor[] {
 export function collectWords(doc: PMNode): WordToken[] {
   const tokens: WordToken[] = []
   doc.descendants((node, pos) => {
-    if (node.type.name === 'notice') {
-      const titleText = getSubtextValue(node, 'noticeTitle')
+    const nav = getNodeNavigationForType(node.type.name)
+    if (nav?.subtext && (!nav.subtext.enabled || nav.subtext.enabled(node))) {
+      const subText = getSubtextValue(node)
+      const inlinePos = !node.isAtom
+        ? (() => {
+            const { firstTextStart } = getContainerInnerTextBounds(node, pos)
+            return firstTextStart !== -1 ? firstTextStart : pos
+          })()
+        : pos
       const regex = /\w+|[^\w\s]+/g
-      let match: RegExpExecArray | null = regex.exec(titleText)
+      let match: RegExpExecArray | null = regex.exec(subText)
       while (match !== null) {
         tokens.push({
           start: pos,
           end: pos,
           text: match[0],
-          blockStart: pos,
-          blockEnd: pos,
+          blockStart: inlinePos,
+          blockEnd: inlinePos,
           subtext: {
             pos,
-            kind: 'noticeTitle',
+            kind: nav.subtext.kind,
             offsetStart: match.index,
             offsetEnd: match.index + match[0].length,
           },
         })
-        match = regex.exec(titleText)
+        match = regex.exec(subText)
       }
-      return true
-    }
-    if (node.type.name === 'image' || node.type.name === 'imageNode') {
-      const capText = getSubtextValue(node, 'imageCaption')
-      const regex = /\w+|[^\w\s]+/g
-      let match: RegExpExecArray | null = regex.exec(capText)
-      while (match !== null) {
-        tokens.push({
-          start: pos,
-          end: pos,
-          text: match[0],
-          blockStart: pos,
-          blockEnd: pos,
-          subtext: {
-            pos,
-            kind: 'imageCaption',
-            offsetStart: match.index,
-            offsetEnd: match.index + match[0].length,
-          },
-        })
-        match = regex.exec(capText)
-      }
-      return false
-    }
-    if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
-      const urlText = getSubtextValue(node, 'linkPreviewUrl')
-      const regex = /\w+|[^\w\s]+/g
-      let match: RegExpExecArray | null = regex.exec(urlText)
-      while (match !== null) {
-        tokens.push({
-          start: pos,
-          end: pos,
-          text: match[0],
-          blockStart: pos,
-          blockEnd: pos,
-          subtext: {
-            pos,
-            kind: 'linkPreviewUrl',
-            offsetStart: match.index,
-            offsetEnd: match.index + match[0].length,
-          },
-        })
-        match = regex.exec(urlText)
-      }
-      return false
+      return !node.isAtom
     }
     if (!node.isTextblock) return true
     const blockStart = pos + 1
@@ -1295,7 +1240,16 @@ function findScrollContainer(el: HTMLElement | null): HTMLElement | null {
  */
 export function dispatchModalTransaction(editor: TiptapEditor, tr: Transaction): void {
   const shouldScroll = tr.scrolledIntoView
-  editor.view.dispatch(tr)
+  try {
+    editor.view.dispatch(tr)
+  } catch {
+    ;(editor as unknown as { editorState: typeof editor.state }).editorState =
+      editor.state.apply(tr)
+    editor.emit('transaction', { editor, transaction: tr, appendedTransactions: [] })
+    if (tr.docChanged) {
+      editor.emit('update', { editor, transaction: tr, appendedTransactions: [] })
+    }
+  }
   if (!shouldScroll) return
   try {
     const dom = editor.view.dom
@@ -1455,7 +1409,8 @@ export function expandWholeContainerRange(
   let nextFrom = from
   let nextTo = to
   doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name === 'notice' || node.type.name === 'blockquote') {
+    const nav = getNodeNavigationForType(node.type.name)
+    if (nav?.expandSelectionRange || node.type.name === 'blockquote') {
       const { firstTextStart, lastTextEnd } = getContainerInnerTextBounds(node, pos)
       if (
         firstTextStart !== -1 &&
@@ -1604,15 +1559,10 @@ function serializeModalSliceText(doc: PMNode, from: number, to: number): string 
   doc.nodesBetween(from, to, (node, pos) => {
     const fullyCovered = pos >= from && pos + node.nodeSize <= to
     if (fullyCovered) {
-      if (node.type.name === 'imageNode' || node.type.name === 'image') {
+      const nav = getNodeNavigationForType(node.type.name)
+      if (nav?.serializeModalText) {
         hasRichNode = true
-        parts.push(`![${String(node.attrs.alt ?? '')}](${String(node.attrs.src ?? '')})`)
-        return false
-      }
-      if (node.type.name === 'linkPreview') {
-        hasRichNode = true
-        const label = String(node.attrs.title || node.attrs.url || 'link')
-        parts.push(`[${label}](${String(node.attrs.url ?? '')})`)
+        parts.push(nav.serializeModalText(node))
         return false
       }
       if (node.type.name === 'urlMention') {
@@ -1631,16 +1581,9 @@ function serializeModalSliceText(doc: PMNode, from: number, to: number): string 
         parts.push('---')
         return false
       }
-      if (node.type.name === 'unparsedBlock' || node.type.name === 'unparsedInline') {
+      if (node.type.name === 'unparsedInline') {
         hasRichNode = true
         parts.push(String(node.attrs.raw ?? node.textContent ?? ''))
-        return false
-      }
-      if (node.type.name === 'notice') {
-        hasRichNode = true
-        const variant = String(node.attrs.variant ?? 'info')
-        const title = node.attrs.title ? `${String(node.attrs.title)}: ` : ''
-        parts.push(`::: ${variant}\n${title}${node.textContent}\n:::`)
         return false
       }
     }
@@ -1881,8 +1824,7 @@ function executeModalOperator(
       if (
         firstInserted &&
         (firstInserted.isAtom ||
-          firstInserted.type.name === 'notice' ||
-          firstInserted.type.name === 'codeBlock') &&
+          getNodeNavigationForType(firstInserted.type.name)?.kind === 'container') &&
         NodeSelection.isSelectable(firstInserted)
       ) {
         tr = tr.setSelection(NodeSelection.create(tr.doc, insertPos))

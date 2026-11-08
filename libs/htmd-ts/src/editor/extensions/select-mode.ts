@@ -9,7 +9,6 @@ import {
   createSafeModalSelection,
   dispatchModalTransaction,
   findCurrentBlockIndex,
-  getContainerInnerTextBounds,
   getCursorCharPos,
   getModalStorage,
   modalKeymapPluginKey,
@@ -259,11 +258,15 @@ export function executeSelectModeExtend(
         targetBlock,
         pluginState?.extendedRange,
       )
-    } else if (targetBlock.subtextKind === 'noticeTitle') {
-      nextSubtextCursor = { pos: targetBlock.pos, kind: 'noticeTitle', offset: 0 }
-      const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
-      const dest = firstTextStart !== -1 ? firstTextStart : targetBlock.pos
-      ext = computeExtendedRangeAndSelection(doc, sel, dest, undefined, pluginState?.extendedRange)
+    } else if (targetBlock.subtextKind) {
+      nextSubtextCursor = { pos: targetBlock.pos, kind: targetBlock.subtextKind, offset: 0 }
+      ext = computeExtendedRangeAndSelection(
+        doc,
+        sel,
+        targetBlock.start,
+        undefined,
+        pluginState?.extendedRange,
+      )
     } else {
       const dest = dir > 0 ? Math.max(targetBlock.start, targetBlock.end - 1) : targetBlock.start
       ext = computeExtendedRangeAndSelection(doc, sel, dest, undefined, pluginState?.extendedRange)
@@ -357,20 +360,18 @@ export function executeSelectModeExtend(
         targetBlock,
         pluginState?.extendedRange,
       )
-    } else if (targetBlock.subtextKind === 'noticeTitle') {
+    } else if (targetBlock.subtextKind) {
       const textLen = (targetBlock.subtextText ?? '').length
       const targetOffset = textLen > 0 ? Math.min(goalCol, textLen - 1) : 0
       nextSubtextCursor = {
         pos: targetBlock.pos,
-        kind: 'noticeTitle',
+        kind: targetBlock.subtextKind,
         offset: targetOffset,
       }
-      const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
-      const nextHead = firstTextStart !== -1 ? firstTextStart : targetBlock.pos
       ext = computeExtendedRangeAndSelection(
         doc,
         sel,
-        nextHead,
+        targetBlock.start,
         undefined,
         pluginState?.extendedRange,
       )

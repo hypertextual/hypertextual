@@ -1,3 +1,4 @@
+import { matchesKeyboardEvent } from '@tanstack/hotkeys'
 import type { EditorMode, KeyBinding, Keymap, KeyScopeOptions, KeyScopePriority } from './types.js'
 
 const PRIORITY_RANK: Record<KeyScopePriority, number> = {
@@ -9,59 +10,19 @@ const PRIORITY_RANK: Record<KeyScopePriority, number> = {
   global: 5,
 }
 
-const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta'])
-
 /**
- * Normalizes a DOM `KeyboardEvent` into a canonical chord string such as
- * `'Control+e'`, `'Shift+Tab'`, or `'Space'`.
+ * Checks whether a DOM `KeyboardEvent` matches a keymap key or chord string
+ * (`'Escape'`, `'Shift-Tab'`, `'Mod-b'`, `'a'`, `'A'`) via `@tanstack/hotkeys`.
  */
-export function normalizeKeyEvent(event: KeyboardEvent): string {
-  const rawKey = event.key === ' ' ? 'Space' : event.key
-  if (MODIFIER_KEYS.has(rawKey)) return rawKey
-
-  const parts: string[] = []
-  if (event.ctrlKey) parts.push('Control')
-  if (event.metaKey) parts.push('Meta')
-  if (event.altKey) parts.push('Alt')
-  if (event.shiftKey && (rawKey.length > 1 || event.ctrlKey || event.metaKey || event.altKey)) {
-    parts.push('Shift')
+export function matchesKeyBinding(event: KeyboardEvent, key: string): boolean {
+  if (!key) return false
+  if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    return event.key === key
   }
-  const normalizedKey =
-    rawKey.length === 1 && (event.ctrlKey || event.metaKey || event.altKey)
-      ? rawKey.toLowerCase()
-      : rawKey
-  parts.push(normalizedKey)
-  return parts.join('+')
-}
-
-/**
- * Returns all candidate keymap lookup keys (`'+'`, `'-'`, and `'Mod'` aliases)
- * that match a `KeyboardEvent`.
- */
-export function candidateKeysForEvent(event: KeyboardEvent): string[] {
-  const rawKey = event.key === ' ' ? 'Space' : event.key
-  if (MODIFIER_KEYS.has(rawKey)) return [rawKey]
-
-  const candidates = new Set<string>()
-  const primary = normalizeKeyEvent(event)
-  candidates.add(primary)
-  candidates.add(primary.replaceAll('+', '-'))
-
-  const normalizedKey =
-    rawKey.length === 1 && (event.ctrlKey || event.metaKey || event.altKey)
-      ? rawKey.toLowerCase()
-      : rawKey
-
-  if (event.metaKey || event.ctrlKey) {
-    const modParts = ['Mod']
-    if (event.altKey) modParts.push('Alt')
-    if (event.shiftKey) modParts.push('Shift')
-    modParts.push(normalizedKey)
-    candidates.add(modParts.join('+'))
-    candidates.add(modParts.join('-'))
-  }
-
-  return [...candidates]
+  const chord = key.replace(/-(?=.)/g, '+') as Parameters<typeof matchesKeyboardEvent>[1]
+  return (
+    matchesKeyboardEvent(event, chord, 'mac') || matchesKeyboardEvent(event, chord, 'windows')
+  )
 }
 
 interface RegisteredScope {
@@ -171,7 +132,6 @@ export class KeyScopeDispatcher {
   ): boolean {
     if (event.isComposing) return false
 
-    const candidates = candidateKeysForEvent(event)
     const overlayOnly = Boolean(options?.overlayOpen)
     const prefixActive = Boolean(options?.prefixActive)
     const activeScopes = this.getSortedActiveScopes(event, overlayOnly)
@@ -190,10 +150,10 @@ export class KeyScopeDispatcher {
       const keymap = resolveKeymap(scope.options.keymap)
       const ctx = scope.options.getContext()
 
-      for (const keyCandidate of candidates) {
-        const binding = keymap[keyCandidate]
+      for (const [key, binding] of Object.entries(keymap)) {
         if (!binding) continue
         if (!matchesMode(binding.mode, mode)) continue
+        if (!matchesKeyBinding(event, key) && !matchesKeyBinding(event, binding.key)) continue
         if (binding.when && !binding.when(ctx, event)) continue
         if (binding.run(ctx, event)) {
           event.preventDefault()

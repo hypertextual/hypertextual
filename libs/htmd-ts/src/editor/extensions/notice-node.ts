@@ -54,8 +54,25 @@ export const NoticeNode = defineHtmdExtension<
         'input[aria-label="Notice title"]',
         '[aria-label="Notice type"][data-part="trigger"]',
       ],
+      defaultControl: 'type',
+      expandSelectionRange: true,
+      subtext: {
+        kind: 'noticeTitle',
+        attr: 'title',
+        defaultValue: 'Note',
+        control: 'title',
+        enterControl: 'type',
+        decorationAttr: 'data-pm-modal-notice-title',
+        textSelector: '[data-notice-title-text]',
+        inputSelector: 'input[aria-label="Notice title"]',
+      },
       bodyOffset: 2,
       enterBelowMode: 'findFrom',
+      serializeModalText(node) {
+        const variant = String(node.attrs.variant ?? 'info')
+        const title = node.attrs.title ? `${String(node.attrs.title)}: ` : ''
+        return `::: ${variant}\n${title}${node.textContent}\n:::`
+      },
       focusControl(editor, pos, _node, options) {
         const dom = editor.view?.nodeDOM(pos)
         if (!(dom instanceof HTMLElement)) return false

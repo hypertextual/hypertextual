@@ -55,13 +55,22 @@ export const EditorOverlays = defineHtmdExtension<
       throw new Error('Overlay surfaces require an initialized editor')
     },
   }),
-  onBeforeCreate({ editor, storage }) {
+  onBeforeCreate({ editor, options, storage }) {
     const bindings = storage.bindings
-    storage.attach = (surface, options) => {
-      const binding = attachSurface(editor, surface, options, () => bindings.delete(binding))
+    storage.attach = (surface, surfaceOptions) => {
+      const binding = attachSurface(editor, surface, surfaceOptions, () => bindings.delete(binding))
       bindings.add(binding)
       return binding
     }
+    let lastOverlay: HtmdOverlayState | null = null
+    editor.on('transaction', () => {
+      if ((editor as unknown as { editorView?: unknown }).editorView) return
+      const current = editorOverlaysKey.getState(editor.state) ?? null
+      if (current !== lastOverlay) {
+        lastOverlay = current
+        options.onChange?.(current)
+      }
+    })
   },
   onDestroy({ storage }) {
     for (const binding of storage.bindings) binding.destroy()

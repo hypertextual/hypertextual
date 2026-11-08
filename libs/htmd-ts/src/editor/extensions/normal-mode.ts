@@ -176,11 +176,8 @@ export function executeNormalModeMove(
       const st = targetWord.subtext
       const node = doc.nodeAt(st.pos)
       if (node) {
-        if (st.kind === 'noticeTitle') {
-          const { firstTextStart } = getContainerInnerTextBounds(node, st.pos)
-          if (firstTextStart !== -1) {
-            tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
-          }
+        if (!node.isAtom && targetWord.blockStart !== st.pos) {
+          tr = tr.setSelection(TextSelection.create(doc, targetWord.blockStart))
         } else if (NodeSelection.isSelectable(node)) {
           tr = tr.setSelection(NodeSelection.create(doc, st.pos))
         }
@@ -231,7 +228,7 @@ export function executeNormalModeMove(
     if (pluginState?.subtextCursor) {
       const sub = pluginState.subtextCursor
       const node = doc.nodeAt(sub.pos)
-      const text = node ? getSubtextValue(node, sub.kind) : ''
+      const text = node ? getSubtextValue(node) : ''
       const nextOffset = motion === 'lineStart' ? 0 : Math.max(0, text.length - 1)
       tr = updateModalMeta(editor, tr, {
         goalColumn: null,
@@ -300,13 +297,8 @@ export function executeNormalModeMove(
         kind: targetBlock.subtextKind,
         offset: 0,
       }
-      if (targetBlock.subtextKind === 'noticeTitle') {
-        const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
-        if (firstTextStart !== -1) {
-          tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
-        } else if (NodeSelection.isSelectable(targetBlock.node)) {
-          tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
-        }
+      if (!targetBlock.isAtom && targetBlock.start !== targetBlock.pos) {
+        tr = tr.setSelection(TextSelection.create(doc, targetBlock.start))
       } else if (NodeSelection.isSelectable(targetBlock.node)) {
         tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
       }
@@ -334,7 +326,7 @@ export function executeNormalModeMove(
     if (pluginState?.subtextCursor) {
       const sub = pluginState.subtextCursor
       const node = doc.nodeAt(sub.pos)
-      const text = node ? getSubtextValue(node, sub.kind) : ''
+      const text = node ? getSubtextValue(node) : ''
       const maxOffset = Math.max(0, text.length - 1)
       const nextOffset = Math.max(0, Math.min(maxOffset, sub.offset + dir * steps))
       tr = updateModalMeta(editor, tr, {
@@ -422,13 +414,8 @@ export function executeNormalModeMove(
         kind: targetBlock.subtextKind,
         offset: targetOffset,
       }
-      if (targetBlock.subtextKind === 'noticeTitle') {
-        const { firstTextStart } = getContainerInnerTextBounds(targetBlock.node, targetBlock.pos)
-        if (firstTextStart !== -1) {
-          tr = tr.setSelection(TextSelection.create(doc, firstTextStart))
-        } else if (NodeSelection.isSelectable(targetBlock.node)) {
-          tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
-        }
+      if (!targetBlock.isAtom && targetBlock.start !== targetBlock.pos) {
+        tr = tr.setSelection(TextSelection.create(doc, targetBlock.start))
       } else if (NodeSelection.isSelectable(targetBlock.node)) {
         tr = tr.setSelection(NodeSelection.create(doc, targetBlock.pos))
       }

@@ -113,5 +113,5 @@ stateDiagram-v2
 
 - Keep `libs/ui` free of `@tiptap/*`, `lowlight`, and `svelte-tiptap`; import `HtmdEditor` and engine-neutral contracts from `htmd-ts` and `core-ts`.
 - Centralize reactive `editable` and `subtextRange` derivation in `libs/ui/src/editor/components/svelte-node-view.svelte.ts` so individual Svelte `NodeView` components remain purely presentational.
-- Cover standalone `HtmdEditor` behavior in `e2e/htmd-ts/htmd-editor.spec.ts` and desktop workflows in `e2e/hypertextual-desktop/{modal-editing,editor}.spec.ts`.
+- Cover `HtmdEditor` library integration in `libs/htmd-ts/src/editor/htmd-editor.test.ts` and Svelte desktop workflows in `e2e/hypertextual-desktop/{modal-editing,editor}.spec.ts`.
 - See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](../htmd-ts/editor-extensions.md) and [editor source ownership](editor-source.md).

@@ -25,7 +25,7 @@ Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-
 - Keep `libs/core-ts` and `libs/htmd-ts` free of Svelte, React, Tauri, and app imports.
 - Keep `libs/ui` and `apps/hypertextual-svelte` free of `@tiptap/*`, `lowlight`, and `svelte-tiptap` dependencies.
 - Resolve third-party dependencies through npm packages. Do not link the Helical checkout.
-- Keep changes traceable to the recorded upstream baseline and test observable behavior through both the standalone `e2e/htmd-ts/` Playwright rig and the integrated `e2e/hypertextual-desktop/` browser suite.
+- Keep changes traceable to the recorded upstream baseline and test observable behavior through `libs/htmd-ts/src/editor/htmd-editor.test.ts` and the integrated `e2e/hypertextual-desktop/` browser suite.
 
 ## Design
 
@@ -146,7 +146,7 @@ binding.destroy()
 
 ### Behavior Coverage
 
-- `e2e/htmd-ts/htmd-editor.spec.ts` runs Playwright in Chromium and WebKit against a standalone `HtmdEditor` fixture (`e2e/htmd-ts/fixture.html`) to verify `htmd-ts` API boundaries, `editor:htmd` and extension key scopes, `EditorHostServices` callbacks, custom node views, embedded child editor focus handoff, and `parse`/`serialize` round-tripping without the desktop shell.
+- `libs/htmd-ts/src/editor/htmd-editor.test.ts` verifies `HtmdDocument` round-tripping, `HtmdEditor` commands and overlays, `editor:htmd` and extension key scopes, `EditorHostServices` callbacks, embedded child editor focus handoff, and modal editing across `insert`, `normal`, and `select` modes.
 - `e2e/hypertextual-desktop/{editor,modal-editing,workspace-file-tree}.spec.ts` covers the integrated desktop workspace, `HtmdEditor.svelte`, `TreeView.svelte`, `WhichKey`, and `HotkeyService`.
 
 ### Moving Changes Back to Helical

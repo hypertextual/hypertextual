@@ -33,7 +33,6 @@ hypertextual/
 │   └── ui/                     # Private reusable Svelte components and HtmdEditor wrapper
 ├── docs/                       # Architecture, UI component, and keybinding docs
 └── e2e/
-    ├── htmd-ts/                # Standalone Playwright integration suite for HtmdEditor
     └── hypertextual-desktop/   # Playwright end-to-end suite and fixtures
 ```
 
@@ -101,7 +100,7 @@ let { ... }: ComponentProps = $props()
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
-- Keep Playwright E2E tests in `e2e/htmd-ts/` (`htmd-editor.spec.ts`) and `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`). Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
+- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`) and `htmd-ts` editor integration and unit tests in `libs/htmd-ts/src/editor/htmd-editor.test.ts`. Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:
 
 ```ts

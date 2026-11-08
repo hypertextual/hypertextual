@@ -56,6 +56,9 @@ export const CodeBlock = defineHtmdExtension<CodeBlockOptions>({
   navigation: () =>
     createContainerNodeNavigation({
       controls: [LANG_TRIGGER_SELECTOR],
+      defaultControl: 'language',
+      multilineTextblock: true,
+      expandSelectionRange: true,
       bodyOffset: 1,
       enterBelowMode: 'endPos',
       focusControl(editor, pos, _node, options) {

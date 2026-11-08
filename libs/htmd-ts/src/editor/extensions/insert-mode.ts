@@ -2,7 +2,11 @@ import type { KeybindingPreset, KeymapMode } from '@cloudvoyant/helical-ui'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { NodeSelection, type Selection, TextSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension, type HtmdCommandContext } from '../define-htmd-extension.js'
+import {
+  defineHtmdExtension,
+  getNodeNavigation,
+  type HtmdCommandContext,
+} from '../define-htmd-extension.js'
 import {
   dispatchModalTransaction,
   exitModalToNormal,
@@ -34,12 +38,12 @@ export interface InsertModeStorage {
 
 /**
  * Insert-mode modal extension managing entry transitions (`i`/`a`/`o`/`O`),
- * compound-block control focusing (notice title, image caption, bookmark URL),
+ * compound-block control focusing (via each node extension's `navigation` spec),
  * and `Escape` exit back to normal mode with compound block re-selection:
  *
  * ```text
- * Normal `i` on Notice title  -->  Focuses <input aria-label="Notice title">
- * Insert `Escape` inside Notice --> Selects outer Notice block in Normal mode
+ * Normal `i` on subtext       -->  Focuses the owning extension's subtext input
+ * Insert `Escape` inside block --> Selects outer compound block in Normal mode
  * ```
  */
 export const InsertMode = defineHtmdExtension<
@@ -92,81 +96,41 @@ export function executeInsertModeEntry(
   if (!storage) return false
   const pluginState = modalKeymapPluginKey.getState(state)
 
-  if (op === 'insertStart') {
+  if (op === 'insertStart' || op === 'appendEnd') {
+    const isAppend = op === 'appendEnd'
     let nextSel: Selection
     if (pluginState?.subtextCursor) {
       const sub = pluginState.subtextCursor
+      const subNode = doc.nodeAt(sub.pos)
+      const subNav = subNode ? getNodeNavigation(editor, subNode.type.name) : undefined
       storage.activeCompoundBlockPos = sub.pos
       storage.focusControlRequest = {
         pos: sub.pos,
-        type:
-          sub.kind === 'noticeTitle'
-            ? 'notice'
-            : sub.kind === 'linkPreviewUrl'
-              ? 'linkPreview'
-              : 'image',
-        control:
-          sub.kind === 'noticeTitle' ? 'title' : sub.kind === 'linkPreviewUrl' ? 'url' : 'caption',
-        offset: sub.offset,
+        type: subNode?.type.name ?? '',
+        control: subNav?.subtext?.control,
+        offset: isAppend ? sub.offset + 1 : sub.offset,
       }
       nextSel = sel
-    } else if (
-      sel instanceof NodeSelection &&
-      (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
-    ) {
-      const { firstTextStart } = getContainerInnerTextBounds(sel.node, sel.from)
-      nextSel = firstTextStart !== -1 ? TextSelection.create(doc, firstTextStart) : sel
     } else if (sel instanceof NodeSelection) {
-      storage.activeCompoundBlockPos = sel.from
-      storage.focusControlRequest = { pos: sel.from, type: sel.node.type.name }
-      nextSel = sel
-    } else {
-      nextSel = TextSelection.create(doc, sel.from)
-    }
-    let tr = state.tr.setSelection(nextSel)
-    tr = updateModalMeta(editor, tr, {
-      mode: 'insert',
-      secondaryRanges: [],
-      goalColumn: null,
-      subtextCursor: null,
-    })
-    storage.mode = 'insert'
-    dispatchModalTransaction(editor, tr)
-    return { enterInsert: true }
-  }
-
-  if (op === 'appendEnd') {
-    let nextSel: Selection
-    if (pluginState?.subtextCursor) {
-      const sub = pluginState.subtextCursor
-      storage.activeCompoundBlockPos = sub.pos
-      storage.focusControlRequest = {
-        pos: sub.pos,
-        type:
-          sub.kind === 'noticeTitle'
-            ? 'notice'
-            : sub.kind === 'linkPreviewUrl'
-              ? 'linkPreview'
-              : 'image',
-        control:
-          sub.kind === 'noticeTitle' ? 'title' : sub.kind === 'linkPreviewUrl' ? 'url' : 'caption',
-        offset: sub.offset + 1,
+      const nav = getNodeNavigation(editor, sel.node.type.name)
+      if (nav?.kind === 'container') {
+        const { firstTextStart, lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
+        const dest = isAppend ? (lastTextEnd !== -1 ? lastTextEnd : sel.to) : firstTextStart
+        nextSel = dest !== -1 ? TextSelection.create(doc, dest) : sel
+      } else {
+        storage.activeCompoundBlockPos = sel.from
+        storage.focusControlRequest = {
+          pos: sel.from,
+          type: sel.node.type.name,
+          control: nav?.defaultControl,
+        }
+        nextSel = sel
       }
-      nextSel = sel
-    } else if (
-      sel instanceof NodeSelection &&
-      (sel.node.type.name === 'notice' || sel.node.type.name === 'codeBlock')
-    ) {
-      const { lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
-      const dest = lastTextEnd !== -1 ? lastTextEnd : sel.to
-      nextSel = TextSelection.create(doc, dest)
-    } else if (sel instanceof NodeSelection) {
-      storage.activeCompoundBlockPos = sel.from
-      storage.focusControlRequest = { pos: sel.from, type: sel.node.type.name }
-      nextSel = sel
-    } else {
+    } else if (isAppend) {
       const dest = sel.empty ? Math.min(sel.$head.end(), sel.to + 1) : sel.to
       nextSel = TextSelection.create(doc, dest)
+    } else {
+      nextSel = TextSelection.create(doc, sel.from)
     }
     let tr = state.tr.setSelection(nextSel)
     tr = updateModalMeta(editor, tr, {
@@ -275,7 +239,8 @@ export function applyModalStateTransition(
     if (compoundPosToSelect !== null) {
       const node = editor.state.doc.nodeAt(compoundPosToSelect)
       if (node) {
-        if (node.type.name === 'notice' || node.type.name === 'codeBlock') {
+        const nav = getNodeNavigation(editor, node.type.name)
+        if (nav?.kind === 'container') {
           const $cur = editor.state.selection.$from
           let insideThisBlock = false
           for (let d = $cur.depth; d >= 1; d -= 1) {
@@ -292,16 +257,10 @@ export function applyModalStateTransition(
           }
         } else if (NodeSelection.isSelectable(node)) {
           tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
-          if (node.type.name === 'image' || node.type.name === 'imageNode') {
+          if (nav?.subtext && (!nav.subtext.enabled || nav.subtext.enabled(node))) {
             restoredSubtextCursor = {
               pos: compoundPosToSelect,
-              kind: 'imageCaption',
-              offset: 0,
-            }
-          } else if (node.type.name === 'linkPreview' && node.attrs.type !== 'embed') {
-            restoredSubtextCursor = {
-              pos: compoundPosToSelect,
-              kind: 'linkPreviewUrl',
+              kind: nav.subtext.kind,
               offset: 0,
             }
           }

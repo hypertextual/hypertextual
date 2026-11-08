@@ -64,12 +64,18 @@ export const ImageNode = defineHtmdExtension<
         'button[aria-label="Replace image"]',
         'button[aria-label="Remove image"]',
       ],
+      defaultControl: 'caption',
       subtext: {
         kind: 'imageCaption',
         attr: 'caption',
+        control: 'caption',
+        enterControl: 'caption',
+        decorationAttr: 'data-pm-modal-image-caption',
         textSelector: '[data-image-caption-text]',
         inputSelector: 'input.caption-input, input[aria-label="Image caption"]',
       },
+      serializeModalText: (node) =>
+        `![${String(node.attrs.alt ?? '')}](${String(node.attrs.src ?? '')})`,
     }),
   commands: () => ({
     insertImage:

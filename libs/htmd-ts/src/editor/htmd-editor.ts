@@ -1,5 +1,5 @@
 import { Editor as TiptapEditor, getSchema, type EditorOptions } from '@tiptap/core'
-import { NodeSelection } from '@tiptap/pm/state'
+import { NodeSelection, type EditorState } from '@tiptap/pm/state'
 import {
   DefaultEmbeddedEditorRegistry,
   isUntitledFormatFile,
@@ -16,9 +16,11 @@ import { buildExtensions, createDefaultHtmdDocument } from './build-extensions.j
 import type { EditorOverlaysStorage } from './extensions/editor-overlays.js'
 import type { LinkPreviewStorage } from './extensions/link-preview.js'
 import {
+  dispatchModalTransaction,
   enterModalCompoundBlock,
   exitModalToNormal,
   focusModalCompoundBlockControl,
+  getEditorModalTarget,
   isEditorInInsertMode,
   modalKeymapPluginKey,
   setModalEditable,
@@ -205,9 +207,34 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         : {}),
     })
 
+    if (
+      !element &&
+      this.tiptap.state.plugins.length === 0 &&
+      this.tiptap.extensionManager?.plugins?.length
+    ) {
+      ;(this.tiptap as unknown as { editorState: EditorState }).editorState =
+        this.tiptap.state.reconfigure({ plugins: this.tiptap.extensionManager.plugins })
+    }
+
     this.tiptap.on('transaction', this.notifySubscribers)
     this.tiptap.on('selectionUpdate', this.notifySubscribers)
+    this.notifyUnparsedNodes(this.options.content)
     this.notifySubscribers()
+  }
+
+  private notifyUnparsedNodes(doc: JSONContent | undefined): void {
+    const notify = this.services.notifications?.notify
+    if (!notify || !doc) return
+    const visit = (node: JSONContent) => {
+      if (node.type === 'unparsedBlock' || node.type === 'unparsedInline') {
+        const message = String(node.attrs?.message ?? 'Unrecognized Markdown syntax')
+        notify({ level: 'warning', message })
+      }
+      if (Array.isArray(node.content)) {
+        for (const child of node.content) visit(child)
+      }
+    }
+    visit(doc)
   }
 
   private get modalStorage(): ModalKeymapStorage | undefined {
@@ -221,13 +248,13 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
 
   private getScopeRootElement(): HTMLElement | null {
     if (this.surfaceElement) {
-      const region = this.surfaceElement.closest('[role="region"]')
-      if (region instanceof HTMLElement) return region
+      const region = this.surfaceElement.closest?.('[role="region"]')
+      if (typeof HTMLElement !== 'undefined' && region instanceof HTMLElement) return region
       return this.surfaceElement
     }
     if (this.mountElement) {
-      const region = this.mountElement.closest('[role="region"]')
-      if (region instanceof HTMLElement) return region
+      const region = this.mountElement.closest?.('[role="region"]')
+      if (typeof HTMLElement !== 'undefined' && region instanceof HTMLElement) return region
       return this.mountElement
     }
     try {
@@ -312,7 +339,13 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   setDocument(document: JSONContent, options?: { emitUpdate?: boolean }): void {
     if (!this.tiptap.schema.nodeFromJSON(document).eq(this.tiptap.state.doc)) {
       this.tiptap.commands.setContent(document, { emitUpdate: options?.emitUpdate ?? false })
+      this.notifyUnparsedNodes(document)
     }
+  }
+
+  getModalTarget() {
+    if (!this.tiptap) return undefined
+    return getEditorModalTarget(this.tiptap)
   }
 
   serialize(options?: { originalSource?: string; format?: string }): string {
@@ -403,6 +436,11 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     return cmds.closeOverlay(name)
   }
 
+  private chain() {
+    const hasView = Boolean((this.tiptap as unknown as { editorView?: unknown })?.editorView)
+    return hasView ? this.tiptap.chain().focus() : this.tiptap.chain()
+  }
+
   insertOrReplaceBookmark(
     position: number,
     attrs: Omit<LinkPreviewAttributes, 'type'>,
@@ -416,13 +454,11 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
           ...attrs,
           type: 'bookmark',
         })
-        this.tiptap.view.dispatch(tr)
+        dispatchModalTransaction(this.tiptap, tr)
         return true
       }
     }
-    return this.tiptap
-      .chain()
-      .focus()
+    return this.chain()
       .setTextSelection(position)
       .insertContent({
         type: 'linkPreview',
@@ -444,13 +480,11 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
           src: attrs.src,
           srcset: attrs.srcset ?? null,
         })
-        this.tiptap.view.dispatch(tr)
+        dispatchModalTransaction(this.tiptap, tr)
         return true
       }
     }
-    return this.tiptap
-      .chain()
-      .focus()
+    return this.chain()
       .setTextSelection(position)
       .insertContent({
         type: 'imageNode',
@@ -465,9 +499,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
   }
 
   insertYouTubeEmbed(position: number, url: string): boolean {
-    return this.tiptap
-      .chain()
-      .focus()
+    return this.chain()
       .insertContentAt(position, {
         type: 'linkPreview',
         attrs: { url, description: '', image: '', type: 'embed' },
@@ -498,7 +530,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     name: K,
     ...args: Parameters<HtmdCommandMap[K]>
   ): boolean {
-    const chain = () => this.tiptap.chain().focus()
+    const chain = () => this.chain()
     const customCmds = this.tiptap.commands as unknown as {
       insertNotice: (attrs?: NoticeAttributes) => boolean
       insertImage: (attrs: {

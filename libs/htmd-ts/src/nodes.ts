@@ -431,6 +431,7 @@ export const UnparsedBlock = Node.create({
   marks: '',
   code: true,
   defining: true,
+  selectable: true,
   addAttributes: () => ({
     kind: {
       default: null,

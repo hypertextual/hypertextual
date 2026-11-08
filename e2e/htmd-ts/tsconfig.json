@@ -1,5 +1,0 @@
-{
-  "extends": "../../libs/htmd-ts/tsconfig.json",
-  "compilerOptions": { "types": ["bun"], "noUnusedLocals": true },
-  "include": ["./**/*.ts"]
-}

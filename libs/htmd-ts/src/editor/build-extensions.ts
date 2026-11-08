@@ -21,7 +21,7 @@ import Underline from '@tiptap/extension-underline'
 import StarterKit from '@tiptap/starter-kit'
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion'
 import {
-  candidateKeysForEvent,
+  matchesKeyBinding,
   type EditorHotkeyService,
   type EditorMode,
   type EditorNotification,
@@ -152,6 +152,23 @@ export function compileHtmdExtension<
   const getHostEditor = options?.getHostEditor ?? (() => undefined)
   let cleanupDomKeymap: (() => void) | undefined
 
+  const getExtensionKeymap = (
+    editorRef: TiptapEditor,
+    optionsRef: TOptions,
+    storageRef: TStorage,
+  ): Keymap<HtmdCommandContext> => {
+    const baseKeymap = spec.keymap
+      ? spec.keymap({
+          editor: editorRef,
+          options: optionsRef,
+          storage: storageRef,
+        })
+      : {}
+    const optionKeymap =
+      (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
+    return { ...baseKeymap, ...optionKeymap }
+  }
+
   const sharedConfig: Record<string, unknown> = {
     name: spec.name,
     priority: spec.priority,
@@ -161,6 +178,19 @@ export function compileHtmdExtension<
       const defaults = spec.defaultOptions ? spec.defaultOptions() : {}
       return { ...parentOpts, ...defaults, ...configuredOptions }
     },
+  }
+
+  if (spec.navigation) {
+    const defaults = spec.defaultOptions ? spec.defaultOptions() : ({} as TOptions)
+    const initialOptions = { ...defaults, ...configuredOptions } as TOptions
+    const initialStorage = spec.createStorage
+      ? spec.createStorage(initialOptions)
+      : ({} as TStorage)
+    registerNodeNavigation(
+      undefined,
+      spec.name,
+      spec.navigation({ options: initialOptions, storage: initialStorage }),
+    )
   }
 
   if (spec.createStorage) {
@@ -197,36 +227,7 @@ export function compileHtmdExtension<
   if (spec.keymap || hasOptionKeymap) {
     sharedConfig.addKeyboardShortcuts = function (this: TiptapHookThis<TOptions, TStorage>) {
       const { editor: editorRef, options: optionsRef, storage: storageRef } = this
-      const getKeymap = () => {
-        const baseKeymap = spec.keymap
-          ? spec.keymap({ editor: editorRef, options: optionsRef, storage: storageRef })
-          : {}
-        const optionKeymap =
-          (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
-        return { ...baseKeymap, ...optionKeymap }
-      }
-
-      const hotkeys = options?.getHotkeys?.()
-      if (hotkeys) {
-        cleanupDomKeymap?.()
-        cleanupDomKeymap = hotkeys.registerKeyScope<HtmdCommandContext>({
-          id: `extension:${spec.name}`,
-          priority: 'extension',
-          element: () => {
-            const scopeEl = options?.getScopeElement?.()
-            if (scopeEl) return scopeEl
-            try {
-              const dom = editorRef.view?.dom
-              return typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement ? dom : null
-            } catch {
-              return null
-            }
-          },
-          enabled: () => Boolean(editorRef?.schema),
-          getContext: () => toCommandContext(editorRef),
-          keymap: getKeymap,
-        })
-      }
+      const getKeymap = () => getExtensionKeymap(editorRef, optionsRef, storageRef)
 
       options?.onExtensionKeymap?.({
         name: spec.name,
@@ -269,14 +270,6 @@ export function compileHtmdExtension<
       }
       if (spec.keymap || hasOptionKeymap) {
         const { editor: editorRef, options: optionsRef, storage: storageRef } = this
-        const getKeymap = () => {
-          const baseKeymap = spec.keymap
-            ? spec.keymap({ editor: editorRef, options: optionsRef, storage: storageRef })
-            : {}
-          const optionKeymap =
-            (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
-          return { ...baseKeymap, ...optionKeymap }
-        }
         const hotkeys = options?.getHotkeys?.()
         if (hotkeys) {
           cleanupDomKeymap?.()
@@ -295,7 +288,7 @@ export function compileHtmdExtension<
             },
             enabled: () => Boolean(editorRef?.schema),
             getContext: () => toCommandContext(editorRef),
-            keymap: getKeymap,
+            keymap: () => getExtensionKeymap(editorRef, optionsRef, storageRef),
           })
         }
       }
@@ -304,62 +297,51 @@ export function compileHtmdExtension<
   }
   if (spec.onCreate || spec.keymap || hasOptionKeymap) {
     sharedConfig.onCreate = function (this: TiptapHookThis<TOptions, TStorage>) {
-      if (spec.keymap || hasOptionKeymap) {
+      if ((spec.keymap || hasOptionKeymap) && !options?.getHotkeys?.()) {
         const { editor: editorRef, options: optionsRef, storage: storageRef } = this
-        const getKeymap = () => {
-          const baseKeymap = spec.keymap
-            ? spec.keymap({ editor: editorRef, options: optionsRef, storage: storageRef })
-            : {}
-          const optionKeymap =
-            (optionsRef as { keymap?: Keymap<HtmdCommandContext> } | undefined)?.keymap ?? {}
-          return { ...baseKeymap, ...optionKeymap }
-        }
-        if (!options?.getHotkeys?.()) {
-          try {
-            const dom = options?.getScopeElement?.() ?? editorRef.view?.dom
-            const doc =
-              typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement
-                ? dom.ownerDocument
-                : undefined
-            if (doc) {
-              const onKeyDown = (event: KeyboardEvent) => {
-                if (event.isComposing || event.defaultPrevented) return
-                const scopeEl =
-                  options?.getScopeElement?.() ??
-                  (typeof HTMLElement !== 'undefined' && editorRef.view?.dom instanceof HTMLElement
-                    ? editorRef.view.dom
-                    : null)
-                const targetNode =
-                  typeof Node !== 'undefined' && event.target instanceof Node ? event.target : null
-                if (scopeEl && targetNode && !scopeEl.contains(targetNode)) return
-                const ctx = toCommandContext(editorRef)
-                const mode: EditorMode =
-                  (modalKeymapPluginKey.getState(editorRef.state)?.mode as
-                    EditorMode | undefined) ?? (editorRef.isEditable ? 'insert' : 'normal')
-                const keymap = getKeymap()
-                for (const candidate of candidateKeysForEvent(event)) {
-                  const binding = keymap[candidate]
-                  if (!binding) continue
-                  if (binding.mode) {
-                    const matches = Array.isArray(binding.mode)
-                      ? binding.mode.includes(mode)
-                      : binding.mode === mode
-                    if (!matches) continue
-                  }
-                  if (binding.when && !binding.when(ctx, event)) continue
-                  if (binding.run(ctx, event)) {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    return
-                  }
+        try {
+          const dom = options?.getScopeElement?.() ?? editorRef.view?.dom
+          const doc =
+            typeof HTMLElement !== 'undefined' && dom instanceof HTMLElement
+              ? dom.ownerDocument
+              : undefined
+          if (doc) {
+            const onKeyDown = (event: KeyboardEvent) => {
+              if (event.isComposing || event.defaultPrevented) return
+              const scopeEl =
+                options?.getScopeElement?.() ??
+                (typeof HTMLElement !== 'undefined' && editorRef.view?.dom instanceof HTMLElement
+                  ? editorRef.view.dom
+                  : null)
+              const targetNode =
+                typeof Node !== 'undefined' && event.target instanceof Node ? event.target : null
+              if (scopeEl && targetNode && !scopeEl.contains(targetNode)) return
+              const ctx = toCommandContext(editorRef)
+              const mode: EditorMode =
+                (modalKeymapPluginKey.getState(editorRef.state)?.mode as
+                  EditorMode | undefined) ?? (editorRef.isEditable ? 'insert' : 'normal')
+              const keymap = getExtensionKeymap(editorRef, optionsRef, storageRef)
+              for (const [key, binding] of Object.entries(keymap)) {
+                if (!matchesKeyBinding(event, key)) continue
+                if (binding.mode) {
+                  const matches = Array.isArray(binding.mode)
+                    ? binding.mode.includes(mode)
+                    : binding.mode === mode
+                  if (!matches) continue
+                }
+                if (binding.when && !binding.when(ctx, event)) continue
+                if (binding.run(ctx, event)) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  return
                 }
               }
-              doc.addEventListener('keydown', onKeyDown, true)
-              cleanupDomKeymap = () => doc.removeEventListener('keydown', onKeyDown, true)
             }
-          } catch {
-            // Headless editor without a mounted DOM view
+            doc.addEventListener('keydown', onKeyDown, true)
+            cleanupDomKeymap = () => doc.removeEventListener('keydown', onKeyDown, true)
           }
+        } catch {
+          // Headless editor without a mounted DOM view
         }
       }
       spec.onCreate?.(this)
@@ -719,7 +701,12 @@ function toCommandContext(
         try {
           editor.view.dispatch(tr)
         } catch {
-          // Headless environment without a mounted view
+          ;(editor as unknown as { editorState: HtmdCommandContext['state'] }).editorState =
+            editor.state.apply(tr)
+          editor.emit('transaction', { editor, transaction: tr, appendedTransactions: [] })
+          if (tr.docChanged) {
+            editor.emit('update', { editor, transaction: tr, appendedTransactions: [] })
+          }
         }
       }),
     commands: (overrides?.commands as HtmdCommandContext['commands']) ?? editor.commands,
