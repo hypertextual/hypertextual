@@ -29,6 +29,11 @@ export interface UseKeyScopeOptions<TCtx = unknown> extends KeyScopeOptions<TCtx
 /**
  * Registers a reactive DOM-scoped keymap for the lifetime of the owning Svelte
  * component.
+ *
+ * TODO(HYPE-170): Replace `useKeyScope` with `@cloudvoyant/helical-svelte`'s
+ * `useKeymap` / `useKeymapScope` once `WhichKeyController.registerKeymap`
+ * supports priority tiers, DOM element containment, insert-mode evaluation, and
+ * conditional handler fallthrough.
  */
 export function useKeyScope<TCtx = unknown>(options: UseKeyScopeOptions<TCtx>): void {
   const getServices = hasContext(EDITOR_HOST_SERVICES_CONTEXT)

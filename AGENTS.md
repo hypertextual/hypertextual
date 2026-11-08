@@ -87,6 +87,7 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
 - [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
 - [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
+- [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
 
 ### Documentation
 

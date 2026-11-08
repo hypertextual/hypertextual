@@ -23,6 +23,10 @@ import type { WorkspaceService } from './workspaceService.svelte'
 export class HotkeyService implements EditorHotkeyService {
   sidebarOpen = $state(true)
 
+  // TODO(HYPE-170): Delegate scoped keymap registration and dispatch directly to
+  // `@cloudvoyant/helical-ui`'s `WhichKeyController.registerKeymap` and remove
+  // the separate `KeyScopeDispatcher` capture-phase listener once upstream
+  // supports priority tiers, DOM containment, insert-mode layers, and fallthrough.
   private readonly dispatcher = new KeyScopeDispatcher()
   private readonly registeredCommands = new Map<string, EditorCommandDefinition>()
   private readonly listeners = new Set<

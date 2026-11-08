@@ -20,9 +20,7 @@ export function matchesKeyBinding(event: KeyboardEvent, key: string): boolean {
     return event.key === key
   }
   const chord = key.replace(/-(?=.)/g, '+') as Parameters<typeof matchesKeyboardEvent>[1]
-  return (
-    matchesKeyboardEvent(event, chord, 'mac') || matchesKeyboardEvent(event, chord, 'windows')
-  )
+  return matchesKeyboardEvent(event, chord, 'mac') || matchesKeyboardEvent(event, chord, 'windows')
 }
 
 interface RegisteredScope {
@@ -60,6 +58,11 @@ function resolveKeymap<TCtx>(keymap: Keymap<TCtx> | (() => Keymap<TCtx>)): Keyma
 /**
  * Dispatches keyboard events across active DOM scopes ordered by overlay status,
  * innermost DOM containment, priority tier, and registration recency.
+ *
+ * TODO(HYPE-170): Offload priority-ordered DOM scope dispatch, `when` predicates,
+ * insert-mode layer evaluation, and conditional fallthrough to
+ * `@cloudvoyant/helical-ui`'s `WhichKeyController.registerKeymap`, then remove
+ * `KeyScopeDispatcher` from `core-ts`.
  */
 export class KeyScopeDispatcher {
   private scopes = new Map<number, RegisteredScope>()

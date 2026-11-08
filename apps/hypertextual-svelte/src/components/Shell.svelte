@@ -43,43 +43,12 @@
 
   onMount(() => {
     let active = true
+    const isActive = () => active
     const unlisteners: (() => void)[] = []
-    void workspace.open().then(async () => {
-      if (!active || workspace.editor.selected) return
-      await tick()
-      requestAnimationFrame(() => {
-        if (
-          active &&
-          !workspace.editor.selected &&
-          (!document.activeElement || document.activeElement === document.body)
-        ) {
-          hotkeys.focusPane('workspace')
-        }
-      })
-    })
-    if (isTauri()) {
-      void Promise.all(
-        [
-          getCurrentWindow().onCloseRequested((event) => {
-            event.preventDefault()
-            void editor.close(() => getCurrentWindow().destroy())
-          }),
-          listen('workspace-quit-requested', () => {
-            void editor.close(() => invoke('workspace_finish_quit'))
-          }),
-        ].map(async (registration) => {
-          const stop = await registration
-          if (active) unlisteners.push(stop)
-          else stop()
-        }),
-      )
-        .then(async () => {
-          if (active) await invoke('workspace_frontend_ready')
-        })
-        .catch((error) => {
-          if (active) editor.openingError = errorMessage(error)
-        })
-    }
+
+    void workspace.open().then(() => setKeyboardFocusWhenIdle(isActive))
+    handleExit(isActive, unlisteners)
+
     return () => {
       active = false
       unlisteners.forEach((stop) => stop())
@@ -88,6 +57,45 @@
   })
 
   // Methods -------------------------------------------------------------------
+  async function setKeyboardFocusWhenIdle(isActive: () => boolean): Promise<void> {
+    if (!isActive() || workspace.editor.selected) return
+    await tick()
+    requestAnimationFrame(() => {
+      if (
+        isActive() &&
+        !workspace.editor.selected &&
+        (!document.activeElement || document.activeElement === document.body)
+      ) {
+        hotkeys.focusPane('workspace')
+      }
+    })
+  }
+
+  function handleExit(isActive: () => boolean, unlisteners: (() => void)[]): void {
+    if (!isTauri()) return
+    void Promise.all(
+      [
+        getCurrentWindow().onCloseRequested((event) => {
+          event.preventDefault()
+          void editor.close(() => getCurrentWindow().destroy())
+        }),
+        listen('workspace-quit-requested', () => {
+          void editor.close(() => invoke('workspace_finish_quit'))
+        }),
+      ].map(async (registration) => {
+        const stop = await registration
+        if (isActive()) unlisteners.push(stop)
+        else stop()
+      }),
+    )
+      .then(async () => {
+        if (isActive()) await invoke('workspace_frontend_ready')
+      })
+      .catch((error) => {
+        if (isActive()) editor.openingError = errorMessage(error)
+      })
+  }
+
   function handleModeChange(nextMode: KeymapMode): void {
     hotkeys.handleModeChange(nextMode)
   }
