@@ -2,7 +2,7 @@
 
 ## Overview
 
-`HtmdEditor` (`libs/ui/src/editor/HtmdEditor.svelte`) is the Svelte UI component that mounts the `HtmdEditor` controller from `htmd-ts` with Svelte 5 `NodeView`s, floating overlays, and `useKeyScope` integration. The host supplies parsed `JSONContent`, `editable`, and `EditorHostServices` (`hotkeys`, `notifications`, `embedRegistry`) and receives `JSONContent` changes without any `@tiptap/*` or ProseMirror types crossing the UI boundary.
+`HtmdEditor` (`libs/ui/src/editor/HtmdEditor.svelte`) is the Svelte UI component that mounts the `HtmdEditor` controller from `htmd-ts` with Svelte 5 `NodeView`s, floating overlays, and `useKeymap` integration. The host supplies parsed `JSONContent`, `editable`, and `EditorHostServices` (`notifications`, `media`, `embedRegistry`) and receives `JSONContent` changes without any `@tiptap/*` or ProseMirror types crossing the UI boundary.
 
 ## Design
 
@@ -44,7 +44,7 @@ flowchart TD
     view -->|"mounts & binds"| controller["htmd-ts: HtmdEditor controller"]
     view -->|"svelteNodeView (editable + subtextRange)"| nodeViews["Svelte NodeViews: Notice, CodeBlock, Image, LinkPreview, UrlMention, Unparsed"]
     view --> surfaces["Svelte Overlays: ImageInput, BookmarkInput, YouTubeInput, SlashMenu, MentionList, BubbleMenu"]
-    nodeViews & surfaces & wrapper -->|"useKeyScope"| hotkeys["EditorHotkeyService / KeyScopeDispatcher"]
+    nodeViews & surfaces & wrapper -->|"useKeymap"| hotkeys["WhichKeyController"]
     controller -->|"editor:htmd & extension scopes"| hotkeys
     controller -->|"attachOverlaySurface"| surfaces
 ```
@@ -107,7 +107,7 @@ stateDiagram-v2
 | --- | --- |
 | `svelte-node-view.svelte.ts` (`svelteNodeView`) | Mounts Svelte 5 `NodeView` components (`mount` / `unmount`), subscribes once per node view to `editor.subscribe()`, and passes reactive `node`, `editable`, and `subtextRange` props to `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, `ImageNodeView.svelte`, and `LinkPreviewCard.svelte`. |
 | Extension `keymap` & `navigation` (`htmd-ts`) | Compound-block extensions (`NoticeNode`, `CodeBlock`, `ImageNode`, `LinkPreview`) own their `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter` navigation via `HtmdNodeNavigation`. |
-| Overlay `useKeyScope` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`). |
+| Overlay `useKeymap` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`). |
 
 ## Implementation
 

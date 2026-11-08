@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { LinkEditPopoverProps } from './types'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { Trash2, Globe, ExternalLink } from 'lucide-svelte'
 
@@ -23,34 +23,34 @@
 
   onDestroy(() => clearTimeout(blurTimer))
 
-  useKeyScope({
-    id: 'overlay:link-edit-popover',
-    priority: 'overlay',
-    element: () => rootElement,
-    enabled: () => Boolean(rootElement),
-    getContext: () => null,
-    keymap: {
+  useKeymap(
+    {
       Enter: {
-        id: 'linkEdit.save',
         key: 'Enter',
         label: 'Save Link',
-        run: () => {
+        hidden: true,
+        action: () => {
           saveAndClose()
           return true
         },
       },
       Escape: {
-        id: 'linkEdit.close',
         key: 'Escape',
         label: 'Close Link Editor',
-        run: () => {
+        hidden: true,
+        action: () => {
           saveAndClose()
           editor.execCommand('exitToNormal')
           return true
         },
       },
     },
-  })
+    {
+      priority: 'overlay',
+      element: () => rootElement,
+      enabled: () => Boolean(rootElement),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function saveAndClose() {

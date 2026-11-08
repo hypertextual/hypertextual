@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import * as LucideIcons from 'lucide-svelte'
   import type { Component } from 'svelte'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import type { SlashMenuProps } from './types'
   import { suggestionSurface, suggestionContent, suggestionItem } from './styles'
 
@@ -35,65 +35,65 @@
       listbox().highlightFirst()
   })
 
-  useKeyScope({
-    id: 'overlay:slash-menu',
-    priority: 'overlay',
-    enabled: () => items.length > 0,
-    getContext: () => null,
-    keymap: () => ({
+  useKeymap(
+    () => ({
       ArrowUp: {
-        id: 'slashMenu.previous',
         key: 'ArrowUp',
         label: 'Previous Command',
-        run: (_ctx, event) => {
-          if (!items.length || event.isComposing) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
           listbox().highlightPrevious()
           return true
         },
       },
-      'Shift-Tab': {
-        id: 'slashMenu.previousTab',
-        key: 'Shift-Tab',
+      'Shift+Tab': {
+        key: 'Shift+Tab',
         label: 'Previous Command',
-        run: (_ctx, event) => {
-          if (!items.length || event.isComposing) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
           listbox().highlightPrevious()
           return true
         },
       },
       ArrowDown: {
-        id: 'slashMenu.next',
         key: 'ArrowDown',
         label: 'Next Command',
-        run: (_ctx, event) => {
-          if (!items.length || event.isComposing) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
           listbox().highlightNext()
           return true
         },
       },
       Tab: {
-        id: 'slashMenu.nextTab',
         key: 'Tab',
         label: 'Next Command',
-        run: (_ctx, event) => {
-          if (!items.length || event.isComposing) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
           listbox().highlightNext()
           return true
         },
       },
       Enter: {
-        id: 'slashMenu.select',
         key: 'Enter',
         label: 'Select Command',
-        run: (_ctx, event) => {
-          if (!items.length || event.isComposing) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!items.length || event?.isComposing) return false
           const value = listbox().highlightedValue
           if (value) listbox().selectValue(value)
           return true
         },
       },
     }),
-  })
+    {
+      priority: 'overlay',
+      enabled: () => items.length > 0,
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function getIcon(iconName: string): Component | undefined {

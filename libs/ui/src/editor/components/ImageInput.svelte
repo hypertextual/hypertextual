@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { Tabs } from '@ark-ui/svelte/tabs'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { ImageInputProps } from './types'
   import type { ImageUploadResult } from 'htmd-ts'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { X } from 'lucide-svelte'
   import ImageFileUpload from './ImageFileUpload.svelte'
 
@@ -43,35 +43,35 @@
     }
   })
 
-  useKeyScope({
-    id: 'overlay:image-input',
-    priority: 'overlay',
-    element: () => dialogElement,
-    enabled: () => Boolean(dialogElement),
-    getContext: () => null,
-    keymap: {
+  useKeymap(
+    {
       Enter: {
-        id: 'imageInput.submitUrl',
         key: 'Enter',
         label: 'Insert Image URL',
-        when: (_ctx, event) => Boolean(urlInputEl && event.target === urlInputEl),
-        run: () => {
+        hidden: true,
+        when: ({ event }) => Boolean(urlInputEl && event?.target === urlInputEl),
+        action: () => {
           handleUrlSubmit()
           return true
         },
       },
       Escape: {
-        id: 'imageInput.close',
         key: 'Escape',
         label: 'Close Image Dialog',
-        run: () => {
+        hidden: true,
+        action: () => {
           onClose()
           editor.execCommand('exitToNormal')
           return true
         },
       },
     },
-  })
+    {
+      priority: 'overlay',
+      element: () => dialogElement,
+      enabled: () => Boolean(dialogElement),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function insertImage(src: string, srcset?: string) {

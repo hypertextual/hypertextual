@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { BookmarkInputProps } from './types'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { onMount, onDestroy } from 'svelte'
 
   // Props ---------------------------------------------------------------------
@@ -30,35 +30,35 @@
 
   onMount(() => inputElement?.focus())
 
-  useKeyScope({
-    id: 'overlay:bookmark-input',
-    priority: 'overlay',
-    element: () => dialogElement,
-    enabled: () => Boolean(dialogElement),
-    getContext: () => null,
-    keymap: {
+  useKeymap(
+    {
       Enter: {
-        id: 'bookmarkInput.submit',
         key: 'Enter',
         label: 'Insert Bookmark',
-        when: (_ctx, event) => event.target === inputElement,
-        run: () => {
+        hidden: true,
+        when: ({ event }) => event?.target === inputElement,
+        action: () => {
           void submit()
           return true
         },
       },
       Escape: {
-        id: 'bookmarkInput.close',
         key: 'Escape',
         label: 'Close Bookmark Dialog',
-        run: () => {
+        hidden: true,
+        action: () => {
           onClose()
           editor.execCommand('exitToNormal')
           return true
         },
       },
     },
-  })
+    {
+      priority: 'overlay',
+      element: () => dialogElement,
+      enabled: () => Boolean(dialogElement),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   async function submit() {

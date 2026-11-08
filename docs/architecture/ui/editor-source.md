@@ -6,9 +6,9 @@ Hypertextual splits its vendored Helical editor baseline across three workspace 
 
 1. `libs/core-ts` (`core-ts`): Abstract `Editor<TDoc, TCommandMap>`, `defineEditorExtension`, `KeyScopeDispatcher`, `EmbeddedEditorRegistry`, and `EditorHostServices`.
 2. `libs/htmd-ts` (`htmd-ts`): Concrete `HtmdEditor` plugin (`kind: 'htmd'`, `scopeId: 'editor:htmd'`), `defineHtmdExtension`, `HtmdNodeNavigation`, `build-extensions.ts`, all 18 HTMD extension modules, and the synchronous Markdown codec.
-3. `libs/ui` (`@hypertextual/ui`): Svelte `HtmdEditor.svelte` wrapper, `Editor.svelte`, Svelte 5 `NodeView`s and overlays mounted via `svelte-node-view.svelte.ts` (`svelteNodeView`), and `useKeyScope`.
+3. `libs/ui` (`@hypertextual/ui`): Svelte `HtmdEditor.svelte` wrapper, `Editor.svelte`, and Svelte 5 `NodeView`s and overlays mounted via `svelte-node-view.svelte.ts` (`svelteNodeView`).
 
-Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`) still supply generic controls, `WhichKeyController`, theme tokens, and shared styles. React, the standalone Reader, documentation demos, and upstream build tools are excluded.
+Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`) still supply generic controls, `WhichKeyController`, `useKeymap`, theme tokens, and shared styles. React, the standalone Reader, documentation demos, and upstream build tools are excluded.
 
 ## Requirement
 
@@ -16,7 +16,7 @@ Published Helical packages (`@cloudvoyant/helical-ui` and `@cloudvoyant/helical-
 
 - Run the HTMD editor through the Tiptap-free `HtmdEditor` controller (`htmd-ts`) and `HtmdEditor.svelte` (`@hypertextual/ui`) APIs.
 - Author all custom extensions via `defineHtmdExtension` (`defineEditorExtension`) and compile them to Tiptap/ProseMirror solely inside `libs/htmd-ts/src/editor/build-extensions.ts`.
-- Route all extension, editor (`editor:htmd`), widget, overlay, and pane keybindings through `EditorHotkeyService` (`KeyScopeDispatcher` + `useKeyScope`).
+- Route all extension, editor (`editor:htmd`), widget, overlay, and pane keybindings through `WhichKeyController` (`registerKeymap` + `useKeymap`).
 - Save and reopen every node, mark, and attribute in the HTMD schema, including combinations and boundary whitespace.
 - Preserve article-local image references, per-node raw-source recovery, and retained-draft recovery for invalid data or persistence failures.
 
@@ -37,9 +37,9 @@ flowchart TD
     Adapter -->|JSONContent changes| App
     App --> Codec[htmd-ts: parse / serialize / validateDocument]
     App --> Client[App filesystem client]
-    Adapter --> View[libs/ui: Editor.svelte + Svelte NodeViews + useKeyScope]
+    Adapter --> View[libs/ui: Editor.svelte + Svelte NodeViews + useKeymap]
     View --> Controller[htmd-ts: HtmdEditor controller]
-    Controller -.->|implements| CoreTS[core-ts: Editor, defineEditorExtension, KeyScopeDispatcher]
+    Controller -.->|implements| CoreTS[core-ts: Editor, defineEditorExtension, KeyScopeOptions]
     View --> Controls[Published Helical and Ark controls]
     Controller --> Build[htmd-ts: build-extensions.ts]
     Build --> Extensions[htmd-ts: 18 extension modules via defineHtmdExtension]
@@ -48,7 +48,7 @@ flowchart TD
     View --> Surfaces[Insertion forms, slash menu, bubble toolbar]
 ```
 
-`libs/ui/src/editor/` owns Svelte rendering, `useKeyScope` widget/overlay/pane registrations, and `svelte-node-view.svelte.ts`. `libs/htmd-ts/src/editor/` owns `HtmdEditor`, `defineHtmdExtension`, `build-extensions.ts`, node/mark/behavior extensions, suggestions, paste handling, modal editing, and overlay placement. App services compose `HtmdEditor.svelte` with `htmd-ts` codec methods, `HotkeyService`, and filesystem clients.
+`libs/ui/src/editor/` owns Svelte rendering, `useKeymap` overlay registrations, and `svelte-node-view.svelte.ts`. `libs/htmd-ts/src/editor/` owns `HtmdEditor`, `defineHtmdExtension`, `build-extensions.ts`, node/mark/behavior extensions, suggestions, paste handling, modal editing, and overlay placement. App services compose `HtmdEditor.svelte` with `htmd-ts` codec methods, `HotkeyService`, and filesystem clients.
 
 ### Data and Control Flow
 
@@ -130,7 +130,7 @@ binding.destroy()
 | `libs/helical-ui/src/editor/extensions/` | `libs/htmd-ts/src/editor/extensions/` (ported to `defineHtmdExtension`) |
 | Concrete `HtmdEditor` controller | `libs/htmd-ts/src/editor/htmd-editor.ts` |
 | `libs/helical-svelte/src/editor/Editor.svelte` | `libs/ui/src/editor/components/Editor.svelte` + `libs/ui/src/editor/HtmdEditor.svelte` |
-| Svelte editor menus, overlays, inputs, and node views | `libs/ui/src/editor/components/` (mounted via `svelte-node-view.svelte.ts` + `useKeyScope`) |
+| Svelte editor menus, overlays, inputs, and node views | `libs/ui/src/editor/components/` (mounted via `svelte-node-view.svelte.ts` + `useKeymap`) |
 | `libs/helical-svelte/src/editor/Reader.svelte` | Excluded: unused standalone rendering API |
 | `libs/helical-react/` and `apps/docs/` | Excluded: other framework and documentation app |
 

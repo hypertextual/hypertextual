@@ -7,7 +7,7 @@
   } from '@ark-ui/svelte/tree-view'
   import { tick, untrack } from 'svelte'
   import { cn, getDocumentWhichKeyController } from '@cloudvoyant/helical-ui'
-  import { useKeyScope } from '../key-scope/useKeyScope.svelte'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import TreeNodeView from './TreeNode.svelte'
   import type { TreeNode } from './types'
   import { treeViewRootBase, treeViewListBase } from './styles'
@@ -122,19 +122,14 @@
       })
   })
 
-  useKeyScope({
-    id: `pane:tree-view:${id}`,
-    priority: 'pane',
-    element: () => rootEl?.closest<HTMLElement>('#workspace-sidebar') ?? rootEl,
-    enabled: () => Boolean(rootEl),
-    getContext: () => null,
-    keymap: {
+  useKeymap(
+    {
       Home: {
-        id: 'tree.first',
         key: 'Home',
         label: 'Focus First Item',
-        run: (_ctx, event) => {
-          if (!resolveTreeItemTarget(event)) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!event || !resolveTreeItemTarget(event)) return false
           const visible = tree()
             .getVisibleNodes()
             .map((v) => v.node)
@@ -145,11 +140,11 @@
         },
       },
       End: {
-        id: 'tree.last',
         key: 'End',
         label: 'Focus Last Item',
-        run: (_ctx, event) => {
-          if (!resolveTreeItemTarget(event)) return false
+        hidden: true,
+        action: ({ event }) => {
+          if (!event || !resolveTreeItemTarget(event)) return false
           const visible = tree()
             .getVisibleNodes()
             .map((v) => v.node)
@@ -160,114 +155,114 @@
         },
       },
       j: {
-        id: 'tree.nextJ',
         key: 'j',
         label: 'Next Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? moveFocusDelta(item.nodeValue, 1) : false
         },
       },
       ArrowDown: {
-        id: 'tree.nextDown',
         key: 'ArrowDown',
         label: 'Next Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? moveFocusDelta(item.nodeValue, 1) : false
         },
       },
       k: {
-        id: 'tree.prevK',
         key: 'k',
         label: 'Previous Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? moveFocusDelta(item.nodeValue, -1) : false
         },
       },
       ArrowUp: {
-        id: 'tree.prevUp',
         key: 'ArrowUp',
         label: 'Previous Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? moveFocusDelta(item.nodeValue, -1) : false
         },
       },
       l: {
-        id: 'tree.expandL',
         key: 'l',
         label: 'Expand Folder',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? expandOrFocusChild(item.nodeValue, item.isBranch) : false
         },
       },
       ArrowRight: {
-        id: 'tree.expandRight',
         key: 'ArrowRight',
         label: 'Expand Folder',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? expandOrFocusChild(item.nodeValue, item.isBranch) : false
         },
       },
       h: {
-        id: 'tree.collapseH',
         key: 'h',
         label: 'Collapse Folder',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? collapseOrFocusParent(item.nodeValue, item.isBranch) : false
         },
       },
       ArrowLeft: {
-        id: 'tree.collapseLeft',
         key: 'ArrowLeft',
         label: 'Collapse Folder',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           return item ? collapseOrFocusParent(item.nodeValue, item.isBranch) : false
         },
       },
       Enter: {
-        id: 'tree.open',
         key: 'Enter',
         label: 'Open Article',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady(),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || item.isBranch) return false
           onselect?.(item.nodeValue)
           return true
         },
       },
       r: {
-        id: 'tree.renameR',
         key: 'r',
         label: 'Rename Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onrename),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onrename) return false
           getDocumentWhichKeyController(rootEl?.ownerDocument)?.setMode('insert')
           tree().startRenaming(item.nodeValue)
@@ -275,13 +270,13 @@
         },
       },
       F2: {
-        id: 'tree.renameF2',
         key: 'F2',
         label: 'Rename Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onrename),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onrename) return false
           getDocumentWhichKeyController(rootEl?.ownerDocument)?.setMode('insert')
           tree().startRenaming(item.nodeValue)
@@ -289,59 +284,64 @@
         },
       },
       d: {
-        id: 'tree.deleteD',
         key: 'd',
         label: 'Delete Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onaction),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onaction) return false
           onaction(item.nodeValue, 'delete')
           return true
         },
       },
       Delete: {
-        id: 'tree.deleteKey',
         key: 'Delete',
         label: 'Delete Item',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onaction),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onaction) return false
           onaction(item.nodeValue, 'delete')
           return true
         },
       },
       a: {
-        id: 'tree.newFile',
         key: 'a',
         label: 'New Article',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onaction),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onaction) return false
           onaction(item.isBranch ? item.nodeValue : '', 'new-file')
           return true
         },
       },
       A: {
-        id: 'tree.newFolder',
         key: 'A',
         label: 'New Folder',
         mode: 'normal',
+        hidden: true,
         when: () => isNormalTreeReady() && Boolean(onaction),
-        run: (_ctx, event) => {
-          const item = resolveTreeItemTarget(event)
+        action: ({ event }) => {
+          const item = event ? resolveTreeItemTarget(event) : null
           if (!item || !onaction) return false
           onaction(item.isBranch ? item.nodeValue : '', 'new-folder')
           return true
         },
       },
     },
-  })
+    {
+      priority: 'pane',
+      element: () => rootEl?.closest<HTMLElement>('#workspace-sidebar') ?? rootEl,
+      enabled: () => Boolean(rootEl),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function resolveTreeItemTarget(

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Listbox, createListCollection, useListbox } from '@ark-ui/svelte/listbox'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { MentionListProps } from './types'
   import { suggestionSurface, suggestionContent, suggestionItem } from './styles'
 
@@ -38,44 +38,44 @@
       listbox().highlightFirst()
   })
 
-  useKeyScope({
-    id: 'overlay:mention-list',
-    priority: 'overlay',
-    enabled: () => items.length > 0,
-    getContext: () => null,
-    keymap: () => ({
+  useKeymap(
+    () => ({
       ArrowUp: {
-        id: 'mentionList.previous',
         key: 'ArrowUp',
         label: 'Previous Mention',
-        run: (_ctx, event) => onKeyDown(event),
+        hidden: true,
+        action: ({ event }) => (event ? onKeyDown(event) : false),
       },
-      'Shift-Tab': {
-        id: 'mentionList.previousTab',
-        key: 'Shift-Tab',
+      'Shift+Tab': {
+        key: 'Shift+Tab',
         label: 'Previous Mention',
-        run: (_ctx, event) => onKeyDown(event),
+        hidden: true,
+        action: ({ event }) => (event ? onKeyDown(event) : false),
       },
       ArrowDown: {
-        id: 'mentionList.next',
         key: 'ArrowDown',
         label: 'Next Mention',
-        run: (_ctx, event) => onKeyDown(event),
+        hidden: true,
+        action: ({ event }) => (event ? onKeyDown(event) : false),
       },
       Tab: {
-        id: 'mentionList.nextTab',
         key: 'Tab',
         label: 'Next Mention',
-        run: (_ctx, event) => onKeyDown(event),
+        hidden: true,
+        action: ({ event }) => (event ? onKeyDown(event) : false),
       },
       Enter: {
-        id: 'mentionList.select',
         key: 'Enter',
         label: 'Select Mention',
-        run: (_ctx, event) => onKeyDown(event),
+        hidden: true,
+        action: ({ event }) => (event ? onKeyDown(event) : false),
       },
     }),
-  })
+    {
+      priority: 'overlay',
+      enabled: () => items.length > 0,
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function onKeyDown(event: KeyboardEvent) {

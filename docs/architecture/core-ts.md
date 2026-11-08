@@ -42,8 +42,8 @@ flowchart TB
   end
 
   subgraph Host["Host Layer (libs/ui & apps/hypertextual-svelte)"]
-    UKS["useKeyScope(options)<br/>Svelte widget/overlay/pane hook"]
-    HS["HotkeyService<br/>App EditorHotkeyService + WhichKey bridge"]
+    UKS["useKeymap(nodes, options)<br/>Helical Svelte widget/overlay/pane hook"]
+    HS["HotkeyService<br/>App leader keymap & workspace commands"]
     NS["EditorService / StatusBar<br/>App EditorNotificationService"]
     MS["MediaService (hyped-fs)<br/>App EditorMediaService"]
   end

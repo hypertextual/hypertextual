@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { YouTubeInputProps } from './types'
-  import { useKeyScope } from '../../key-scope/useKeyScope.svelte'
   import { Play, X } from 'lucide-svelte'
 
   // Props ---------------------------------------------------------------------
@@ -15,35 +15,35 @@
   let error = $state('')
 
   // Lifecycle -----------------------------------------------------------------
-  useKeyScope({
-    id: 'overlay:youtube-input',
-    priority: 'overlay',
-    element: () => dialogElement,
-    enabled: () => Boolean(dialogElement),
-    getContext: () => null,
-    keymap: {
+  useKeymap(
+    {
       Enter: {
-        id: 'youtubeInput.submit',
         key: 'Enter',
         label: 'Embed YouTube Video',
-        when: (_ctx, event) => Boolean(inputElement && event.target === inputElement),
-        run: () => {
+        hidden: true,
+        when: ({ event }) => Boolean(inputElement && event?.target === inputElement),
+        action: () => {
           insert()
           return true
         },
       },
       Escape: {
-        id: 'youtubeInput.close',
         key: 'Escape',
         label: 'Close YouTube Dialog',
-        run: () => {
+        hidden: true,
+        action: () => {
           onClose()
           editor.execCommand('exitToNormal')
           return true
         },
       },
     },
-  })
+    {
+      priority: 'overlay',
+      element: () => dialogElement,
+      enabled: () => Boolean(dialogElement),
+    },
+  )
 
   // Methods -------------------------------------------------------------------
   function isYouTubeUrl(value: string): boolean {
