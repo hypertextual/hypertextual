@@ -28,6 +28,26 @@ export class HotkeyService {
       'Toggle the Workspace Explorer sidebar open or closed',
       ['normal', 'select'],
     ),
+    'Control+w': {
+      key: 'Control+w',
+      label: '+window',
+      group: 'Window / Pane',
+      category: 'Window / Pane',
+      mode: ['normal', 'select'],
+      expand: (): Record<string, WhichKeyNode> => {
+        const hasMermaidActive = this.hasActiveMermaidBlock()
+        if (!hasMermaidActive) return {}
+        return {
+          z: leaf(
+            'z',
+            'Toggle Mermaid Maximize',
+            'Window / Pane',
+            'mermaid.toggleFullscreen',
+            'Maximize or minimize the active Mermaid diagram (Ctrl+w z / Space w z)',
+          ),
+        }
+      },
+    },
     Space: {
       key: 'Space',
       label: '+leader',
@@ -165,6 +185,18 @@ export class HotkeyService {
             description: 'Spatial and indexed pane navigation',
             category: 'Window / Pane',
             proxy: ['Control+w'],
+            expand: (): Record<string, WhichKeyNode> => {
+              if (!this.hasActiveMermaidBlock()) return {}
+              return {
+                z: leaf(
+                  'z',
+                  'Toggle Mermaid Maximize',
+                  'Window / Pane',
+                  'mermaid.toggleFullscreen',
+                  'Maximize or minimize the active Mermaid diagram (Ctrl+w z / Space w z)',
+                ),
+              }
+            },
           },
           v: {
             key: 'v',
@@ -303,9 +335,22 @@ export class HotkeyService {
     },
     'mermaid.toggleFullscreen': () => {
       if (typeof document === 'undefined') return false
-      const btn = document.querySelector<HTMLElement>(
-        '.ProseMirror [data-pm-modal-node-selection="normal"] button[data-mermaid-fullscreen]',
-      )
+      const btn =
+        document.querySelector<HTMLElement>(
+          '.ProseMirror [data-pm-modal-node-selection] button[data-mermaid-fullscreen]',
+        ) ??
+        document.querySelector<HTMLElement>(
+          '.ProseMirror .ProseMirror-selectednode button[data-mermaid-fullscreen]',
+        ) ??
+        document.activeElement
+          ?.closest('[data-mermaid-node]')
+          ?.querySelector<HTMLElement>('button[data-mermaid-fullscreen]') ??
+        document.querySelector<HTMLElement>(
+          '.ProseMirror [data-mermaid-fullscreen="true"] button[data-mermaid-fullscreen]',
+        ) ??
+        document.querySelector<HTMLElement>(
+          '.ProseMirror [data-mermaid-mode="select"] button[data-mermaid-fullscreen], .ProseMirror [data-mermaid-mode="insert"] button[data-mermaid-fullscreen]',
+        )
       if (!btn) return false
       btn.click()
       return true
@@ -313,6 +358,15 @@ export class HotkeyService {
   }
 
   constructor(private readonly workspace: WorkspaceService) {}
+
+  private hasActiveMermaidBlock(): boolean {
+    if (typeof document === 'undefined') return false
+    return Boolean(
+      document.querySelector(
+        '.ProseMirror [data-pm-modal-node-selection][data-mermaid-node], .ProseMirror [data-pm-modal-node-selection] [data-mermaid-node], .ProseMirror .ProseMirror-selectednode[data-mermaid-node], .ProseMirror .ProseMirror-selectednode [data-mermaid-node], .ProseMirror [data-mermaid-fullscreen="true"], .ProseMirror [data-mermaid-mode="select"]',
+      ) || document.activeElement?.closest('[data-mermaid-node]'),
+    )
+  }
 
   private get controller() {
     return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null

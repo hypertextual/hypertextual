@@ -1,6 +1,8 @@
 import type { Keymap } from 'core-ts'
 import type { Editor as TiptapEditor } from '@tiptap/core'
-import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import type { Node as PmNode } from '@tiptap/pm/model'
+import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
   createContainerNodeNavigation,
   defineHtmdExtension,
@@ -36,6 +38,7 @@ export interface MermaidViewportState {
 }
 
 export interface MermaidNodeOptions {
+  lowlight?: unknown
   nodeView?: HtmdNodeViewFactory
   HTMLAttributes?: Record<string, unknown>
   keymap?: Keymap<HtmdCommandContext>
@@ -43,6 +46,7 @@ export interface MermaidNodeOptions {
 
 export interface MermaidNodeStorage {
   viewports: Map<number, MermaidViewportState>
+  pendingWindowPrefix: boolean
 }
 
 export type MermaidNodeCommands = {
@@ -52,7 +56,7 @@ export type MermaidNodeCommands = {
 export const DEFAULT_MERMAID_SOURCE = 'flowchart TD\n  A[Start] --> B[End]'
 
 const MERMAID_HEADER_CONTROL_SELECTOR =
-  '[data-mermaid-edit], [data-mermaid-fullscreen], [data-mermaid-copy], [data-mermaid-zoom-in], [data-mermaid-zoom-out], [data-mermaid-zoom-reset]'
+  '[data-mermaid-edit], [data-mermaid-fullscreen], [data-mermaid-copy]'
 
 const PAN_STEP = 48
 const ZOOM_STEP = 0.25
@@ -62,26 +66,26 @@ const MAX_ZOOM = 4.0
 // api -----------------------------------------------------------------------
 
 /**
- * Interactive Mermaid diagram block extension with normal-mode diagram viewer,
- * select-mode line selection, insert-mode source editor with PiP preview,
- * editor-scoped fullscreen viewer/split-pane, and unified pan/zoom shortcuts:
+ * Interactive Mermaid diagram block extension with Lowlight syntax highlighting,
+ * normal-mode diagram viewer, select-mode line selection, insert-mode source
+ * editor with top-right PiP preview, editor-scoped fullscreen viewer/split-pane,
+ * and unified pan/zoom shortcuts:
  *
  * ```text
  * Normal mode:
  * +------------------------------------------------------------+
- * | Mermaid              [-] 100% [+] [Reset] [Edit] [Fullscr] |
+ * | Mermaid                                         [✎] [⤢]    |
  * +------------------------------------------------------------+
  * |                 [Start] ---> [End]                         |
  * +------------------------------------------------------------+
  *
  * Insert / Select mode:
  * +------------------------------------------------------------+
- * | Mermaid                                   [Copy] [Fullscr] |
+ * | Mermaid                                         [⧉] [⤢]    |
  * +------------------------------------------------------------+
- * | flowchart TD                 +---------------------------+ |
- * |   A[Start] --> B[End]|       | Preview  [-] 100% [+] [F] | |
- * |                              |   [Start] ---> [End]      | |
- * |                              +---------------------------+ |
+ * | flowchart TD                         +-------------------+ |
+ * |   A[Start] --> B[End]|               | [Start] ---> [End]| |
+ * |                                      +-------------------+ |
  * +------------------------------------------------------------+
  * ```
  */
@@ -93,12 +97,14 @@ export const MermaidNode = defineHtmdExtension<
   name: 'mermaid',
   kind: 'node',
   defaultOptions: () => ({
+    lowlight: undefined,
     nodeView: undefined,
     HTMLAttributes: {},
     keymap: undefined,
   }),
   createStorage: () => ({
     viewports: new Map<number, MermaidViewportState>(),
+    pendingWindowPrefix: false,
   }),
   navigation: () =>
     createContainerNodeNavigation({
@@ -293,20 +299,42 @@ export const MermaidNode = defineHtmdExtension<
         run: (ctx, event) => handleViewportAction(ctx, event, storage, 'pan-right'),
       },
       'Mod-Enter': {
-        id: 'mermaid.toggleFullscreenInsertModEnter',
+        id: 'mermaid.toggleFullscreenModEnter',
         key: 'Mod+Enter',
-        label: 'Toggle Mermaid Fullscreen Split-Pane',
-        mode: 'insert',
-        when: whenMermaidActiveOrControl,
+        label: 'Toggle Mermaid Fullscreen',
+        mode: ['normal', 'select', 'insert'],
+        when: whenMermaidActiveOrSelected,
         run: (ctx, event) => handleViewportAction(ctx, event, storage, 'toggle-fullscreen'),
       },
       'Control-Shift-f': {
-        id: 'mermaid.toggleFullscreenInsertCtrlShiftF',
+        id: 'mermaid.toggleFullscreenCtrlShiftF',
         key: 'Ctrl+Shift+f',
-        label: 'Toggle Mermaid Fullscreen Split-Pane',
+        label: 'Toggle Mermaid Fullscreen',
+        mode: ['normal', 'select', 'insert'],
+        when: whenMermaidActiveOrSelected,
+        run: (ctx, event) => handleViewportAction(ctx, event, storage, 'toggle-fullscreen'),
+      },
+      'Control-w': {
+        id: 'mermaid.windowPrefixInsert',
+        key: 'Ctrl+w',
+        label: 'Mermaid Window Prefix',
         mode: 'insert',
         when: whenMermaidActiveOrControl,
-        run: (ctx, event) => handleViewportAction(ctx, event, storage, 'toggle-fullscreen'),
+        run: () => {
+          storage.pendingWindowPrefix = true
+          return true
+        },
+      },
+      z: {
+        id: 'mermaid.toggleFullscreenWindowZoom',
+        key: 'z',
+        label: 'Toggle Mermaid Maximize (Ctrl+w z)',
+        mode: 'insert',
+        when: (ctx, event) => storage.pendingWindowPrefix && whenMermaidActiveOrControl(ctx, event),
+        run: (ctx, event) => {
+          storage.pendingWindowPrefix = false
+          return handleViewportAction(ctx, event, storage, 'toggle-fullscreen')
+        },
       },
       Tab: {
         id: 'mermaid.indent',
@@ -342,7 +370,165 @@ export const MermaidNode = defineHtmdExtension<
       },
     }
   },
+  pmPlugins({ options, storage }) {
+    const lowlightPlugin = createMermaidLowlightPlugin(options.lowlight)
+    const windowPrefixPlugin = new Plugin({
+      props: {
+        handleKeyDown(_view, event) {
+          if (!storage.pendingWindowPrefix) return false
+          if (
+            event.key === 'Control' ||
+            event.key === 'Shift' ||
+            event.key === 'Alt' ||
+            event.key === 'Meta'
+          ) {
+            return false
+          }
+          storage.pendingWindowPrefix = false
+          return false
+        },
+      },
+    })
+    return lowlightPlugin ? [lowlightPlugin, windowPrefixPlugin] : [windowPrefixPlugin]
+  },
 })
+
+// pm ------------------------------------------------------------------------
+
+interface LowlightHastNode {
+  value?: string
+  properties?: { className?: string[] }
+  children?: LowlightHastNode[]
+}
+
+interface LowlightLike {
+  highlight: (
+    language: string,
+    value: string,
+  ) => { value?: LowlightHastNode[]; children?: LowlightHastNode[] }
+  listLanguages: () => string[]
+  register?: (
+    grammars: Record<
+      string,
+      (hljs: {
+        COMMENT: (begin: string, end: string) => unknown
+        QUOTE_STRING_MODE: unknown
+        APOS_STRING_MODE: unknown
+        C_NUMBER_MODE: unknown
+      }) => unknown
+    >,
+  ) => void
+}
+
+const mermaidLowlightPluginKey = new PluginKey<DecorationSet>('mermaidLowlight')
+
+function ensureMermaidGrammarRegistered(lowlight: LowlightLike): boolean {
+  try {
+    if (!lowlight.listLanguages().includes('mermaid') && typeof lowlight.register === 'function') {
+      lowlight.register({
+        mermaid: (hljs) => ({
+          name: 'Mermaid',
+          case_insensitive: false,
+          keywords: {
+            keyword:
+              'flowchart graph sequenceDiagram stateDiagram stateDiagram-v2 classDiagram erDiagram gantt pie mindmap timeline gitGraph C4Context C4Container C4Component C4Dynamic C4Deployment xychart-beta subgraph end direction participant actor activate deactivate loop alt else opt par and critical break rect note over as state class style classDef click linkStyle autonumber title section dateFormat axisFormat',
+            literal: 'TB TD BT RL LR true false',
+            built_in: 'left right top bottom of',
+          },
+          contains: [
+            hljs.COMMENT('%%', '$'),
+            hljs.QUOTE_STRING_MODE,
+            hljs.APOS_STRING_MODE,
+            hljs.C_NUMBER_MODE,
+            {
+              className: 'keyword',
+              begin: /<?--+>?|==+>|-\.+->?|--[xo]|<<?->>?|->>|-->>|-[x)]|--[x)]|:::/,
+            },
+            {
+              className: 'attr',
+              begin: /\|[^|\n]*\|/,
+            },
+            {
+              className: 'title',
+              begin: /\b[A-Za-z_][A-Za-z0-9_]*(?=\s*[[({])/,
+            },
+            {
+              className: 'string',
+              begin: /\[[^\]]*\]|\([^)]*\)|\{[^}]*\}/,
+            },
+          ],
+        }),
+      })
+    }
+    return lowlight.listLanguages().includes('mermaid')
+  } catch {
+    return false
+  }
+}
+
+function flattenLowlightNodes(
+  nodes: LowlightHastNode[],
+  className: string[] = [],
+): Array<{ text: string; classes: string[] }> {
+  return nodes.flatMap((node) => {
+    const classes = [...className, ...(node.properties?.className ?? [])]
+    if (node.children) return flattenLowlightNodes(node.children, classes)
+    return [{ text: node.value ?? '', classes }]
+  })
+}
+
+function buildMermaidDecorations(doc: PmNode, lowlight: LowlightLike): DecorationSet {
+  if (!ensureMermaidGrammarRegistered(lowlight)) {
+    return DecorationSet.empty
+  }
+  const decorations: Decoration[] = []
+  doc.descendants((node, pos) => {
+    if (node.type.name !== 'mermaid') return true
+    if (!node.textContent) return false
+    try {
+      const result = lowlight.highlight('mermaid', node.textContent)
+      const nodes = result.value ?? result.children ?? []
+      let from = pos + 1
+      for (const token of flattenLowlightNodes(nodes)) {
+        const to = from + token.text.length
+        if (token.classes.length > 0 && to > from) {
+          decorations.push(Decoration.inline(from, to, { class: token.classes.join(' ') }))
+        }
+        from = to
+      }
+    } catch {
+      // Ignore highlight errors on partial source
+    }
+    return false
+  })
+  return DecorationSet.create(doc, decorations)
+}
+
+function createMermaidLowlightPlugin(rawLowlight: unknown): Plugin | null {
+  const lowlight = rawLowlight as LowlightLike | undefined
+  if (
+    !lowlight ||
+    typeof lowlight.highlight !== 'function' ||
+    typeof lowlight.listLanguages !== 'function'
+  ) {
+    return null
+  }
+  return new Plugin<DecorationSet>({
+    key: mermaidLowlightPluginKey,
+    state: {
+      init: (_, { doc }) => buildMermaidDecorations(doc, lowlight),
+      apply: (tr, prevSet) => {
+        if (!tr.docChanged) return prevSet
+        return buildMermaidDecorations(tr.doc, lowlight)
+      },
+    },
+    props: {
+      decorations(state) {
+        return mermaidLowlightPluginKey.getState(state) ?? null
+      },
+    },
+  })
+}
 
 // helpers -------------------------------------------------------------------
 

@@ -18,7 +18,8 @@
     open = true,
     scope = 'container',
     boundaryEl = null,
-    placement = 'bottom-right',
+    placement = 'top-right',
+    showHeader = true,
     minimized = $bindable(false),
     draggable = false,
     resizable = false,
@@ -116,9 +117,10 @@
       class={rootClass}
       style={transformStyle}
     >
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        data-pip-header=""
+      {#if showHeader}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          data-pip-header=""
         data-minimized={minimized ? 'true' : 'false'}
         class={cn(pipWindowHeader, draggable ? 'cursor-grab active:cursor-grabbing' : undefined)}
         onpointerdown={handleHeaderPointerDown}
@@ -158,6 +160,7 @@
           {/if}
         </div>
       </div>
+      {/if}
 
       {#if !minimized}
         <div data-pip-body="" class={pipWindowBody}>

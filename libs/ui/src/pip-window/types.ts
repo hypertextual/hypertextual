@@ -15,6 +15,8 @@ export interface PipWindowProps {
   boundaryEl?: HTMLElement | null
   /** Initial corner anchor inside the scoped container or viewport. */
   placement?: PipWindowPlacement
+  /** Whether to render the top header bar and window controls. */
+  showHeader?: boolean
   /** Whether the body is collapsed to a header-only pill. */
   minimized?: boolean
   /** Whether pointer dragging on the header bar is enabled. */

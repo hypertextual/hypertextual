@@ -477,7 +477,7 @@ export function buildExtensions<TEditor = unknown>(
     TextStyle,
     Color,
     compile(CodeBlock.configure({ lowlight, nodeView: untypedNodeViews.codeBlock })),
-    compile(MermaidNode.configure({ nodeView: untypedNodeViews.mermaid })),
+    compile(MermaidNode.configure({ lowlight, nodeView: untypedNodeViews.mermaid })),
     CharacterCount.configure({ mode: 'textSize' }),
     TaskList,
     TaskItem.configure({ nested: true }),

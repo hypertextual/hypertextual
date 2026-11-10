@@ -8,39 +8,23 @@
     mermaidSvgBase,
     renderMermaidSource,
   } from '@cloudvoyant/helical-ui'
-  import {
-    Splitter,
-    SplitterPanel,
-    SplitterResizeTrigger,
-    useKeymap,
-  } from '@cloudvoyant/helical-svelte'
-  import {
-    Check,
-    Copy,
-    GitFork,
-    Maximize2,
-    Minimize2,
-    Minus,
-    Pencil,
-    Plus,
-    RotateCcw,
-  } from 'lucide-svelte'
+  import { useKeymap } from '@cloudvoyant/helical-svelte'
+  import { Check, Copy, GitFork, Maximize2, Minimize2, Pencil } from 'lucide-svelte'
   import PipWindow from '../../pip-window/PipWindow.svelte'
   import {
     codeContent,
     mermaidCodeContainer,
-    mermaidErrorBanner,
+    mermaidErrorFooter,
     mermaidFullscreenOverlay,
     mermaidHeader,
+    mermaidPipSvgFit,
     mermaidRootVariants,
     mermaidSplitCodePane,
     mermaidSplitPreviewPane,
-    mermaidSplitTextarea,
     mermaidTitle,
     mermaidToolbar,
     mermaidToolbarButton,
     mermaidViewerCanvas,
-    mermaidZoomBadge,
   } from './styles'
   import type { MermaidNodeViewProps } from './types'
 
@@ -54,7 +38,6 @@
   const MAX_ZOOM = 4.0
 
   let wrapperEl = $state<HTMLDivElement | null>(null)
-  let splitTextareaEl = $state<HTMLTextAreaElement | null>(null)
   let splitPreviewEl = $state<HTMLDivElement | null>(null)
 
   let svgMarkup = $state('')
@@ -66,21 +49,30 @@
   let panX = $state(0)
   let panY = $state(0)
   let isFullscreen = $state(false)
-  let pipMinimized = $state(false)
+  let fullscreenRect = $state<{ top: number; left: number; width: number; height: number } | null>(
+    null,
+  )
   let splitFocusPane = $state<'code' | 'preview'>('code')
   let pendingWindowPrefix = false
   let copied = $state(false)
   let isPointerPanning = $state(false)
   let pointerPanStart = { clientX: 0, clientY: 0, startX: 0, startY: 0 }
+  let activePointers = new Map<number, { clientX: number; clientY: number }>()
+  let pinchStartDistance = 0
+  let pinchStartScale = 1
   let renderSeq = 0
 
   // Derived -------------------------------------------------------------------
   const sourceCode = $derived(node.textContent)
   const isCodeMode = $derived(mode === 'insert' || mode === 'select')
-  const zoomPercent = $derived(`${Math.round(scale * 100)}%`)
   const displaySvg = $derived(svgMarkup || lastValidSvg)
   const canvasTransformStyle = $derived(
     `transform: translate3d(${panX}px, ${panY}px, 0) scale(${scale}); transform-origin: center center;`,
+  )
+  const wrapperStyle = $derived(
+    isFullscreen && fullscreenRect
+      ? `white-space: normal; top: ${fullscreenRect.top}px; left: ${fullscreenRect.left}px; width: ${fullscreenRect.width}px; height: ${fullscreenRect.height}px;`
+      : 'white-space: normal;',
   )
 
   // Lifecycle -----------------------------------------------------------------
@@ -120,6 +112,52 @@
     }
     hostEl.addEventListener('htmd:mermaid-viewport', onViewportEvent)
     return () => hostEl.removeEventListener('htmd:mermaid-viewport', onViewportEvent)
+  })
+
+  $effect(() => {
+    if (!isFullscreen || !wrapperEl) {
+      fullscreenRect = null
+      return
+    }
+    const region =
+      wrapperEl.closest<HTMLElement>('[role="region"]') ??
+      wrapperEl.closest<HTMLElement>('.editor-container')
+    if (!region) return
+    const previousOverflow = region.style.overflow
+    region.style.overflow = 'hidden'
+    const updateRect = () => {
+      const rect = region.getBoundingClientRect()
+      fullscreenRect = {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
+    updateRect()
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateRect) : null
+    resizeObserver?.observe(region)
+    window.addEventListener('resize', updateRect)
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', updateRect)
+      region.style.overflow = previousOverflow
+    }
+  })
+
+  $effect(() => {
+    const codeMode = isCodeMode
+    const fullscreen = isFullscreen
+    if (!fullscreen) return
+    void tick().then(() => {
+      if (codeMode) {
+        splitFocusPane = 'code'
+        focusCodeEditor()
+      } else {
+        splitPreviewEl?.focus()
+      }
+    })
   })
 
   $effect(() => {
@@ -193,11 +231,41 @@
         hidden: true,
         action: () => resetViewport(),
       },
-      Escape: {
-        key: 'Escape',
+      'Mod+Enter': {
+        key: 'Mod+Enter',
         label: 'Minimize Mermaid Fullscreen',
         mode: ['normal', 'select', 'insert'],
         hidden: true,
+        action: () => closeFullscreen(),
+      },
+      'Control+Shift+f': {
+        key: 'Control+Shift+f',
+        label: 'Minimize Mermaid Fullscreen',
+        mode: ['normal', 'select', 'insert'],
+        hidden: true,
+        action: () => closeFullscreen(),
+      },
+      'Control+Shift+F': {
+        key: 'Control+Shift+F',
+        label: 'Minimize Mermaid Fullscreen',
+        mode: ['normal', 'select', 'insert'],
+        hidden: true,
+        action: () => closeFullscreen(),
+      },
+      Tab: {
+        key: 'Tab',
+        label: 'Toggle Mermaid Split Pane Focus',
+        mode: ['select', 'insert'],
+        hidden: true,
+        when: () => isCodeMode,
+        action: () => focusSplitPane(splitFocusPane === 'code' ? 'preview' : 'code'),
+      },
+      Escape: {
+        key: 'Escape',
+        label: 'Minimize Mermaid Fullscreen',
+        mode: 'normal',
+        hidden: true,
+        when: () => !isCodeMode,
         action: () => closeFullscreen(),
       },
       f: {
@@ -290,6 +358,17 @@
           return focusSplitPane(splitFocusPane === 'code' ? 'preview' : 'code')
         },
       },
+      z: {
+        key: 'z',
+        label: 'Minimize Mermaid Fullscreen',
+        mode: ['normal', 'select', 'insert'],
+        hidden: true,
+        when: () => pendingWindowPrefix,
+        action: () => {
+          pendingWindowPrefix = false
+          return closeFullscreen()
+        },
+      },
       '+': {
         key: '+',
         label: 'Zoom In Mermaid',
@@ -327,7 +406,6 @@
         label: '+window',
         mode: ['normal', 'select', 'insert'],
         hidden: true,
-        when: () => isCodeMode,
         action: () => {
           pendingWindowPrefix = true
           return true
@@ -390,19 +468,11 @@
     return true
   }
 
-  function handleZoomInClick(event: MouseEvent) {
-    event.stopPropagation()
-    zoomBy(ZOOM_STEP)
-  }
-
-  function handleZoomOutClick(event: MouseEvent) {
-    event.stopPropagation()
-    zoomBy(-ZOOM_STEP)
-  }
-
-  function handleZoomResetClick(event: MouseEvent) {
-    event.stopPropagation()
-    resetViewport()
+  function focusCodeEditor() {
+    const pos = getPos?.()
+    if (typeof pos === 'number') {
+      editor.focus(pos + 1)
+    }
   }
 
   function openFullscreen(): boolean {
@@ -418,10 +488,7 @@
     syncDatasetState()
     void tick().then(() => {
       if (isCodeMode) {
-        const pos = getPos?.()
-        if (typeof pos === 'number') {
-          editor.focus(pos + 1)
-        }
+        focusCodeEditor()
       } else {
         const region = wrapperEl?.closest<HTMLElement>('[role="region"]')
         region?.focus({ preventScroll: true })
@@ -463,7 +530,7 @@
     await tick()
     if (isCodeMode) {
       splitFocusPane = 'code'
-      splitTextareaEl?.focus()
+      focusCodeEditor()
     } else {
       splitPreviewEl?.focus()
     }
@@ -473,20 +540,12 @@
     splitFocusPane = pane
     void tick().then(() => {
       if (pane === 'code') {
-        splitTextareaEl?.focus()
+        focusCodeEditor()
       } else {
         splitPreviewEl?.focus()
       }
     })
     return true
-  }
-
-  function handleSplitCodeInput(event: Event) {
-    const target = event.currentTarget as HTMLTextAreaElement
-    const pos = getPos?.()
-    if (typeof pos === 'number') {
-      editor.updateMermaidSource(pos, target.value)
-    }
   }
 
   function handleCodePaneFocus() {
@@ -498,7 +557,12 @@
   }
 
   function handleSplitWindowPrefix(event: KeyboardEvent): boolean {
-    if (event.key === 'Control' || event.key === 'Shift' || event.key === 'Alt' || event.key === 'Meta') {
+    if (
+      event.key === 'Control' ||
+      event.key === 'Shift' ||
+      event.key === 'Alt' ||
+      event.key === 'Meta'
+    ) {
       return false
     }
     if (pendingWindowPrefix) {
@@ -519,6 +583,12 @@
         event.preventDefault()
         event.stopPropagation()
         focusSplitPane(splitFocusPane === 'code' ? 'preview' : 'code')
+        return true
+      }
+      if (event.key === 'z') {
+        event.preventDefault()
+        event.stopPropagation()
+        closeFullscreen()
         return true
       }
       return false
@@ -579,23 +649,8 @@
     return false
   }
 
-  function handleSplitTextareaKeyDown(event: KeyboardEvent) {
-    if (handleSplitWindowPrefix(event)) return
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.preventDefault()
-      event.stopPropagation()
-      focusSplitPane('preview')
-      return
-    }
-    if (handleCtrlViewportShortcut(event)) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      closeFullscreen()
-    }
-  }
-
   function handlePreviewKeyDown(event: KeyboardEvent) {
+    if (!isFullscreen) return
     if (handleSplitWindowPrefix(event)) return
     if (event.key === 'Tab') {
       if (isCodeMode) {
@@ -655,7 +710,7 @@
         resetViewport()
         return
       }
-      if (event.key === 'Escape' || (!isCodeMode && (event.key === 'f' || event.key === 'q'))) {
+      if (!isCodeMode && (event.key === 'Escape' || event.key === 'f' || event.key === 'q')) {
         event.preventDefault()
         event.stopPropagation()
         closeFullscreen()
@@ -675,21 +730,63 @@
     }
   }
 
+  function getTouchDistance(): number {
+    const pts = Array.from(activePointers.values())
+    if (pts.length < 2) return 0
+    return Math.hypot(pts[1]!.clientX - pts[0]!.clientX, pts[1]!.clientY - pts[0]!.clientY)
+  }
+
+  function handleCanvasWheel(event: WheelEvent) {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      const factor = event.deltaY < 0 ? 1.1 : 0.9
+      const next = Math.round(scale * factor * 100) / 100
+      scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
+      syncDatasetState()
+    }
+  }
+
   function handleCanvasPointerDown(event: PointerEvent) {
-    if (event.button !== 0) return
+    if (event.button !== 0 && event.pointerType === 'mouse') return
     const target = event.target as HTMLElement | null
     if (target?.closest('button, input, textarea, select')) return
-    isPointerPanning = true
-    pointerPanStart = {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      startX: panX,
-      startY: panY,
-    }
+    event.preventDefault()
+    event.stopPropagation()
+    activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
     ;(event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId)
+
+    if (activePointers.size === 2) {
+      isPointerPanning = false
+      pinchStartDistance = getTouchDistance()
+      pinchStartScale = scale
+      return
+    }
+
+    if (activePointers.size === 1) {
+      isPointerPanning = true
+      pointerPanStart = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        startX: panX,
+        startY: panY,
+      }
+    }
   }
 
   function handleCanvasPointerMove(event: PointerEvent) {
+    if (activePointers.has(event.pointerId)) {
+      activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+    }
+    if (activePointers.size >= 2 && pinchStartDistance > 0) {
+      const dist = getTouchDistance()
+      if (dist > 0) {
+        const next = Math.round(pinchStartScale * (dist / pinchStartDistance) * 100) / 100
+        scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
+        syncDatasetState()
+      }
+      return
+    }
     if (!isPointerPanning) return
     panX = pointerPanStart.startX + (event.clientX - pointerPanStart.clientX)
     panY = pointerPanStart.startY + (event.clientY - pointerPanStart.clientY)
@@ -697,52 +794,32 @@
   }
 
   function handleCanvasPointerUp(event: PointerEvent) {
-    if (!isPointerPanning) return
-    isPointerPanning = false
+    activePointers.delete(event.pointerId)
+    if (activePointers.size < 2) {
+      pinchStartDistance = 0
+    }
+    if (activePointers.size === 0) {
+      isPointerPanning = false
+    }
     ;(event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId)
-  }
-
-  function portalToEditorRegion(overlayEl: HTMLElement) {
-    const region =
-      wrapperEl?.closest<HTMLElement>('[role="region"]') ??
-      wrapperEl?.closest<HTMLElement>('.editor-container')
-    if (!region) return {}
-    const previousOverflow = region.style.overflow
-    const previousPosition = region.style.position
-    if (getComputedStyle(region).position === 'static') {
-      region.style.position = 'relative'
-    }
-    overlayEl.style.top = `${region.scrollTop}px`
-    overlayEl.style.left = '0px'
-    overlayEl.style.width = '100%'
-    overlayEl.style.height = '100%'
-    region.style.overflow = 'hidden'
-    region.appendChild(overlayEl)
-
-    return {
-      destroy() {
-        region.style.overflow = previousOverflow
-        region.style.position = previousPosition
-        if (overlayEl.parentNode === region) {
-          region.removeChild(overlayEl)
-        }
-      },
-    }
   }
 </script>
 
 <div
   bind:this={wrapperEl}
   data-node-view-wrapper=""
+  data-code-block=""
   data-mermaid-node=""
   data-mermaid-mode={mode}
   data-mermaid-scale={scale}
   data-mermaid-pan-x={panX}
   data-mermaid-pan-y={panY}
   data-mermaid-fullscreen={isFullscreen ? 'true' : 'false'}
+  data-mermaid-fullscreen-surface={isFullscreen ? '' : undefined}
+  data-mermaid-fullscreen-mode={isFullscreen ? (isCodeMode ? 'split' : 'viewer') : undefined}
   role="none"
-  style="white-space: normal;"
-  class={mermaidRootVariants({ mode })}
+  style={wrapperStyle}
+  class={cn(mermaidRootVariants({ mode }), isFullscreen ? mermaidFullscreenOverlay : undefined)}
 >
   <div contenteditable={false} class={mermaidHeader} data-editor-controls>
     <span class={mermaidTitle}>
@@ -754,47 +831,14 @@
       {#if !isCodeMode}
         <button
           type="button"
-          data-mermaid-zoom-out=""
-          aria-label="Zoom out diagram"
-          title="Zoom out (- / Ctrl+-)"
-          class={mermaidToolbarButton}
-          onclick={handleZoomOutClick}
-        >
-          <Minus class="size-3.5" />
-        </button>
-        <span data-mermaid-zoom-percent="" data-mermaid-zoom-badge="" class={mermaidZoomBadge}
-          >{zoomPercent}</span
-        >
-        <button
-          type="button"
-          data-mermaid-zoom-in=""
-          aria-label="Zoom in diagram"
-          title="Zoom in (+ / Ctrl+=)"
-          class={mermaidToolbarButton}
-          onclick={handleZoomInClick}
-        >
-          <Plus class="size-3.5" />
-        </button>
-        <button
-          type="button"
-          data-mermaid-zoom-reset=""
-          aria-label="Reset diagram zoom"
-          title="Reset zoom and pan (0 / Ctrl+0)"
-          class={mermaidToolbarButton}
-          onclick={handleZoomResetClick}
-        >
-          <RotateCcw class="size-3.5" />
-        </button>
-        <button
-          type="button"
           data-mermaid-edit=""
+          data-mermaid-fullscreen-edit={isFullscreen ? '' : undefined}
           aria-label="Edit Mermaid diagram"
           title="Edit Mermaid diagram (Enter / i)"
           class={mermaidToolbarButton}
           onclick={handleEditClick}
         >
           <Pencil class="size-3.5" />
-          <span>Edit</span>
         </button>
       {:else}
         <button
@@ -816,6 +860,7 @@
       <button
         type="button"
         data-mermaid-fullscreen=""
+        data-mermaid-minimize={isFullscreen ? '' : undefined}
         aria-label={isFullscreen ? 'Minimize Mermaid diagram' : 'Fullscreen Mermaid diagram'}
         title={isFullscreen ? 'Minimize (Esc)' : 'Fullscreen (f / Mod+Enter)'}
         class={mermaidToolbarButton}
@@ -823,298 +868,130 @@
       >
         {#if isFullscreen}
           <Minimize2 class="size-3.5" />
-          <span>Minimize</span>
         {:else}
           <Maximize2 class="size-3.5" />
-          <span>Fullscreen</span>
         {/if}
       </button>
     </div>
   </div>
 
-  {#if !isCodeMode}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    data-mermaid-body=""
+    class={cn('relative flex min-h-0 w-full flex-1', isFullscreen && isCodeMode ? 'flex-row' : 'flex-col')}
+  >
     <div
-      contenteditable={false}
-      data-mermaid-viewer=""
-      data-mermaid-viewport=""
-      data-modal-ignore-pointer=""
-      class={cn(mermaidViewerCanvas, 'cursor-grab active:cursor-grabbing')}
-      onpointerdown={handleCanvasPointerDown}
-      onpointermove={handleCanvasPointerMove}
-      onpointerup={handleCanvasPointerUp}
+      data-mermaid-code=""
+      data-mermaid-split-pane={isFullscreen && isCodeMode ? 'code' : undefined}
+      data-mermaid-split-code={isFullscreen && isCodeMode ? '' : undefined}
+      data-pane-focused={isFullscreen && isCodeMode ? (splitFocusPane === 'code' ? 'true' : 'false') : undefined}
+      onfocusin={handleCodePaneFocus}
+      class={cn(
+        codeBlockBodyBase,
+        !isCodeMode
+          ? 'sr-only'
+          : isFullscreen
+            ? mermaidSplitCodePane
+            : mermaidCodeContainer,
+      )}
     >
-      {#if displaySvg}
-        <div
-          data-mermaid-canvas=""
-          class={cn(mermaidSvgBase, 'transition-transform duration-75')}
-          style={canvasTransformStyle}
+      <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
+          data-node-view-content=""
+          class={node.textContent.length === 0 ? 'block' : undefined}
+          style="white-space: pre-wrap;"></code></pre>
+
+      {#if isCodeMode && !isFullscreen}
+        <PipWindow
+          title="Preview"
+          scope="container"
+          placement="top-right"
+          showHeader={false}
+          boundaryEl={wrapperEl}
         >
-          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-          {@html displaySvg}
-        </div>
-      {:else if isRendering}
-        <div class={mermaidLoadingBase}>Rendering diagram...</div>
-      {/if}
-      {#if renderError}
-        <div data-mermaid-error="" class={cn(mermaidErrorBanner, 'absolute right-3 bottom-3')}>
-          {renderError}
-        </div>
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            data-pip-diagram=""
+            data-mermaid-viewport=""
+            class="relative flex h-full w-full cursor-grab items-center justify-center overflow-hidden touch-none active:cursor-grabbing"
+            onwheel={handleCanvasWheel}
+            onpointerdown={handleCanvasPointerDown}
+            onpointermove={handleCanvasPointerMove}
+            onpointerup={handleCanvasPointerUp}
+            onpointercancel={handleCanvasPointerUp}
+          >
+            <div
+              data-mermaid-canvas=""
+              class={cn(mermaidSvgBase, mermaidPipSvgFit, 'transition-transform duration-75')}
+              style={canvasTransformStyle}
+            >
+              {#if displaySvg}
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                {@html displaySvg}
+              {:else}
+                <span class="text-xs text-muted-foreground">Empty diagram</span>
+              {/if}
+            </div>
+          </div>
+        </PipWindow>
       {/if}
     </div>
-  {/if}
 
-  <div
-    data-mermaid-code=""
-    class={cn(codeBlockBodyBase, isCodeMode ? mermaidCodeContainer : 'sr-only')}
-  >
-    <pre class={cn(codeBlockContentBase, codeContent)}><code
-        data-node-view-content=""
-        class={node.textContent.length === 0 ? 'block' : undefined}
-        style="white-space: pre-wrap;"></code></pre>
-
-    {#if isCodeMode}
-      <PipWindow
-        title="Preview"
-        scope="container"
-        placement="bottom-right"
-        bind:minimized={pipMinimized}
-        draggable={true}
-        boundaryEl={wrapperEl}
-        onfullscreen={openFullscreen}
+    {#if !isCodeMode || isFullscreen}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        bind:this={splitPreviewEl}
+        tabindex={isFullscreen ? 0 : -1}
+        role="region"
+        aria-label="Mermaid diagram preview"
+        contenteditable={false}
+        data-mermaid-viewer={!isFullscreen && !isCodeMode ? '' : undefined}
+        data-mermaid-fullscreen-viewer={isFullscreen && !isCodeMode ? '' : undefined}
+        data-mermaid-split-pane={isFullscreen && isCodeMode ? 'preview' : undefined}
+        data-mermaid-split-preview={isFullscreen && isCodeMode ? '' : undefined}
+        data-mermaid-viewport=""
+        data-pane-focused={isFullscreen && isCodeMode ? (splitFocusPane === 'preview' ? 'true' : 'false') : undefined}
+        data-modal-ignore-pointer=""
+        class={cn(
+          isFullscreen
+            ? isCodeMode
+              ? mermaidSplitPreviewPane
+              : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
+            : mermaidViewerCanvas,
+          'cursor-grab touch-none active:cursor-grabbing',
+        )}
+        onfocus={handlePreviewPaneFocus}
+        onkeydown={handlePreviewKeyDown}
+        onwheel={handleCanvasWheel}
+        onpointerdown={handleCanvasPointerDown}
+        onpointermove={handleCanvasPointerMove}
+        onpointerup={handleCanvasPointerUp}
+        onpointercancel={handleCanvasPointerUp}
       >
-        {#snippet actions()}
-          <button
-            type="button"
-            data-pip-zoom-out=""
-            aria-label="Zoom out preview"
-            class={mermaidToolbarButton}
-            onclick={handleZoomOutClick}
+        {#if displaySvg}
+          <div
+            data-mermaid-fullscreen-canvas={isFullscreen ? '' : undefined}
+            data-mermaid-canvas=""
+            class={cn(mermaidSvgBase, 'transition-transform duration-75')}
+            style={canvasTransformStyle}
           >
-            <Minus class="size-3" />
-          </button>
-          <span data-pip-zoom-percent="" data-mermaid-zoom-badge="" class={mermaidZoomBadge}
-            >{zoomPercent}</span
-          >
-          <button
-            type="button"
-            data-pip-zoom-in=""
-            aria-label="Zoom in preview"
-            class={mermaidToolbarButton}
-            onclick={handleZoomInClick}
-          >
-            <Plus class="size-3" />
-          </button>
-          <button
-            type="button"
-            data-pip-zoom-reset=""
-            aria-label="Reset preview zoom"
-            title="Reset zoom & pan"
-            class={mermaidToolbarButton}
-            onclick={handleZoomResetClick}
-          >
-            <RotateCcw class="size-3" />
-          </button>
-        {/snippet}
-
-        <div
-          data-pip-diagram=""
-          data-mermaid-canvas=""
-          class={cn(mermaidSvgBase, 'max-h-40 w-full transition-transform duration-75')}
-          style={canvasTransformStyle}
-        >
-          {#if displaySvg}
             <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             {@html displaySvg}
-          {:else}
-            <span class="text-xs text-muted-foreground">Empty diagram</span>
-          {/if}
-        </div>
-      </PipWindow>
+          </div>
+        {:else if isRendering}
+          <div class={mermaidLoadingBase}>Rendering diagram...</div>
+        {/if}
+      </div>
     {/if}
   </div>
 
-  {#if isFullscreen}
+  {#if renderError}
     <div
-      use:portalToEditorRegion
-      role="dialog"
-      aria-modal="false"
-      aria-label={isCodeMode ? 'Mermaid Fullscreen Split-Pane Editor' : 'Mermaid Fullscreen Viewer'}
       contenteditable={false}
-      data-mermaid-fullscreen-surface=""
-      data-mermaid-fullscreen-mode={isCodeMode ? 'split' : 'viewer'}
-      data-modal-ignore-pointer=""
-      class={mermaidFullscreenOverlay}
+      data-mermaid-error=""
+      data-mermaid-footer=""
+      class={cn(mermaidErrorFooter, isFullscreen ? 'rounded-b-none' : 'rounded-b-lg')}
     >
-      <div class={mermaidHeader} data-editor-controls>
-        <span class={mermaidTitle}>
-          <GitFork class="size-3.5" />
-          <span>{isCodeMode ? 'Mermaid — Split View' : 'Mermaid — Fullscreen Viewer'}</span>
-        </span>
-
-        <div class={mermaidToolbar}>
-          <button
-            type="button"
-            data-mermaid-fullscreen-zoom-out=""
-            aria-label="Zoom out diagram"
-            title="Zoom out (- / Ctrl+-)"
-            class={mermaidToolbarButton}
-            onclick={handleZoomOutClick}
-          >
-            <Minus class="size-3.5" />
-          </button>
-          <span
-            data-mermaid-fullscreen-zoom-percent=""
-            data-mermaid-zoom-badge=""
-            class={mermaidZoomBadge}>{zoomPercent}</span
-          >
-          <button
-            type="button"
-            data-mermaid-fullscreen-zoom-in=""
-            aria-label="Zoom in diagram"
-            title="Zoom in (+ / Ctrl+=)"
-            class={mermaidToolbarButton}
-            onclick={handleZoomInClick}
-          >
-            <Plus class="size-3.5" />
-          </button>
-          <button
-            type="button"
-            data-mermaid-fullscreen-zoom-reset=""
-            aria-label="Reset diagram zoom"
-            title="Reset zoom and pan (0 / Ctrl+0)"
-            class={mermaidToolbarButton}
-            onclick={handleZoomResetClick}
-          >
-            <RotateCcw class="size-3.5" />
-          </button>
-
-          {#if !isCodeMode}
-            <button
-              type="button"
-              data-mermaid-fullscreen-edit=""
-              aria-label="Edit Mermaid diagram"
-              title="Edit Mermaid diagram (Enter / i)"
-              class={mermaidToolbarButton}
-              onclick={handleEditClick}
-            >
-              <Pencil class="size-3.5" />
-              <span>Edit</span>
-            </button>
-          {/if}
-
-          <button
-            type="button"
-            data-mermaid-minimize=""
-            aria-label="Minimize Mermaid diagram"
-            title="Minimize (Esc)"
-            class={mermaidToolbarButton}
-            onclick={handleToggleFullscreenClick}
-          >
-            <Minimize2 class="size-3.5" />
-            <span>Minimize</span>
-          </button>
-        </div>
-      </div>
-
-      {#if isCodeMode}
-        <Splitter
-          panels={[
-            { id: 'code', minSize: 20 },
-            { id: 'preview', minSize: 20 },
-          ]}
-          defaultSize={[50, 50]}
-          class="min-h-0 flex-1"
-        >
-          <SplitterPanel id="code" paneDisabled={true} class="h-full min-h-0">
-            <div
-              data-mermaid-split-pane="code"
-              data-pane-focused={splitFocusPane === 'code' ? 'true' : 'false'}
-              class={mermaidSplitCodePane}
-            >
-              <textarea
-                bind:this={splitTextareaEl}
-                data-mermaid-split-code=""
-                aria-label="Mermaid source code"
-                value={sourceCode}
-                class={mermaidSplitTextarea}
-                onfocus={handleCodePaneFocus}
-                oninput={handleSplitCodeInput}
-                onkeydown={handleSplitTextareaKeyDown}
-              ></textarea>
-            </div>
-          </SplitterPanel>
-
-          <SplitterResizeTrigger id="code:preview" />
-
-          <SplitterPanel id="preview" paneDisabled={true} class="h-full min-h-0">
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <div
-              bind:this={splitPreviewEl}
-              tabindex="0"
-              role="region"
-              aria-label="Mermaid diagram preview"
-              data-mermaid-split-pane="preview"
-              data-mermaid-split-preview=""
-              data-pane-focused={splitFocusPane === 'preview' ? 'true' : 'false'}
-              class={cn(mermaidSplitPreviewPane, 'cursor-grab active:cursor-grabbing')}
-              onfocus={handlePreviewPaneFocus}
-              onkeydown={handlePreviewKeyDown}
-              onpointerdown={handleCanvasPointerDown}
-              onpointermove={handleCanvasPointerMove}
-              onpointerup={handleCanvasPointerUp}
-            >
-              {#if displaySvg}
-                <div
-                  data-mermaid-fullscreen-canvas=""
-                  data-mermaid-canvas=""
-                  class={cn(mermaidSvgBase, 'transition-transform duration-75')}
-                  style={canvasTransformStyle}
-                >
-                  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                  {@html displaySvg}
-                </div>
-              {/if}
-              {#if renderError}
-                <div
-                  data-mermaid-error=""
-                  class={cn(mermaidErrorBanner, 'absolute right-4 bottom-4')}
-                >
-                  {renderError}
-                </div>
-              {/if}
-            </div>
-          </SplitterPanel>
-        </Splitter>
-      {:else}
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <div
-          bind:this={splitPreviewEl}
-          tabindex="0"
-          role="region"
-          aria-label="Mermaid fullscreen diagram canvas"
-          data-mermaid-fullscreen-viewer=""
-          class={cn(mermaidSplitPreviewPane, 'flex-1 cursor-grab active:cursor-grabbing')}
-          onkeydown={handlePreviewKeyDown}
-          onpointerdown={handleCanvasPointerDown}
-          onpointermove={handleCanvasPointerMove}
-          onpointerup={handleCanvasPointerUp}
-        >
-          {#if displaySvg}
-            <div
-              data-mermaid-fullscreen-canvas=""
-              data-mermaid-canvas=""
-              class={cn(mermaidSvgBase, 'transition-transform duration-75')}
-              style={canvasTransformStyle}
-            >
-              <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-              {@html displaySvg}
-            </div>
-          {/if}
-        </div>
-      {/if}
+      {renderError}
     </div>
   {/if}
 </div>

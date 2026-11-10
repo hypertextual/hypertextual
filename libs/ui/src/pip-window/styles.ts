@@ -26,13 +26,13 @@ export const pipWindowVariants = cva(
         'top-left': 'top-3 left-3',
       },
       minimized: {
-        true: 'h-auto w-56',
-        false: 'w-72 max-w-[calc(100%-1.5rem)]',
+        true: 'h-auto w-40',
+        false: 'w-44 max-w-[calc(100%-1.5rem)]',
       },
     },
     defaultVariants: {
       scope: 'container',
-      placement: 'bottom-right',
+      placement: 'top-right',
       minimized: false,
     },
   },
@@ -59,5 +59,5 @@ export const pipWindowControlButton = cn(
 
 export const pipWindowBody = cn(
   windowBodyBase,
-  'relative flex max-h-48 min-h-28 flex-1 items-center justify-center overflow-hidden bg-background/80 p-2',
+  'relative flex h-28 w-full flex-1 items-center justify-center overflow-hidden bg-background/80 p-2',
 )

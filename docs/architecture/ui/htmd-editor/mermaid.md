@@ -39,20 +39,20 @@ const nodeViews = {
 ```mermaid
 flowchart TD
     Codec["htmd-ts: nodes.ts<br/>Fenced ```mermaid <-> mermaid node<br/>(disallowed in codeBlock)"]
-    Ext["htmd-ts: MermaidNode (mermaid-node.ts)<br/>defineHtmdExtension + HtmdNodeNavigation<br/>normal: whole-block NodeSelection + pan/zoom/fullscreen<br/>select/insert: multiline line navigation"]
+    Ext["htmd-ts: MermaidNode (mermaid-node.ts)<br/>defineHtmdExtension + Lowlight Mermaid grammar<br/>normal: whole-block NodeSelection + pan/zoom/fullscreen<br/>select/insert: multiline line navigation + syntax highlighting"]
     Adapter["libs/ui: svelteNodeView<br/>Reactive node, editable, mode, selected"]
     View["libs/ui: MermaidNodeView.svelte"]
-    Canvas["MermaidCanvas (pan/zoom SVG viewport)<br/>renderMermaidSource() + transform matrix"]
-    PiP["libs/ui: PipWindow.svelte<br/>scope='container' | 'viewport', placement='bottom-right'<br/>Live SVG + minimize + fullscreen trigger"]
-    FSView["Editor-Full Viewer Surface (normal mode)<br/>Fills HtmdEditor surface + Edit & Minimize buttons"]
-    FSSplit["Editor-Full Split-Pane Surface (insert mode)<br/>Fills HtmdEditor surface + Helical Splitter + Minimize button"]
+    Canvas["MermaidCanvas (pointer drag + keyboard pan/zoom SVG viewport)<br/>renderMermaidSource() + transform matrix"]
+    PiP["libs/ui: PipWindow.svelte<br/>scope='container', placement='top-right', showHeader=false<br/>Compact w-44 live SVG preview"]
+    FSView["Editor-Full Viewer Surface (normal mode)<br/>Fills HtmdEditor surface + icon-only Edit & Minimize buttons"]
+    FSSplit["Editor-Full Split-Pane Surface (insert/select mode)<br/>50/50 flush Code + Preview panes + icon-only Minimize button"]
 
     Codec --> Ext --> Adapter --> View
     View -->|"mode === 'normal'"| Canvas
-    View -->|"mode === 'insert' | 'select'"| PiP
+    View -->|"mode === 'insert' | 'select' (inline)"| PiP
     PiP --> Canvas
     View -->|"fullscreen in normal mode"| FSView
-    View -->|"fullscreen in insert mode"| FSSplit
+    View -->|"fullscreen in insert/select mode"| FSSplit
     FSView & FSSplit --> Canvas
 ```
 
@@ -60,54 +60,49 @@ flowchart TD
 
 #### 1. Normal Mode (Inline Highlighted Diagram Viewer)
 
-When `mode === 'normal'`, the `mermaid` block renders the diagram SVG inside a pan/zoom viewport. Stepping onto the block (`j`, `k`, `{`, `}`) highlights the entire block (`[data-pm-modal-node-selection="normal"]`) and reveals the zoom/pan readout, **Edit** button, and **Fullscreen** button:
+When `mode === 'normal'`, the `mermaid` block renders the diagram SVG inside a pointer-draggable and keyboard-navigable pan/zoom viewport. Stepping onto the block (`j`, `k`, `{`, `}`) highlights the entire block (`[data-pm-modal-node-selection="normal"]`) and displays the top bar with icon-only **Edit** (`Pencil`) and **Fullscreen** (`Maximize2`) buttons:
 
 ```text
 +-----------------------------------------------------------------------+
 | .node-mermaid [data-pm-modal-node-selection="normal"]                 |
 | +-------------------------------------------------------------------+ |
-| | Mermaid                          [-] [100%] [+] [Reset] [Edit] [Full] |
+| | Mermaid                                                [✎]  [⛶]  | |
 | +-------------------------------------------------------------------+ |
 | |                                                                   | |
 | |                     +---------+     +---------+                   | |
 | |                     | Client  | --> | Server  |                   | |
 | |                     +---------+     +---------+                   | |
 | |                                                                   | |
-| +-------------------------------------------------------------------+ |
 +-----------------------------------------------------------------------+
 ```
 
-#### 2. Insert Mode & Select Mode (Inline Code + Bottom-Right PiP Preview)
+#### 2. Insert Mode & Select Mode (Inline Syntax-Highlighted Code + Top-Right Compact PiP Preview)
 
-When `mode === 'insert'` or `mode === 'select'`, the component displays the Mermaid source code (`[data-node-view-content]`) with a floating Picture-in-Picture (PiP) preview anchored at the bottom-right corner. In `select` mode (`v` or `x`), line selections (`[data-pm-modal-selection="select"]`) highlight individual lines of Mermaid code while keeping the live PiP diagram visible:
+When `mode === 'insert'` or `mode === 'select'` inline, the component displays the syntax-highlighted Mermaid source code (`[data-node-view-content]` with Lowlight `.hljs-*` tokens, flush with the component boundaries and `min-h-64`) and a compact, headerless Picture-in-Picture (`PipWindow`) preview anchored at the **top-right** corner (`placement="top-right"`, `showHeader={false}`, `w-44`). All action icons (`Copy`, `Fullscreen`) remain exclusively in the top bar:
 
 ```text
 +-----------------------------------------------------------------------+
-| .node-mermaid (mode === 'insert' | 'select')                          |
+| .node-mermaid (mode === 'insert' | 'select', min-h-64)                |
 | +-------------------------------------------------------------------+ |
-| | Mermaid                                           [Copy]   [Full] | |
+| | Mermaid                                                [⧉]  [⛶]  | |
 | +-------------------------------------------------------------------+ |
-| | 1  flowchart LR                                                   | |
-| | 2    Client["Client"] --> Server["Server"]                        | |
-| | 3    Server --> DB[("Database")]|                                 | |
-| | 4                                 +-----------------------------+ | |
-| | 5                                 | Preview     [-] [+] [_] [F] | | |
-| | 6                                 | +-------------------------+ | | |
-| |                                   | | [Client]-->[Server]     | | | |
-| |                                   | |               |         | | | |
-| |                                   | |             [(DB)]      | | | |
-| |                                   | +-------------------------+ | | |
-| |                                   +-----------------------------+ | |
+| | 1  flowchart LR                           +---------------------+ | |
+| | 2    Client["Client"] --> Server          | [Client]-->[Server] | | |
+| | 3    Server --> DB[("Database")]|         |               |     | | |
+| | 4                                         |             [(DB)]  | | |
+| | 5                                         +---------------------+ | |
+| | 6                                                                 | |
+| |                                                                   | |
 +-----------------------------------------------------------------------+
 ```
 
 #### 3. Fullscreen Viewer (Normal Mode — Fills Full Editor Space)
 
-Pressing `f` (or `Space m f`) or clicking `[Full]` in `normal` mode expands the viewer to fill the **entire `HtmdEditor` pane space** (`[role="region"]` / `.article-scroll`). In fullscreen mode, the `[Full]` button is replaced by a **Minimize** (`[Min]`) button, with an **Edit** (`[Edit]`) button beside it that switches directly into the Fullscreen Split-Pane Editor:
+Pressing `Ctrl+w z` (or `Space w z` / `f` / `Space m f`) or clicking the Fullscreen icon button (`[⛶]`) in `normal` mode expands the viewer to fill the **entire `HtmdEditor` pane space** (`[role="region"]` / `.article-scroll`). In fullscreen mode, the Fullscreen icon is replaced by an icon-only **Minimize** (`Minimize2`) button, with an icon-only **Edit** (`Pencil`) button beside it that enters `insert` mode and transitions directly into the Fullscreen 50/50 Split-Pane Editor:
 
 ```text
 +=======================================================================+
-| Mermaid Diagram                  [-] [125%] [+] [Reset] [Edit] [Min]  |
+| Mermaid                                                    [✎]  [⤡]  |
 +=======================================================================+
 |                                                                       |
 |                                                                       |
@@ -120,17 +115,16 @@ Pressing `f` (or `Space m f`) or clicking `[Full]` in `normal` mode expands the 
 |                                      | Database |                     |
 |                                      +----------+                     |
 |                                                                       |
-|  h/j/k/l or Ctrl+h/j/k/l: pan · +/-: zoom · 0: reset · Esc: minimize  |
 +=======================================================================+
 ```
 
 #### 4. Fullscreen Split-Pane Editor (Insert Mode — Fills Full Editor Space)
 
-Opening fullscreen in `insert` mode (`Mod+Enter`, `Ctrl+Shift+f`, clicking `[Full]`, or clicking `[Edit]` from the Fullscreen Viewer) fills the **entire `HtmdEditor` pane space** with a split-pane surface (`Splitter` from `@cloudvoyant/helical-svelte`) containing the editable Mermaid code on the left, the interactive pan/zoom preview canvas on the right, and a **Minimize** (`[Min]`) button in place of Fullscreen:
+Entering `insert` mode while in Fullscreen (or opening Fullscreen while in `insert` mode via `Ctrl+w z`, `Mod+Enter`, `Ctrl+Shift+f`, or clicking the Fullscreen icon `[⛶]`) **is the toggle** into the Fullscreen 50/50 Split-Pane Editor. Both panes are completely flush with the Mermaid component's boundaries: the left 50% pane hosts the live syntax-highlighted `[data-node-view-content]` code editor, and the right 50% pane hosts the pointer-draggable and keyboard-navigable diagram preview canvas:
 
 ```text
 +=======================================================================+
-| Mermaid Split Editor          [Pane: Code | Preview]  [-] [100%] [+] [Min] |
+| Mermaid                                              [⧉]  [✎]  [⤡]  |
 +===================================+===================================+
 | 1  flowchart LR                   |                                   |
 | 2    Client --> Server            |      +--------+     +--------+    |
@@ -142,7 +136,6 @@ Opening fullscreen in `insert` mode (`Mod+Enter`, `Ctrl+Shift+f`, clicking `[Ful
 |                                   |                     |   DB   |    |
 |                                   |                     +--------+    |
 |                                   |                                   |
-| Ctrl+h/j/k/l: pan · Ctrl+=/Ctrl+-/Ctrl+0: zoom · Esc: minimize        |
 +===================================+===================================+
 ```
 
@@ -166,15 +159,15 @@ stateDiagram-v2
     InsertSplitCode --> InsertInline: Press Escape / click Minimize
 ```
 
-- **Document State (`ProseMirror`)**: `node.textContent` is the single source of truth for the diagram source. `<code data-node-view-content>` remains mounted at all times (visually hidden with `sr-only` in `normal` mode) so ProseMirror owns text transactions, undo/redo history, and inline selection decorations in `select` and `insert` modes.
-- **SVG Rendering (`@cloudvoyant/helical-ui`)**: `MermaidNodeView` debounces `renderMermaidSource(node.textContent)` (120 ms in `insert` mode, immediate on mount in `normal` mode) and caches the last valid SVG string alongside any syntax error state so typing incomplete tokens in `insert` mode keeps the last valid diagram visible in the PiP/split preview with a compact syntax indicator.
-- **Viewport Pan & Zoom State**: Each `MermaidNodeView` instance holds reactive `{ scale, panX, panY }` state (`scale` clamped to `0.25 .. 4.0`, default `1.0`, `panX = 0`, `panY = 0`) shared between its inline canvas and fullscreen view.
+- **Document State & Syntax Highlighting (`ProseMirror` + `lowlight`)**: `node.textContent` is the single source of truth for the diagram source. `<code data-node-view-content>` remains mounted in place across inline and fullscreen modes (visually hidden with `sr-only` in `normal` mode, full-width in inline `insert`/`select` mode, and the left 50% `Code` pane in Fullscreen Split View), with `MermaidNode` registering a custom `mermaid` grammar on `lowlight` to decorate keywords, arrows, node titles, strings, directives, and comments with `.hljs-*` classes.
+- **SVG Rendering (`@cloudvoyant/helical-ui`)**: `MermaidNodeView` debounces `renderMermaidSource(node.textContent)` (120 ms in `insert` mode, immediate on mount in `normal` mode) and caches the last valid SVG string alongside any syntax error state so typing incomplete tokens in `insert` mode keeps the last valid diagram visible in the PiP/split preview while rendering a full-width flush error footer (`[data-mermaid-footer][data-mermaid-error]`) as the third row (`Header` -> `Viewer (1 or 2 cols)` -> `Footer`).
+- **Viewport Pan & Zoom State (Mouse Drag + Pinch Zoom + Keyboard)**: Each `MermaidNodeView` instance holds reactive `{ scale, panX, panY }` state (`scale` clamped to `0.25 .. 4.0`, default `1.0`, `panX = 0`, `panY = 0`) shared across its inline viewer, top-right `PipWindow` (auto-fitted via `mermaidPipSvgFit`), and fullscreen surfaces. All preview surfaces support pointer drag panning, trackpad/touch pinch zooming (`onwheel` with `ctrlKey`/`metaKey` and two-pointer touch pinch), and keyboard pan/zoom shortcuts; no zoom or reset toolbar buttons are rendered.
 
 ### Behavior
 
 - **Default (`normal` mode):** Renders the diagram SVG centered in its block container. Moving the cursor onto the block highlights the whole block (`NodeSelection`).
-- **Keyboard Pan, Zoom, and Fullscreen Across Modes:**
-  `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` (pan) and `Ctrl+=` / `Ctrl+-` / `Ctrl+0` (zoom in / zoom out / reset) work uniformly across **all** modes (`normal`, `select`, and `insert`, both inline and fullscreen) when the cursor or selection is inside a `mermaid` block. Non-insert diagram views (`normal` mode inline/fullscreen and the focused `Preview` pane in fullscreen split view) also accept single-key `h`/`j`/`k`/`l` or `H`/`J`/`K`/`L` pan and `+`/`=`/`-`/`0` zoom/reset shortcuts, while `f` / `Space m f` (`normal` mode) and `Mod+Enter` / `Ctrl+Shift+f` (`insert` mode) toggle fullscreen and `Ctrl+w l` / `Ctrl+w h` / `Ctrl+w w` / `Tab` switch between the split-pane `Code` and `Preview` panes. See the [Mermaid block keybinding table](../../../keybindings/index.md#mermaid-blocks-mermaidnode--mermaidnodeview) for the complete per-mode shortcut matrix.
+- **Pointer Drag & Keyboard Pan, Zoom, and Fullscreen Across Modes:**
+  Dragging with the mouse/pointer on any Mermaid preview surface pans the diagram directly. `Ctrl+h` / `Ctrl+j` / `Ctrl+k` / `Ctrl+l` (pan) and `Ctrl+=` / `Ctrl+-` / `Ctrl+0` (zoom in / zoom out / reset) work uniformly across **all** modes (`normal`, `select`, and `insert`, both inline and fullscreen) when the cursor or selection is inside a `mermaid` block. Non-insert diagram views (`normal` mode inline/fullscreen and the focused `Preview` pane in fullscreen split view) also accept single-key `h`/`j`/`k`/`l` or `H`/`J`/`K`/`L` pan and `+`/`=`/`-`/`0` zoom/reset shortcuts, while `f` / `Space m f` (`normal` mode) and `Mod+Enter` / `Ctrl+Shift+f` (`insert` mode) toggle fullscreen and `Ctrl+w l` / `Ctrl+w h` / `Ctrl+w w` / `Tab` switch between the split-pane `Code` and `Preview` panes. See the [Mermaid block keybinding table](../../../keybindings/index.md#mermaid-diagram-editor--viewer-shortcuts-mermaidnode--mermaidnodeview) for the complete per-mode shortcut matrix.
 
 - **Loading, empty, and error:**
   - Empty `mermaid` blocks show an empty-state placeholder in `normal` mode (`Empty Mermaid diagram — press Enter to edit`) and a starter hint in `insert` mode.
@@ -187,8 +180,8 @@ stateDiagram-v2
 
 ### Styling and Responsiveness
 
-- Define CVA variants and base classes in `libs/ui/src/editor/components/styles.ts` (`mermaidRootVariants`, `mermaidToolbar`, `mermaidViewerCanvas`, `mermaidFullscreenOverlay`) using semantic theme tokens (`bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, `ring-ring`) and Helical's `renderMermaidSource` / `resolveMermaidThemeVariables` so diagrams automatically adapt to light/dark mode and all 54 Helical themes.
-- Compose [`PipWindow`](../pip-window.md) (`libs/ui/src/pip-window/PipWindow.svelte`) with `scope="container"` (confined to the `.node-mermaid` relative wrapper by default, or switchable to `scope="viewport"`) and `placement="bottom-right"` so the preview floats over the bottom-right corner and can be minimized to a compact header pill (`Preview [-] [100%] [+] [+] [Full]`).
+- Define CVA variants and base classes in `libs/ui/src/editor/components/styles.ts` (`mermaidRootVariants`, `mermaidToolbar`, `mermaidViewerCanvas`, `mermaidFullscreenOverlay`) using semantic theme tokens (`bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, `ring-ring`) and Helical's `renderMermaidSource` / `resolveMermaidThemeVariables` so diagrams automatically adapt to light/dark mode and all 54 Helical themes. Set `data-code-block=""` on the root wrapper so `.ProseMirror [data-code-block] .editor-code-content` resets `.prose pre` rounded corners/margins and applies `.hljs-*` syntax highlighting colors flush to the pane boundaries.
+- Compose [`PipWindow`](../pip-window.md) (`libs/ui/src/pip-window/PipWindow.svelte`) with `scope="container"`, `placement="top-right"`, and `showHeader={false}` in inline `insert` and `select` modes so a compact (`w-44`), headerless diagram preview floats at the top-right corner while all icon controls remain in the top bar.
 
 ### Maintainer Notes
 
