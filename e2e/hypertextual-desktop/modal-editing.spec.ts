@@ -798,6 +798,14 @@ test.describe(
           const menuInput = page.getByTestId('command-menu-input')
           const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
 
+          // Assert: no fallback trigger buttons or vertical page overflow exist in default 'palette' style
+          await expect(page.getByRole('button', { name: /Open Command/i })).toHaveCount(0)
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+            ),
+          ).toBe(true)
+
           // Act & Assert: default commandStyle is 'palette' — pressing ':' in normal mode opens CommandPalette
           await page.keyboard.press(':')
           await expect(palette).toBeVisible()
@@ -827,6 +835,12 @@ test.describe(
 
           // Assert: CommandPalette closes, 'menu' is persisted, and ':', 'Space :', and 'Mod+k' now open CommandMenu
           await expect(palette).toHaveCount(0)
+          await expect(page.getByRole('button', { name: /Open Command/i })).toHaveCount(0)
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+            ),
+          ).toBe(true)
           await expect
             .poll(() =>
               page.evaluate(() =>

@@ -111,6 +111,10 @@
     settings.setCommandStyle(next)
   }
 
+  function handleCommandOpenChange(next: boolean): void {
+    hotkeys.commandOpen = next
+  }
+
   function handleRecoveryClose(): void {
     editor.recoveryOpen = false
   }
@@ -200,10 +204,18 @@
         <ContentPane {workspace} />
       </Row>
       <StatusBar {workspace} />
-    </SidebarProvider>
 
-    <CommandPalette hotkey={settings.commandStyle === 'palette' ? 'Mod+k' : false} />
-    <CommandMenu hotkey={settings.commandStyle === 'menu' ? 'Mod+k' : false} />
+      <CommandPalette
+        open={settings.commandStyle === 'palette' && hotkeys.commandOpen}
+        onOpenChange={handleCommandOpenChange}
+        hotkey={settings.commandStyle === 'palette' ? 'Mod+k' : false}
+      />
+      <CommandMenu
+        open={settings.commandStyle === 'menu' && hotkeys.commandOpen}
+        onOpenChange={handleCommandOpenChange}
+        hotkey={settings.commandStyle === 'menu' ? 'Mod+k' : false}
+      />
+    </SidebarProvider>
   </CommandProvider>
 
   <WhichKey />
