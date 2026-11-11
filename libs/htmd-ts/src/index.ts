@@ -5,7 +5,7 @@ export type { JSONContent, ParseIssue, ParseResult } from './types.js'
 export {
   createAtomNodeNavigation,
   createContainerNodeNavigation,
-  createInplaceWindowNodeNavigation,
+  createCustomNodeNavigation,
   createTextblockNavigation,
   CursorManager,
   DEFAULT_MERMAID_SOURCE,

@@ -4,7 +4,7 @@ import type { Node as PmNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
-  createInplaceWindowNodeNavigation,
+  createCustomNodeNavigation,
   CursorManager,
   defineHtmdExtension,
   findNextBlockPos,
@@ -108,14 +108,20 @@ export const MermaidEditor = defineHtmdExtension<
     pendingWindowPrefix: false,
   }),
   navigation: () =>
-    createInplaceWindowNodeNavigation({
+    createCustomNodeNavigation({
       controls: [MERMAID_HEADER_CONTROL_SELECTOR],
       defaultControl: 'body',
-      textObject: 'c',
       multilineTextblock: true,
       expandSelectionRange: true,
-      bodyOffset: 1,
       serializeModalText: (node) => `\`\`\`mermaid\n${node.textContent}\n\`\`\``,
+      enterFromAbove(editor, pos) {
+        CursorManager.setActiveCompoundBlockPos(editor, pos)
+        return focusTextPosition(editor, Math.min(pos + 1, editor.state.doc.content.size))
+      },
+      enterFromBelow(editor, pos, node) {
+        CursorManager.setActiveCompoundBlockPos(editor, pos)
+        return focusTextPosition(editor, Math.max(pos + 1, pos + node.nodeSize - 1))
+      },
       focusControl(editor, pos, _node, options) {
         try {
           const dom = editor.view?.nodeDOM(pos)

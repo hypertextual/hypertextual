@@ -424,7 +424,7 @@ export function executeSelectionTransform(
       sel instanceof NodeSelection ? sel : TextSelection.create(doc, getCursorCharPos(doc, sel))
     const $from = nextSelection.$from
     for (let d = $from.depth; d >= 1; d -= 1) {
-      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'inplace') {
+      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'custom') {
         const blockPos = $from.before(d)
         const blockNode = doc.nodeAt(blockPos)
         if (blockNode && NodeSelection.isSelectable(blockNode)) {

@@ -47,7 +47,7 @@ export class SelectionManager {
     const { $from } = selection
     for (let d = $from.depth; d >= 1; d -= 1) {
       const navKind = getNodeNavigation(undefined, $from.node(d).type.name)?.kind
-      if (navKind === 'container' || navKind === 'inplace') {
+      if (navKind === 'container' || navKind === 'custom') {
         return null
       }
       const beforePos = $from.before(d)

@@ -690,7 +690,7 @@ function createModalEditingPlugin(
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
             const navKind = getNodeNavigationForType(ancestor.type.name)?.kind
-            if (navKind === 'container' || navKind === 'inplace') {
+            if (navKind === 'container' || navKind === 'custom') {
               const ancestorPos = $head.before(d)
               decos.push(
                 Decoration.node(ancestorPos, ancestorPos + ancestor.nodeSize, {
@@ -708,7 +708,7 @@ function createModalEditingPlugin(
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
             const navKind = getNodeNavigationForType(ancestor.type.name)?.kind
-            if (navKind === 'container' || navKind === 'inplace') {
+            if (navKind === 'container' || navKind === 'custom') {
               const ancestorPos = $head.before(d)
               const alreadyDecorated =
                 ancestorPos >= primaryRange.from &&
@@ -820,7 +820,7 @@ export function enterModalCompoundBlock(editor: TiptapEditor): boolean {
     for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
       const node = resolvedFrom.node(d)
       const nav = getNodeNavigation(editor, node.type.name)
-      if (nav?.kind === 'container' || nav?.kind === 'inplace') {
+      if (nav?.kind === 'container' || nav?.kind === 'custom') {
         blockPos = resolvedFrom.before(d)
         control = nav.defaultControl
         break
@@ -1070,7 +1070,7 @@ export function collectLeafBlocks(doc: PMNode, mode: KeymapMode = 'normal'): Blo
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
     const nav = getNodeNavigationForType(node.type.name)
-    if (nav?.kind === 'inplace' && mode !== 'select') {
+    if (nav?.kind === 'custom' && mode !== 'select') {
       blocks.push({
         node,
         pos,
@@ -1835,7 +1835,7 @@ function executeModalOperator(
         : undefined
       if (
         firstInserted &&
-        (firstInserted.isAtom || insertedKind === 'container' || insertedKind === 'inplace') &&
+        (firstInserted.isAtom || insertedKind === 'container' || insertedKind === 'custom') &&
         NodeSelection.isSelectable(firstInserted)
       ) {
         tr = tr.setSelection(NodeSelection.create(tr.doc, insertPos))

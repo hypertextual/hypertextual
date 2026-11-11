@@ -27,5 +27,4 @@ export interface MermaidViewerProps {
   onkeydown?: (event: KeyboardEvent) => void
   /** Optional caller class overrides merged onto the viewport container. */
   class?: string
-  [key: `data-${string}`]: string | undefined
 }

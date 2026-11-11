@@ -2,7 +2,7 @@ export * from './types.js'
 export {
   createAtomNodeNavigation,
   createContainerNodeNavigation,
-  createInplaceWindowNodeNavigation,
+  createCustomNodeNavigation,
   createTextblockNavigation,
   CursorManager,
   defineHtmdExtension,

@@ -83,14 +83,7 @@ let { ... }: ComponentProps = $props()
 - Document every exported TypeScript function with a JSDoc comment, and document every HTMD editor extension with a JSDoc comment that explains its editor usage and includes a brief ASCII visual example of its expected behavior.
 - Extract extension keymap handlers into named helper functions (`handleTab`, `handleShiftTab`, `handleArrowUp`, `handleArrowDown`, `handleEnter`) under `// helpers ---`.
 - Decompose modal editing in `libs/htmd-ts/src/editor/extensions` into dedicated mode (`NormalMode`, `SelectMode`, `InsertMode`) and preset (`Helix`, `Vim`, `Kakoune`) extensions composed by a parent `ModalEditing` extension.
-- [Proposed] Name HTMD extensions after their node or behavior without superfluous suffixes like `Custom`.
-- [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
-- [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
-- [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
-- [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
-- [Proposed] Compose complex editor NodeViews from reusable primitives in `libs/ui` (such as `WindowInplace` and `MermaidViewer`) rather than embedding viewport pan/zoom or floating window logic inside the NodeView.
-- [Proposed] Keep shared modal editing and motion extensions (`ModalEditing`, `NormalMode`, `SelectMode`, `InsertMode`) node-agnostic; define node-specific modal behavior through `HtmdNodeNavigation` and the owning extension in `libs/htmd-ts/src/editor/extensions`.
-- [Proposed] Loop `ArrowDown` and `ArrowUp` navigation in suggestion menus (`SlashCommands`) between the first and last list items.
+- Favor composition and separation of concerns across UI primitives, editor NodeViews, and HTMD extensions.
 
 ### Documentation
 
@@ -102,11 +95,12 @@ let { ... }: ComponentProps = $props()
 
 ## Testing
 
+- Prefer E2E tests unless integration and unit tests add value or reduce testing burden.
+- Cover all modal editing modes in BDD suites for all editor blocks.
+- Structure BDD `Given` / `When` / `it` clauses as a logical hierarchy that reflects the component or application behavior tree, narrowing down paths so branch coverage is clear.
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
-- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`) and `htmd-ts` editor integration and unit tests in `libs/htmd-ts/src/editor/htmd-editor.test.ts` (focused on whole-editor contracts rather than node-specific cases). Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
-- Structure modal block E2E suites in `modal-editing.spec.ts` by starting mode (`Given normal`, `Given edit`, `Given select`) and granular `When ... -> it ...` user actions across all interactive block types.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:
 
 ```ts

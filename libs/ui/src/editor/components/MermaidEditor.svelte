@@ -4,18 +4,15 @@
   import { useKeymap } from '@cloudvoyant/helical-svelte'
   import { Check, Copy, GitFork, Maximize2, Minimize2, Pencil } from 'lucide-svelte'
   import MermaidViewer from '../../mermaid-viewer/MermaidViewer.svelte'
+  import PipWindow from '../../pip-window/PipWindow.svelte'
   import WindowInplace from '../../window-inplace/WindowInplace.svelte'
   import {
     codeContent,
     mermaidCodeContainer,
     mermaidErrorFooter,
-    mermaidFullscreenOverlay,
-    mermaidHeader,
     mermaidRootVariants,
     mermaidSplitCodePane,
     mermaidSplitPreviewPane,
-    mermaidTitle,
-    mermaidToolbar,
     mermaidToolbarButton,
     mermaidViewerCanvas,
   } from './styles'
@@ -30,7 +27,7 @@
   const MIN_ZOOM = 0.25
   const MAX_ZOOM = 4.0
 
-  let wrapperEl = $state<HTMLDivElement | null>(null)
+  let windowInplace = $state<ReturnType<typeof WindowInplace> | null>(null)
   let mainViewer = $state<ReturnType<typeof MermaidViewer> | null>(null)
 
   let renderError = $state<string | null>(null)
@@ -39,9 +36,6 @@
   let panY = $state(0)
   let isFullscreen = $state(false)
   let isBlockActive = $state(false)
-  let fullscreenRect = $state<{ top: number; left: number; width: number; height: number } | null>(
-    null,
-  )
   let splitFocusPane = $state<'code' | 'preview'>('code')
   let pendingWindowPrefix = false
   let copied = $state(false)
@@ -49,11 +43,6 @@
   // Derived -------------------------------------------------------------------
   const sourceCode = $derived(node.textContent)
   const isCodeMode = $derived(mode === 'insert' || mode === 'select')
-  const wrapperStyle = $derived(
-    isFullscreen && fullscreenRect
-      ? `white-space: normal; top: ${fullscreenRect.top}px; left: ${fullscreenRect.left}px; width: ${fullscreenRect.width}px; height: ${fullscreenRect.height}px;`
-      : 'white-space: normal;',
-  )
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
@@ -62,6 +51,7 @@
   })
 
   $effect(() => {
+    const wrapperEl = windowInplace?.getElement()
     const hostEl = wrapperEl?.closest<HTMLElement>('.node-mermaid') ?? wrapperEl
     if (!hostEl) return
     const onViewportEvent = (event: Event) => {
@@ -83,38 +73,6 @@
     }
     hostEl.addEventListener('htmd:mermaid-viewport', onViewportEvent)
     return () => hostEl.removeEventListener('htmd:mermaid-viewport', onViewportEvent)
-  })
-
-  $effect(() => {
-    if (!isFullscreen || !wrapperEl) {
-      fullscreenRect = null
-      return
-    }
-    const region =
-      wrapperEl.closest<HTMLElement>('[role="region"]') ??
-      wrapperEl.closest<HTMLElement>('.editor-container')
-    if (!region) return
-    const previousOverflow = region.style.overflow
-    region.style.overflow = 'hidden'
-    const updateRect = () => {
-      const rect = region.getBoundingClientRect()
-      fullscreenRect = {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      }
-    }
-    updateRect()
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateRect) : null
-    resizeObserver?.observe(region)
-    window.addEventListener('resize', updateRect)
-    return () => {
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', updateRect)
-      region.style.overflow = previousOverflow
-    }
   })
 
   $effect(() => {
@@ -449,6 +407,7 @@
   }
 
   function syncDatasetState() {
+    const wrapperEl = windowInplace?.getElement()
     const hostEl = wrapperEl?.closest<HTMLElement>('.node-mermaid') ?? wrapperEl
     if (!hostEl) return
     hostEl.dataset.mermaidScale = String(scale)
@@ -500,6 +459,7 @@
       if (isCodeMode) {
         focusCodeEditor()
       } else {
+        const wrapperEl = windowInplace?.getElement()
         const region = wrapperEl?.closest<HTMLElement>('[role="region"]')
         region?.focus({ preventScroll: true })
       }
@@ -741,166 +701,145 @@
   }
 </script>
 
-<div
-  bind:this={wrapperEl}
+<WindowInplace
+  bind:this={windowInplace}
+  title="Mermaid"
+  bind:fullscreen={isFullscreen}
   data-node-view-wrapper=""
-  data-code-block=""
   data-mermaid-node=""
   data-mermaid-mode={mode}
   data-mermaid-scale={scale}
   data-mermaid-pan-x={panX}
   data-mermaid-pan-y={panY}
   data-mermaid-fullscreen={isFullscreen ? 'true' : 'false'}
-  data-mermaid-fullscreen-surface={isFullscreen ? '' : undefined}
-  data-mermaid-fullscreen-mode={isFullscreen ? (isCodeMode ? 'split' : 'viewer') : undefined}
   role="none"
-  style={wrapperStyle}
-  class={cn(mermaidRootVariants({ mode }), isFullscreen ? mermaidFullscreenOverlay : undefined)}
+  class={mermaidRootVariants({ mode })}
+  bodyClass={isFullscreen && isCodeMode ? 'flex-row' : 'flex-col'}
 >
-  <div contenteditable={false} class={mermaidHeader} data-editor-controls>
-    <span class={mermaidTitle}>
-      <GitFork class="size-3.5" />
-      <span>Mermaid</span>
-    </span>
+  {#snippet icon()}
+    <GitFork class="size-3.5" />
+  {/snippet}
 
-    <div class={mermaidToolbar}>
-      {#if !isCodeMode}
-        <button
-          type="button"
-          data-mermaid-edit=""
-          data-mermaid-fullscreen-edit={isFullscreen ? '' : undefined}
-          aria-label="Edit Mermaid diagram"
-          title="Edit Mermaid diagram (Enter / i)"
-          class={mermaidToolbarButton}
-          onclick={handleEditClick}
-        >
-          <Pencil class="size-3.5" />
-        </button>
-      {:else}
-        <button
-          type="button"
-          data-mermaid-copy=""
-          aria-label="Copy Mermaid source"
-          title="Copy Mermaid source"
-          class={mermaidToolbarButton}
-          onclick={handleCopyClick}
-        >
-          {#if copied}
-            <Check class="size-3.5" />
-          {:else}
-            <Copy class="size-3.5" />
-          {/if}
-        </button>
-      {/if}
-
+  {#snippet toolbar()}
+    {#if !isCodeMode}
       <button
         type="button"
-        data-mermaid-fullscreen=""
-        data-mermaid-minimize={isFullscreen ? '' : undefined}
-        aria-label={isFullscreen ? 'Minimize Mermaid diagram' : 'Fullscreen Mermaid diagram'}
-        title={isFullscreen ? 'Minimize (Esc)' : 'Fullscreen (f / Mod+Enter)'}
+        data-mermaid-edit=""
+        aria-label="Edit Mermaid diagram"
+        title="Edit Mermaid diagram (Enter / i)"
         class={mermaidToolbarButton}
-        onclick={handleToggleFullscreenClick}
+        onclick={handleEditClick}
       >
-        {#if isFullscreen}
-          <Minimize2 class="size-3.5" />
+        <Pencil class="size-3.5" />
+      </button>
+    {:else}
+      <button
+        type="button"
+        data-mermaid-copy=""
+        aria-label="Copy Mermaid source"
+        title="Copy Mermaid source"
+        class={mermaidToolbarButton}
+        onclick={handleCopyClick}
+      >
+        {#if copied}
+          <Check class="size-3.5" />
         {:else}
-          <Maximize2 class="size-3.5" />
+          <Copy class="size-3.5" />
         {/if}
       </button>
-    </div>
-  </div>
+    {/if}
+
+    <button
+      type="button"
+      data-mermaid-fullscreen=""
+      aria-label={isFullscreen ? 'Minimize Mermaid diagram' : 'Fullscreen Mermaid diagram'}
+      title={isFullscreen ? 'Minimize (Esc)' : 'Fullscreen (f / Mod+Enter)'}
+      class={mermaidToolbarButton}
+      onclick={handleToggleFullscreenClick}
+    >
+      {#if isFullscreen}
+        <Minimize2 class="size-3.5" />
+      {:else}
+        <Maximize2 class="size-3.5" />
+      {/if}
+    </button>
+  {/snippet}
 
   <div
-    data-mermaid-body=""
+    data-mermaid-code=""
+    data-pane-focused={isFullscreen && isCodeMode
+      ? splitFocusPane === 'code'
+        ? 'true'
+        : 'false'
+      : undefined}
+    onfocusin={handleCodePaneFocus}
     class={cn(
-      'relative flex min-h-0 w-full flex-1',
-      isFullscreen && isCodeMode ? 'flex-row' : 'flex-col',
+      codeBlockBodyBase,
+      !isCodeMode ? 'sr-only' : isFullscreen ? mermaidSplitCodePane : mermaidCodeContainer,
     )}
   >
-    <div
-      data-mermaid-code=""
-      data-mermaid-split-pane={isFullscreen && isCodeMode ? 'code' : undefined}
-      data-mermaid-split-code={isFullscreen && isCodeMode ? '' : undefined}
-      data-pane-focused={isFullscreen && isCodeMode
-        ? splitFocusPane === 'code'
-          ? 'true'
-          : 'false'
-        : undefined}
-      onfocusin={handleCodePaneFocus}
-      class={cn(
-        codeBlockBodyBase,
-        !isCodeMode ? 'sr-only' : isFullscreen ? mermaidSplitCodePane : mermaidCodeContainer,
-      )}
-    >
-      <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
-          data-node-view-content=""
-          class={node.textContent.length === 0 ? 'block' : undefined}
-          style="white-space: pre-wrap;"></code></pre>
+    <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
+        data-node-view-content=""
+        class={node.textContent.length === 0 ? 'block' : undefined}
+        style="white-space: pre-wrap;"></code></pre>
 
-      {#if isCodeMode && !isFullscreen}
-        <WindowInplace
-          title="Preview"
-          scope="container"
-          placement="top-right"
-          showHeader={false}
-          boundaryEl={wrapperEl}
-        >
-          <MermaidViewer
-            code={sourceCode}
-            debounceMs={120}
-            fit="contain"
-            bind:scale
-            bind:panX
-            bind:panY
-            bind:error={renderError}
-            onviewportchange={syncDatasetState}
-            data-pip-diagram=""
-          />
-        </WindowInplace>
-      {/if}
-    </div>
-
-    {#if !isCodeMode || isFullscreen}
-      <MermaidViewer
-        bind:this={mainViewer}
-        code={sourceCode}
-        debounceMs={isCodeMode ? 120 : 0}
-        fit="auto"
-        tabindex={isFullscreen ? 0 : -1}
-        bind:scale
-        bind:panX
-        bind:panY
-        bind:error={renderError}
-        onviewportchange={syncDatasetState}
-        onfocus={handlePreviewPaneFocus}
-        onkeydown={handlePreviewKeyDown}
-        data-mermaid-viewer={!isFullscreen && !isCodeMode ? '' : undefined}
-        data-mermaid-fullscreen-viewer={isFullscreen && !isCodeMode ? '' : undefined}
-        data-mermaid-split-pane={isFullscreen && isCodeMode ? 'preview' : undefined}
-        data-mermaid-split-preview={isFullscreen && isCodeMode ? '' : undefined}
-        data-pane-focused={isFullscreen && isCodeMode
-          ? splitFocusPane === 'preview'
-            ? 'true'
-            : 'false'
-          : undefined}
-        class={isFullscreen
-          ? isCodeMode
-            ? mermaidSplitPreviewPane
-            : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
-          : mermaidViewerCanvas}
-      />
+    {#if isCodeMode && !isFullscreen}
+      <PipWindow
+        title="Preview"
+        scope="container"
+        placement="top-right"
+        showHeader={false}
+        boundaryEl={windowInplace?.getElement() ?? null}
+      >
+        <MermaidViewer
+          code={sourceCode}
+          debounceMs={120}
+          fit="contain"
+          bind:scale
+          bind:panX
+          bind:panY
+          bind:error={renderError}
+          onviewportchange={syncDatasetState}
+        />
+      </PipWindow>
     {/if}
   </div>
 
-  {#if renderError}
-    <div
-      contenteditable={false}
-      data-mermaid-error=""
-      data-mermaid-footer=""
-      class={cn(mermaidErrorFooter, isFullscreen ? 'rounded-b-none' : 'rounded-b-lg')}
-    >
-      {renderError}
-    </div>
+  {#if !isCodeMode || isFullscreen}
+    <MermaidViewer
+      bind:this={mainViewer}
+      code={sourceCode}
+      debounceMs={isCodeMode ? 120 : 0}
+      fit="auto"
+      tabindex={isFullscreen ? 0 : -1}
+      bind:scale
+      bind:panX
+      bind:panY
+      bind:error={renderError}
+      onviewportchange={syncDatasetState}
+      onfocus={handlePreviewPaneFocus}
+      onkeydown={handlePreviewKeyDown}
+      class={isFullscreen
+        ? isCodeMode
+          ? cn(
+              mermaidSplitPreviewPane,
+              splitFocusPane === 'preview' ? 'ring-2 ring-inset ring-ring/50' : undefined,
+            )
+          : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
+        : mermaidViewerCanvas}
+    />
   {/if}
-</div>
+
+  {#snippet footer()}
+    {#if renderError}
+      <div
+        contenteditable={false}
+        role="alert"
+        data-mermaid-error=""
+        class={cn(mermaidErrorFooter, isFullscreen ? 'rounded-b-none' : 'rounded-b-lg')}
+      >
+        {renderError}
+      </div>
+    {/if}
+  {/snippet}
+</WindowInplace>

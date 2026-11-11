@@ -114,7 +114,7 @@ export function executeInsertModeEntry(
     } else if (sel instanceof NodeSelection) {
       const nav = getNodeNavigation(editor, sel.node.type.name)
       storage.activeCompoundBlockPos = sel.from
-      if (nav?.kind === 'container' || nav?.kind === 'inplace') {
+      if (nav?.kind === 'container' || nav?.kind === 'custom') {
         const { firstTextStart, lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
         const dest = isAppend ? (lastTextEnd !== -1 ? lastTextEnd : sel.to) : firstTextStart
         nextSel = dest !== -1 ? TextSelection.create(doc, dest) : sel
@@ -216,23 +216,23 @@ export function applyModalStateTransition(
   if (nextMode === 'normal' && compoundPosToSelect === null) {
     const $from = editor.state.selection.$from
     for (let d = $from.depth; d >= 1; d -= 1) {
-      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'inplace') {
+      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'custom') {
         compoundPosToSelect = $from.before(d)
         break
       }
     }
   }
-  const enteringInplaceSelect =
+  const enteringCustomSelect =
     nextMode === 'select' &&
     editor.state.selection instanceof NodeSelection &&
-    getNodeNavigation(editor, editor.state.selection.node.type.name)?.kind === 'inplace'
+    getNodeNavigation(editor, editor.state.selection.node.type.name)?.kind === 'custom'
   if (
     storage.mode === nextMode &&
     storage.preset === nextPreset &&
     prev?.mode === nextMode &&
     prev?.preset === nextPreset &&
     compoundPosToSelect === null &&
-    !enteringInplaceSelect
+    !enteringCustomSelect
   ) {
     return
   }
@@ -244,21 +244,21 @@ export function applyModalStateTransition(
     prev.preset === nextPreset &&
     prev.secondaryRanges.length === 0 &&
     compoundPosToSelect === null &&
-    !enteringInplaceSelect
+    !enteringCustomSelect
   ) {
     return
   }
   try {
     let tr = editor.state.tr
     let restoredSubtextCursor: SubtextCursorState | null = null
-    if (enteringInplaceSelect && editor.state.selection instanceof NodeSelection) {
+    if (enteringCustomSelect && editor.state.selection instanceof NodeSelection) {
       const startPos = Math.min(editor.state.doc.content.size, editor.state.selection.from + 1)
       tr = tr.setSelection(TextSelection.create(editor.state.doc, startPos))
     } else if (compoundPosToSelect !== null) {
       const node = editor.state.doc.nodeAt(compoundPosToSelect)
       if (node) {
         const nav = getNodeNavigation(editor, node.type.name)
-        if (nav?.kind === 'inplace' && NodeSelection.isSelectable(node)) {
+        if (nav?.kind === 'custom' && NodeSelection.isSelectable(node)) {
           tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
         } else if (nav?.kind === 'container') {
           const $cur = editor.state.selection.$from

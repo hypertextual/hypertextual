@@ -128,7 +128,7 @@ flowchart TD
 | Module | Responsibility |
 | --- | --- |
 | `src/nodes.ts` & `src/marks.ts` | Single source of truth for HTML (`parseHTML`, `renderHTML`) and Markdown (`parseMarkdown`, `renderMarkdown`) schemas. |
-| `src/editor/define-htmd-extension.ts` | Defines `HtmdExtensionSpec` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation preset factories (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`). |
+| `src/editor/define-htmd-extension.ts` | Defines `HtmdExtensionSpec` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation preset factories (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, `createCustomNodeNavigation`). |
 | `src/editor/build-extensions.ts` | Extends canonical nodes from `src/nodes.ts`, merges `.configure({ keymap })` overrides, and registers `HtmdNodeNavigation` specs. |
 | `src/editor/htmd-editor.ts` | Implements `HtmdEditor` (`Editor<JSONContent, HtmdCommandMap>`), mounts `EditorView`, and bridges `EditorHostServices`. |
 
@@ -153,7 +153,7 @@ flowchart TD
 ##### Container vs. Atom `NodeView` Layout
 
 ```text
-1. Container / Inplace NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte, MermaidEditor.svelte)
+1. Container / Custom NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte, MermaidEditor.svelte)
 +-----------------------------------------------------------------------+
 | .node-notice (NodeView.dom, contenteditable="false" header controls)  |
 | +-------------------------------------------------------------------+ |
@@ -230,12 +230,13 @@ flowchart TD
     Text["createTextblockNavigation()<br/>Default caret entry at start or end of block"]
     Cont["createContainerNodeNavigation({ controls, bodyOffset })<br/>CodeBlock & NoticeNode: header controls <-> contentDOM body"]
     Atom["createAtomNodeNavigation({ controls, subtext })<br/>ImageNode & LinkPreview: control ring + modal subtext"]
+    Cust["createCustomNodeNavigation(config)<br/>MermaidEditor: custom primitive-driven entry & focus"]
 
-    Base --> Text
+    Base --> Text & Cust
     Text --> Cont & Atom
 ```
 
-| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `NoticeNode`) & `createInplaceWindowNodeNavigation` (`MermaidEditor`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
+| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `NoticeNode`) & `createCustomNodeNavigation` (`MermaidEditor`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
 | --- | --- | --- | --- |
 | `enterFromAbove` (`ArrowDown` / `Tab`) | Caret at start of block | `CodeBlock` & `NoticeNode`: focuses `controls[0]`; `MermaidEditor`: caret at start of code | Focuses `controls[0]` (`caption` or `url` input) |
 | `enterFromBelow` (`ArrowUp` / `Shift+Tab`) | Caret at end of block | Caret on last line of `contentDOM` body | Focuses `controls[0]` or last control |

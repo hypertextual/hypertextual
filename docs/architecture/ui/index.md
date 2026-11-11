@@ -7,9 +7,10 @@ These pages document the reusable components and hooks in `libs/ui` using the Di
 | [Tree view](tree-view.md)       | Reusable Ark tree behavior with `useKeymap` navigation   |
 | [Context menu](context-menu.md) | Reusable compact action menu                             |
 | [HTMD editor](htmd-editor/index.md)   | Svelte view wrapper for `htmd-ts`'s `HtmdEditor` plugin |
-| [Mermaid editor](htmd-editor/mermaid.md) | Modal diagram editor composing `MermaidViewer` and `WindowInplace` |
+| [Mermaid editor](htmd-editor/mermaid.md) | Modal diagram editor composing `WindowInplace`, `PipWindow`, and `MermaidViewer` |
 | [Mermaid viewer](mermaid-viewer.md) | Interactive Mermaid SVG renderer with pan, zoom, and error retention |
-| [In-place window](window-inplace.md) | Container- or viewport-scoped floating preview window |
+| [In-place window](window-inplace.md) | Reusable block window frame with header toolbar, footer, and fullscreen overlay |
+| [Picture-in-Picture window](pip-window.md) | Container- or viewport-scoped floating preview window |
 | [Breadcrumb](breadcrumb.md)     | Current item path                                        |
 
 `TreeNode`, `ContextMenuPositioner`, and `svelte-node-view` are internal or supporting parts documented with their parent components. Application compositions are documented under [Svelte web app](../svelte-web-app/index.md).

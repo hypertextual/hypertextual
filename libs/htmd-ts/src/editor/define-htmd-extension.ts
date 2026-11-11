@@ -69,10 +69,9 @@ export interface HtmdControlFocusOptions {
 }
 
 export interface HtmdNodeNavigation {
-  kind: 'textblock' | 'container' | 'atom' | 'inplace'
+  kind: 'textblock' | 'container' | 'atom' | 'custom'
   controls?: readonly string[]
   defaultControl?: string
-  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   subtext?: HtmdSubtextSpec
@@ -231,14 +230,12 @@ export function defineHtmdExtension<
  * from above and at the end from below.
  */
 export function createTextblockNavigation(config?: {
-  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   serializeModalText?: (node: PMNode) => string
 }): HtmdNodeNavigation {
   return {
     kind: 'textblock',
-    textObject: config?.textObject,
     multilineTextblock: config?.multilineTextblock,
     expandSelectionRange: config?.expandSelectionRange,
     serializeModalText: config?.serializeModalText,
@@ -271,7 +268,6 @@ export function createTextblockNavigation(config?: {
 export function createContainerNodeNavigation(config: {
   controls: readonly string[]
   defaultControl?: string
-  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   subtext?: HtmdSubtextSpec
@@ -293,7 +289,6 @@ export function createContainerNodeNavigation(config: {
     kind: 'container',
     controls: config.controls,
     defaultControl: config.defaultControl,
-    textObject: config.textObject,
     multilineTextblock: config.multilineTextblock,
     expandSelectionRange: config.expandSelectionRange ?? true,
     subtext: config.subtext,
@@ -338,52 +333,16 @@ export function createContainerNodeNavigation(config: {
 }
 
 /**
- * Creates an `inplace` navigation contract for complex code/diagram blocks
- * (`mermaid`) that render an in-place window preview in edit/select modes,
- * select as a whole block in `normal` mode, and enter at the first line from
- * above or the last line from below in `insert` mode.
+ * Creates a `custom` navigation contract that delegates entry, exit, and
+ * control focus directly to the extension using `CursorManager` and
+ * `SelectionManager` primitives.
  */
-export function createInplaceWindowNodeNavigation(config: {
-  controls: readonly string[]
-  defaultControl?: string
-  textObject?: 'p' | 'c' | 'n' | 'l'
-  multilineTextblock?: boolean
-  expandSelectionRange?: boolean
-  bodyOffset?: number
-  focusControl?: (
-    editor: TiptapEditor,
-    pos: number,
-    node: PMNode,
-    options?: HtmdControlFocusOptions,
-  ) => boolean
-  serializeModalText?: (node: PMNode) => string
-}): HtmdNodeNavigation {
-  const bodyOffset = config.bodyOffset ?? 1
-
+export function createCustomNodeNavigation(
+  config: Omit<HtmdNodeNavigation, 'kind'>,
+): HtmdNodeNavigation {
   return {
-    kind: 'inplace',
-    controls: config.controls,
-    defaultControl: config.defaultControl ?? 'body',
-    textObject: config.textObject ?? 'c',
-    multilineTextblock: config.multilineTextblock ?? true,
-    expandSelectionRange: config.expandSelectionRange ?? true,
-    serializeModalText: config.serializeModalText,
-    enterFromAbove(editor, pos) {
-      const { doc } = editor.state
-      CursorManager.setActiveCompoundBlockPos(editor, pos)
-      const targetPos = Math.min(pos + bodyOffset, doc.content.size)
-      editor.commands.setTextSelection(targetPos)
-      CursorManager.focusEditorView(editor)
-      return true
-    },
-    enterFromBelow(editor, pos, node) {
-      CursorManager.setActiveCompoundBlockPos(editor, pos)
-      const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
-      editor.commands.setTextSelection(endPos)
-      CursorManager.focusEditorView(editor)
-      return true
-    },
-    focusControl: config.focusControl,
+    kind: 'custom',
+    ...config,
   }
 }
 

@@ -113,7 +113,7 @@ stateDiagram-v2
 
 | Component | Responsibility |
 | --- | --- |
-| [Mermaid editor (`MermaidEditor`)](mermaid.md) | Modal diagram viewer (`normal`), line-selectable source view (`select`), live code + `WindowInplace` preview (`insert`), and fullscreen viewer / split-pane editor with keyboard pan and zoom |
+| [Mermaid editor (`MermaidEditor`)](mermaid.md) | Modal diagram viewer (`normal`), line-selectable source view (`select`), live code + `PipWindow` preview (`insert`), and fullscreen `WindowInplace` viewer / split-pane editor with keyboard pan and zoom |
 
 ## Implementation
 

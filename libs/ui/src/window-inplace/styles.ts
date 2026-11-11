@@ -11,29 +11,17 @@ import { cva, type VariantProps } from 'class-variance-authority'
 export const windowInplaceVariants = cva(
   cn(
     windowContentBase,
-    'z-20 flex flex-col overflow-hidden rounded-lg border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur-sm transition-[width,height] duration-150',
+    'relative my-4 flex flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground transition-colors',
   ),
   {
     variants: {
-      scope: {
-        container: 'absolute',
-        viewport: 'fixed z-40',
-      },
-      placement: {
-        'bottom-right': 'right-3 bottom-3',
-        'top-right': 'top-3 right-3',
-        'bottom-left': 'bottom-3 left-3',
-        'top-left': 'top-3 left-3',
-      },
-      minimized: {
-        true: 'h-auto w-40',
-        false: 'w-44 max-w-[calc(100%-1.5rem)]',
+      fullscreen: {
+        true: 'fixed z-40 m-0 rounded-none border-0 shadow-lg outline-none',
+        false: '',
       },
     },
     defaultVariants: {
-      scope: 'container',
-      placement: 'top-right',
-      minimized: false,
+      fullscreen: false,
     },
   },
 )
@@ -42,22 +30,22 @@ export type WindowInplaceVariants = VariantProps<typeof windowInplaceVariants>
 
 export const windowInplaceHeader = cn(
   windowHeaderBase,
-  'flex h-7 shrink-0 items-center justify-between gap-1.5 border-b border-border/70 bg-muted/60 px-2.5 py-1 text-xs select-none data-[minimized=true]:border-b-0',
+  'flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-1.5 text-xs select-none',
 )
 
 export const windowInplaceTitle = cn(
   windowTitleBase,
-  'truncate font-medium text-xs text-muted-foreground',
+  'inline-flex items-center gap-1.5 font-mono text-xs font-medium text-muted-foreground',
 )
 
-export const windowInplaceControls = 'flex items-center gap-0.5'
+export const windowInplaceToolbar = 'flex items-center gap-1'
 
 export const windowInplaceControlButton = cn(
   windowControlBase,
-  'inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+  'inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 )
 
 export const windowInplaceBody = cn(
   windowBodyBase,
-  'relative flex h-28 w-full flex-1 items-center justify-center overflow-hidden bg-background/80 p-2',
+  'relative flex min-h-0 w-full flex-1 flex-col p-0',
 )

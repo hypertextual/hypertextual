@@ -55,7 +55,7 @@ flowchart TD
 | `src/index.ts` | Exports `HtmdEditor`, `HtmdDocument`, `htmdCodec`, `defineHtmdExtension`, navigation presets, `NodeView` types, and error classes. |
 | `src/nodes.ts`, `marks.ts`, `syntax.ts`, `lib.ts` | Own the canonical HTMD node and mark schemas, Markdown parsing/serialization, document validation, and issue recovery. |
 | `src/editor/htmd-document.ts` | Implements `HtmdDocument` (`EditorDocument<JSONContent>`). Extracts the H1 title and maps image URLs between portable paths and display URLs. |
-| `src/editor/define-htmd-extension.ts` | Defines `defineHtmdExtension` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`). |
+| `src/editor/define-htmd-extension.ts` | Defines `defineHtmdExtension` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, `createCustomNodeNavigation`). |
 | `src/editor/build-extensions.ts` | Extends canonical nodes from `nodes.ts`, merges `.configure({ keymap })` overrides, and registers `HtmdNodeNavigation` specs. |
 | `src/editor/htmd-editor.ts` | Implements `HtmdEditor` (`Editor<JSONContent, HtmdCommandMap>`), mounts ProseMirror `EditorView`, and connects `EditorHostServices`. |
 
@@ -129,7 +129,7 @@ editor.mount(containerElement)
 | --- | --- |
 | Editor keyscope | `editor:htmd` (`editor` priority): `Enter` enters a compound block in normal mode; `Escape` returns to normal mode in insert mode. |
 | Extension keyscope | `extension:<name>` (`extension` priority): declarative `Keymap<HtmdCommandContext>`, overridable via `.configure({ keymap })` and `.extend({ keymap })`. |
-| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, `createInplaceWindowNodeNavigation`, or `createAtomNodeNavigation`. |
+| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, or `createCustomNodeNavigation`. |
 | Custom block views | `NodeViewRenderer` (`HtmdNodeViewFactory`) receives `NodeViewProps` (`editor`, `node`, `getPos`, `updateAttributes`, `deleteNode`) and returns `{ dom, contentDOM?, update?, destroy? }`. |
 
 #### 3. Markdown Syntax and Recovery
@@ -155,8 +155,8 @@ editor.mount(containerElement)
 ### Engine Adapters and Extension System
 
 - `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own the canonical HTMD node and mark schemas, Markdown parsing, serialization, and schema validation.
-- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` and the `HtmdNodeNavigation` presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`).
-- `src/editor/extensions/*` contains the 19 HTMD editor extension modules (10 node extensions including `mermaid-node.ts`, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
+- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` and the `HtmdNodeNavigation` presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, `createCustomNodeNavigation`).
+- `src/editor/extensions/*` contains the 19 HTMD editor extension modules (10 node extensions including `mermaid-editor.ts`, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
 - `src/editor/build-extensions.ts` extends the canonical node schemas from `src/nodes.ts` and attaches interactive extension behavior. See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](editor-extensions.md).
 
 ### Testing

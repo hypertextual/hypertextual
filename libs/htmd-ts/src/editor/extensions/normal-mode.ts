@@ -1,11 +1,7 @@
 import type { KeybindingPreset, ModalMotion, ModalTextObjectSpec } from '@cloudvoyant/helical-ui'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
-import {
-  defineHtmdExtension,
-  getNodeNavigation,
-  type HtmdCommandContext,
-} from '../define-htmd-extension.js'
+import { defineHtmdExtension, type HtmdCommandContext } from '../define-htmd-extension.js'
 import {
   collectLeafBlocks,
   collectWords,
@@ -492,6 +488,7 @@ export function executeNormalModeTextObject(
   const defaultTextObjectByType: Record<string, string> = {
     paragraph: 'p',
     heading: 'p',
+    notice: 'n',
     blockquote: 'n',
     listItem: 'l',
     taskItem: 'l',
@@ -503,18 +500,14 @@ export function executeNormalModeTextObject(
 
   if (
     sel instanceof NodeSelection &&
-    (getNodeNavigation(editor, sel.node.type.name)?.textObject ??
-      defaultTextObjectByType[sel.node.type.name]) === kind
+    (sel.node.type.spec.code ? 'c' : defaultTextObjectByType[sel.node.type.name]) === kind
   ) {
     targetNode = sel.node
     targetPos = sel.from
   } else {
     for (let d = $head.depth; d >= 1; d -= 1) {
       const ancestor = $head.node(d)
-      if (
-        (getNodeNavigation(editor, ancestor.type.name)?.textObject ??
-          defaultTextObjectByType[ancestor.type.name]) === kind
-      ) {
+      if ((ancestor.type.spec.code ? 'c' : defaultTextObjectByType[ancestor.type.name]) === kind) {
         targetNode = ancestor
         targetPos = $head.before(d)
         break

@@ -2,7 +2,7 @@
 
 ## Overview
 
-`WindowInplace` (`libs/ui/src/window-inplace/WindowInplace.svelte`) is a reusable floating preview window that anchors inside a parent container (`scope="container"`) or portals to the viewport (`scope="viewport"`). [`MermaidEditor`](htmd-editor/mermaid.md) uses `WindowInplace` to display a live diagram preview at the top-right corner of the code block in `insert` and `select` modes.
+`WindowInplace` (`libs/ui/src/window-inplace/WindowInplace.svelte`) is a reusable in-place block window frame with a header bar (icon, title, right-aligned toolbar controls), a body region, an optional footer slot, and an editor-scoped fullscreen overlay mode (`fullscreen={true}`). [`MermaidEditor`](htmd-editor/mermaid.md) uses `WindowInplace` as its outer block frame across inline and fullscreen views.
 
 ## Design
 
@@ -10,31 +10,24 @@
 
 | Prop | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `title` | `string` | `'Preview'` | Header title or `aria-label` when `showHeader={false}`. |
-| `open` | `boolean` | `true` | Controls whether the window is rendered. |
-| `scope` | `'container' \| 'viewport'` | `'container'` | `'container'` positions absolutely inside the parent; `'viewport'` portals to `document.body`. |
-| `boundaryEl` | `HTMLElement \| null` | `null` | Boundary element for drag clamping when `draggable` is enabled. |
-| `placement` | `'bottom-right' \| 'top-right' \| 'bottom-left' \| 'top-left'` | `'top-right'` | Corner anchor inside the container or viewport. |
-| `showHeader` | `boolean` | `true` | Shows the header bar and window controls. |
-| `minimized` | `boolean` | `false` | Collapses the body to a header pill. |
-| `draggable` | `boolean` | `false` | Enables pointer dragging on the header bar. |
-| `resizable` | `boolean` | `false` | Enables CSS resize handles on the window body. |
-| `onminimizechange` | `(minimized: boolean) => void` | `undefined` | Called when the minimize button is toggled. |
-| `onfullscreen` | `() => void` | `undefined` | Called when the fullscreen button is clicked. |
-| `actions` | `Snippet` | `undefined` | Extra header buttons rendered before minimize and fullscreen. |
-| `children` | `Snippet` | — | Window body content. |
-| `class` | `string` | `undefined` | Caller class overrides merged via `cn`. |
+| `title` | `string \| Snippet` | `undefined` | Header title text or snippet. |
+| `icon` | `Snippet` | `undefined` | Icon rendered before the title. |
+| `fullscreen` | `boolean` (`$bindable`) | `false` | Expands the window to fill the enclosing `[role="region"]` or `.editor-container`. |
+| `toolbar` | `Snippet` | `undefined` | Toolbar controls rendered on the right side of the header. |
+| `footer` | `Snippet` | `undefined` | Optional footer rendered below the body (e.g. error bar). |
+| `children` | `Snippet` | — | Main window body content. |
+| `class` | `string` | `undefined` | Caller class overrides merged onto the root container. |
+| `bodyClass` | `string` | `undefined` | Caller class overrides merged onto the body container. |
 
 ### Layout
 
 ```text
 +-------------------------------------------------------------------+
-| Parent Container (position: relative, min-h-64)                   |
-|                                         +-----------------------+ |
-|                                         | [Client] ---> [Server]| |
-|                                         |                  |    | |
-|                                         |                [(DB)] | |
-|                                         +-----------------------+ |
+| [icon] Title                                         [Toolbar...] |
++-------------------------------------------------------------------+
+| Body content                                                      |
++-------------------------------------------------------------------+
+| Optional footer                                                   |
 +-------------------------------------------------------------------+
 ```
 
@@ -42,15 +35,12 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Expanded: open = true, minimized = false
-    Expanded --> Dragging: pointer down on header
-    Dragging --> Expanded: pointer up
-    Expanded --> Minimized: click Minimize
-    Minimized --> Expanded: click Expand
+    [*] --> Inline: fullscreen = false
+    Inline --> Fullscreen: fullscreen = true
+    Fullscreen --> Inline: fullscreen = false
 ```
 
 ### Behavior
 
-- **Container scope**: Renders inside the parent container (`position: absolute`) anchored `12px` from the chosen corner (`w-44`).
-- **Headerless mode**: When `showHeader={false}`, omits the title bar so all action buttons stay in the parent block's toolbar.
-- **Accessibility**: Uses `role="group"` with `aria-label={title}` so parent `.closest('[role="region"]')` lookups always resolve the outer article scroll region.
+- **Inline mode**: Renders as a bordered block card (`rounded-lg border border-border bg-card`) inside the document flow.
+- **Fullscreen mode**: When `fullscreen={true}`, measures the enclosing `[role="region"]` or `.editor-container` via `ResizeObserver` and locks its scroll overflow while fixed over the editor pane.

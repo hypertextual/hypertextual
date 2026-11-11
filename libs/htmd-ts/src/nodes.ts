@@ -497,7 +497,17 @@ export const Mermaid = Node.create({
   defining: true,
   selectable: true,
   parseHTML() {
-    return [{ tag: 'pre[data-type="mermaid"]', preserveWhitespace: 'full' }]
+    return [
+      { tag: 'pre[data-type="mermaid"]', preserveWhitespace: 'full' },
+      {
+        tag: 'pre',
+        preserveWhitespace: 'full',
+        getAttrs: (element) => {
+          const code = (element as HTMLElement).querySelector('code')
+          return code?.classList.contains('language-mermaid') ? {} : false
+        },
+      },
+    ]
   },
   renderHTML({ HTMLAttributes }) {
     return [
@@ -508,6 +518,9 @@ export const Mermaid = Node.create({
       }),
       ['code', 0],
     ]
+  },
+  parseMarkdown(token, h) {
+    return h.createNode('mermaid', {}, token.text ? [h.createTextNode(token.text)] : [])
   },
   renderMarkdown(node) {
     const text = (node.content ?? []).map((child) => child.text ?? '').join('')
@@ -623,7 +636,7 @@ export function adaptNodes(extensions: AnyExtension[]): AnyExtension[] {
     if (extension.name === 'codeBlock')
       return extension.configure({ defaultLanguage: 'javascript' }).extend({
         parseMarkdown(token, h) {
-          const language = String(token.lang || 'javascript')
+          const language = String(token.lang || 'javascript').trim()
           if (language === 'mermaid') {
             return h.createNode('mermaid', {}, token.text ? [h.createTextNode(token.text)] : [])
           }

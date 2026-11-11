@@ -19,7 +19,6 @@
     onfocus,
     onkeydown,
     class: className,
-    ...rest
   }: MermaidViewerProps = $props()
 
   // State ---------------------------------------------------------------------
@@ -215,15 +214,10 @@
   onpointermove={handleCanvasPointerMove}
   onpointerup={handleCanvasPointerUp}
   onpointercancel={handleCanvasPointerUp}
-  {...rest}
 >
   {#if displaySvg}
     <div
       data-mermaid-canvas=""
-      data-mermaid-fullscreen-canvas={rest['data-mermaid-fullscreen-viewer'] !== undefined ||
-      rest['data-mermaid-split-preview'] !== undefined
-        ? ''
-        : undefined}
       class={mermaidViewerCanvasVariants({ fit })}
       style={canvasTransformStyle}
     >

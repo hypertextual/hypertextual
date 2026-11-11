@@ -694,7 +694,7 @@ test.describe(
         await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
 
         // Act: drag-pan the diagram canvas with the mouse
-        const viewer = mermaidNode.locator('[data-mermaid-viewer]')
+        const viewer = mermaidNode.locator('[data-mermaid-viewport]')
         const viewerBox = await viewer.boundingBox()
         await page.mouse.move(
           viewerBox!.x + viewerBox!.width / 2,
@@ -738,7 +738,7 @@ test.describe(
 
         // Assert
         const fullscreen = page.locator(
-          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="viewer"]',
+          '[data-mermaid-node][data-mermaid-fullscreen="true"][data-mermaid-mode="normal"]',
         )
         await expect(fullscreen).toBeVisible()
         const regionBox = await editorRegion.boundingBox()
@@ -916,13 +916,13 @@ test.describe(
         await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
           'flowchart',
         )
-        const pip = mermaidNode.locator('[data-window-inplace]')
+        const pip = mermaidNode.locator('[data-pip-window]')
         await expect(pip).toBeVisible()
-        await expect(pip).toHaveAttribute('data-window-inplace-placement', 'top-right')
-        await expect(pip.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(pip).toHaveAttribute('data-pip-placement', 'top-right')
+        await expect(pip.locator('[data-pip-header]')).toHaveCount(0)
         const pipSvg = pip.locator('[data-mermaid-canvas] svg')
         await expect(pipSvg).toBeVisible()
-        const pipBodyBox = await pip.locator('[data-window-inplace-body]').boundingBox()
+        const pipBodyBox = await pip.locator('[data-pip-body]').boundingBox()
         const pipSvgBox = await pipSvg.boundingBox()
         expect(pipSvgBox!.width).toBeLessThanOrEqual(pipBodyBox!.width)
         expect(pipSvgBox!.height).toBeLessThanOrEqual(pipBodyBox!.height)
@@ -949,10 +949,10 @@ test.describe(
         await page.keyboard.press('j')
         await page.keyboard.press('j')
         await mermaidNode.getByRole('button', { name: 'Edit Mermaid diagram' }).click()
-        const pip = mermaidNode.locator('[data-window-inplace]')
+        const pip = mermaidNode.locator('[data-pip-window]')
 
         // Act
-        await pip.locator('[data-pip-diagram]').dispatchEvent('wheel', {
+        await pip.locator('[data-mermaid-viewport]').dispatchEvent('wheel', {
           deltaY: -100,
           ctrlKey: true,
         })
@@ -990,11 +990,11 @@ test.describe(
 
         // Assert: split-screen view opens with code on the left and preview on the right
         const splitFullscreen = page.locator(
-          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="split"]',
+          '[data-mermaid-node][data-mermaid-fullscreen="true"][data-mermaid-mode="insert"]',
         )
         await expect(splitFullscreen).toBeVisible()
-        const splitCodePane = splitFullscreen.locator('[data-mermaid-split-pane="code"]')
-        const splitPreview = splitFullscreen.locator('[data-mermaid-split-preview]')
+        const splitCodePane = splitFullscreen.locator('[data-mermaid-code]')
+        const splitPreview = splitFullscreen.locator('[data-mermaid-viewport]')
         await expect(splitCodePane).toHaveAttribute('data-pane-focused', 'true')
         const surfaceBox = await splitFullscreen.boundingBox()
         const codeBox = await splitCodePane.boundingBox()
@@ -1029,7 +1029,7 @@ test.describe(
         await page.keyboard.type('  ??? invalid syntax\n')
 
         // Assert: keeps the last valid diagram and shows a bottom error bar
-        const errorFooter = splitFullscreen.locator('[data-mermaid-footer][data-mermaid-error]')
+        const errorFooter = splitFullscreen.locator('[data-mermaid-error]')
         await expect(errorFooter).toBeVisible()
         await expect(splitPreview.locator('[data-mermaid-canvas] svg')).toBeVisible()
 
@@ -1038,7 +1038,7 @@ test.describe(
 
         // Assert: exits to view mode and switches to fullscreen preview
         const viewerFullscreen = page.locator(
-          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="viewer"]',
+          '[data-mermaid-node][data-mermaid-fullscreen="true"][data-mermaid-mode="normal"]',
         )
         await expect(badge).toHaveText('helix · normal')
         await expect(viewerFullscreen).toBeVisible()
@@ -1081,11 +1081,11 @@ test.describe(
         await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
           'flowchart',
         )
-        const pip = mermaidNode.locator('[data-window-inplace]')
+        const pip = mermaidNode.locator('[data-pip-window]')
         await expect(pip).toBeVisible()
-        await expect(pip).toHaveAttribute('data-window-inplace-scope', 'container')
-        await expect(pip).toHaveAttribute('data-window-inplace-placement', 'top-right')
-        await expect(pip.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(pip).toHaveAttribute('data-pip-scope', 'container')
+        await expect(pip).toHaveAttribute('data-pip-placement', 'top-right')
+        await expect(pip.locator('[data-pip-header]')).toHaveCount(0)
         await expect(pip.locator('[data-mermaid-canvas] svg')).toBeVisible()
         const selectedSpan = mermaidNode.locator(
           '[data-mermaid-code] [data-pm-modal-selection="select"]',

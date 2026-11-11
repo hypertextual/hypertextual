@@ -2,7 +2,7 @@
 
 ## Overview
 
-`MermaidEditor` (`libs/ui/src/editor/components/MermaidEditor.svelte`) is the Svelte 5 `NodeView` for `mermaid` blocks (`libs/htmd-ts/src/editor/extensions/mermaid-editor.ts` and `libs/htmd-ts/src/nodes.ts`). It composes [`MermaidViewer`](../mermaid-viewer.md) and [`WindowInplace`](../window-inplace.md) across `normal`, `select`, and `insert` modes.
+`MermaidEditor` (`libs/ui/src/editor/components/MermaidEditor.svelte`) is the Svelte 5 `NodeView` for `mermaid` blocks (`libs/htmd-ts/src/editor/extensions/mermaid-editor.ts` and `libs/htmd-ts/src/nodes.ts`). It composes [`WindowInplace`](../window-inplace.md), [`PipWindow`](../pip-window.md), and [`MermaidViewer`](../mermaid-viewer.md) across `normal`, `select`, and `insert` modes.
 
 ## Design
 
@@ -36,16 +36,18 @@ const nodeViews = {
 ```mermaid
 flowchart TD
     Codec["htmd-ts: nodes.ts<br/>```mermaid <-> mermaid node"]
-    Ext["htmd-ts: MermaidEditor (mermaid-editor.ts)<br/>createInplaceWindowNodeNavigation + Lowlight grammar"]
+    Ext["htmd-ts: MermaidEditor (mermaid-editor.ts)<br/>createCustomNodeNavigation + Lowlight grammar"]
     Adapter["libs/ui: svelteNodeView"]
     Editor["libs/ui: MermaidEditor.svelte"]
+    Inplace["libs/ui: WindowInplace.svelte<br/>Block frame + toolbar + fullscreen"]
+    Pip["libs/ui: PipWindow.svelte<br/>Top-right PiP preview"]
     Viewer["libs/ui: MermaidViewer.svelte<br/>SVG rendering + zoom and pan"]
-    Inplace["libs/ui: WindowInplace.svelte<br/>Top-right in-place preview"]
 
     Codec --> Ext --> Adapter --> Editor
-    Editor -->|"normal mode or fullscreen"| Viewer
-    Editor -->|"insert / select inline"| Inplace
-    Inplace --> Viewer
+    Editor --> Inplace
+    Inplace -->|"normal mode or fullscreen"| Viewer
+    Inplace -->|"insert / select inline"| Pip
+    Pip --> Viewer
 ```
 
 ### Layout
@@ -64,7 +66,7 @@ flowchart TD
 +-----------------------------------------------------------------------+
 ```
 
-#### 2. Insert & Select Mode (Inline Code + Top-Right `WindowInplace` Preview)
+#### 2. Insert & Select Mode (Inline Code + Top-Right `PipWindow` Preview)
 
 ```text
 +-----------------------------------------------------------------------+
@@ -125,7 +127,7 @@ stateDiagram-v2
 ```
 
 - **Document State**: `node.textContent` holds the Mermaid source. `<code data-node-view-content>` stays mounted in the DOM and uses `.sr-only` in `normal` mode so ProseMirror preserves its `contentDOM`.
-- **Rendering & Viewport**: [`MermaidViewer`](../mermaid-viewer.md) debounces `renderMermaidSource(code)`, retains the last valid SVG during syntax errors, and manages `{ scale, panX, panY }` across inline, `WindowInplace`, and fullscreen views.
+- **Rendering & Viewport**: [`MermaidViewer`](../mermaid-viewer.md) debounces `renderMermaidSource(code)`, retains the last valid SVG during syntax errors, and manages `{ scale, panX, panY }` across inline, `PipWindow`, and fullscreen views.
 
 ### Behavior
 
@@ -133,23 +135,24 @@ stateDiagram-v2
   - When the user moves onto the block (`j`, `k`), the editor selects the whole diagram (`NodeSelection`) and hides the raw code.
   - When the user drags the diagram or presses `+`, `-`, `0`, or `Ctrl+h/j/k/l`, the viewer pans and zooms.
 - **Insert mode**:
-  - When the user presses `Enter`, `i`, or clicks `Edit`, the editor shows syntax-highlighted code and the top-right `WindowInplace` preview.
+  - When the user presses `Enter`, `i`, or clicks `Edit`, the editor shows syntax-highlighted code and the top-right `PipWindow` preview.
   - When the user presses `ArrowUp` on line 1, focus moves to the toolbar `Copy` button; `Tab` moves to `Fullscreen`, and `ArrowUp` moves to the block above.
-  - When the user types invalid Mermaid syntax, `MermaidViewer` keeps the last valid diagram and `MermaidEditor` shows a bottom error bar.
+  - When the user types invalid Mermaid syntax, `MermaidViewer` keeps the last valid diagram and `WindowInplace` shows a bottom error bar.
 - **Select mode**:
-  - When the user presses `x` or `v`, the editor reveals the code and `WindowInplace` preview and selects individual source lines.
+  - When the user presses `x` or `v`, the editor reveals the code and `PipWindow` preview and selects individual source lines.
 - **Fullscreen**:
-  - When the user presses `Ctrl+w z` (or `Space w z` / `Space m f` / `f`), the block expands to fill the editor pane (`viewer` in `normal` mode, 50/50 `split` in `insert`/`select` mode).
+  - When the user presses `Ctrl+w z` (or `Space w z` / `Space m f` / `f`), `WindowInplace` expands to fill the editor pane (`viewer` in `normal` mode, 50/50 `split` in `insert`/`select` mode).
   - When the user presses `Escape` in split screen, the editor exits to `normal` mode and switches to fullscreen preview; a second `Escape` minimizes fullscreen back to the inline block.
 
 ## Implementation
 
 ### Design Decisions
 
-- **Separate `mermaid` node from `codeBlock`**: `libs/htmd-ts/src/nodes.ts` parses ```` ```mermaid ```` fences into `mermaid` nodes and disallows `language === 'mermaid'` on `codeBlock` so diagrams use `createInplaceWindowNodeNavigation` (`kind: 'inplace'`) instead of plain code-block navigation.
+- **Separate `mermaid` node from `codeBlock`**: `libs/htmd-ts/src/nodes.ts` parses ```` ```mermaid ```` fences into `mermaid` nodes and disallows `language === 'mermaid'` on `codeBlock` so diagrams use `createCustomNodeNavigation` (`kind: 'custom'`) instead of plain code-block navigation.
 - **Keep `[data-node-view-content]` mounted**: ProseMirror requires `contentDOM` to remain in the DOM across mode changes, so `MermaidEditor` hides the code container with `sr-only` in `normal` mode rather than unmounting it.
 - **References**:
   - [In-place window (`WindowInplace`)](../window-inplace.md)
+  - [Picture-in-Picture window (`PipWindow`)](../pip-window.md)
   - [Mermaid viewer (`MermaidViewer`)](../mermaid-viewer.md)
   - [HTMD editor (`HtmdEditor`)](index.md)
   - [Keybindings](../../../keybindings/index.md)
