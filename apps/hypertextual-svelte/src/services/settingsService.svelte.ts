@@ -1,8 +1,10 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { CommandStyle } from '@cloudvoyant/helical-ui'
-import { themeService, type ThemeMode, type ThemeName } from '@hypertextual/ui'
+import { themeService, type ThemeMode, type ThemeName } from '@cloudvoyant/helical-svelte'
 
+// TODO(HYPE-176): Move settings persistence from window.localStorage to filesystem config via hyped-fs
+// (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
 const PANE_OUTLINE_KEY = 'hypertextual.settings.paneOutline'
 const CLICK_TO_INSERT_KEY = 'hypertextual.settings.clickToInsert'
 const THEME_MODE_KEY = 'hypertextual.settings.themeMode'
@@ -12,6 +14,8 @@ const COMMAND_STYLE_KEY = 'hypertextual.settings.commandStyle'
 /** Normalized application command surface style (`'palette'` or `'menu'`). */
 export type AppCommandStyle = 'palette' | 'menu'
 
+// TODO(HYPE-176): Replace window.localStorage read/write helpers with atomic filesystem config persistence
+// via hyped-fs (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
 function readSetting<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
   try {
@@ -47,6 +51,9 @@ export class SettingsService {
     }
     const initialTheme = readSetting<ThemeName>(THEME_KEY, 'hypertextual')
     const initialMode = readSetting<ThemeMode>(THEME_MODE_KEY, 'system')
+    themeService.registerThemes([{ name: 'hypertextual', label: 'Hypertextual' }], {
+      defaultTheme: 'hypertextual',
+    })
     themeService.setTheme(initialTheme, false)
     themeService.setThemeMode(initialMode, false)
     this.syncTauriTheme(initialMode)

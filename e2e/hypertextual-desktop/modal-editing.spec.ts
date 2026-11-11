@@ -787,7 +787,7 @@ test.describe(
 
     test.describe('When the user updates command style and appearance settings via commands', () => {
       test(
-        'it applies DOM side effects, persists settings across reloads, and captures optional screenshots',
+        'it applies theme class, dark mode class, pane outline attribute, and command surface style to the DOM',
         { tag: '@smoke' },
         async ({ page }, testInfo) => {
           // Arrange
@@ -805,7 +805,7 @@ test.describe(
             ),
           ).toBe(true)
 
-          // Act: open CommandPalette via ':' and switch command style to CommandMenu
+          // Act
           await page.keyboard.press(':')
           await expect(palette).toBeVisible()
           await captureScreenshot(page, testInfo, 'command-palette')
@@ -813,7 +813,6 @@ test.describe(
           await page.keyboard.press('Enter')
           await expect(palette).toHaveCount(0)
 
-          // Act: apply theme, color mode, and pane-outline settings through CommandMenu
           await page.keyboard.press(':')
           await expect(menu).toBeVisible()
           await captureScreenshot(page, testInfo, 'command-menu')
@@ -831,12 +830,43 @@ test.describe(
           await page.keyboard.press('Enter')
           await expect(menu).toHaveCount(0)
 
+          // Assert
           await expect(html).toHaveClass(/\btheme-catppuccin\b/)
           await expect(html).toHaveClass(/\bdark\b/)
           await expect(shell).toHaveAttribute('data-pane-outline', 'false')
           await captureScreenshot(page, testInfo, 'theme-catppuccin-dark')
+        },
+      )
 
-          // Act: reload to verify persistence
+      test(
+        'it persists command style, theme, color mode, and pane outline settings across reloads',
+        { tag: '@smoke' },
+        async ({ page }) => {
+          // Arrange
+          const html = page.locator('html')
+          const shell = page.locator('.workspace-shell')
+          const palette = page.getByTestId('command-palette')
+          const paletteInput = page.getByTestId('command-palette-input')
+          const menu = page.getByTestId('command-menu')
+          const menuInput = page.getByTestId('command-menu-input')
+
+          await page.keyboard.press(':')
+          await paletteInput.fill('Command Menu')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('theme catppuccin')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('mode dark')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('pane-outline off')
+          await page.keyboard.press('Enter')
+
+          // Act
           await page.reload()
 
           // Assert

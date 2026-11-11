@@ -8,8 +8,8 @@
     SelectContent,
     SelectItem,
     SelectItemText,
+    ThemeToggle,
   } from '@cloudvoyant/helical-svelte'
-  import { ThemeToggle } from '@hypertextual/ui'
   import { PanelLeft, ChevronDown } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
 

@@ -27,7 +27,6 @@ export class WorkspaceService {
   pendingParent = $state('')
   renamingPath = $state<string | null>(null)
   sidebarOpen = $state(true)
-  commandOpen = $state(false)
   refreshFolder = $state<FolderRefresh | undefined>()
   treeVersion = $state(0)
   busy = $state(false)

@@ -5,8 +5,7 @@ import {
   type KeybindingPreset,
   type KeymapMode,
 } from '@cloudvoyant/helical-ui'
-import type { WhichKeyNode } from '@cloudvoyant/helical-svelte'
-import { themeService, type ThemeMode } from '@hypertextual/ui'
+import { themeService, type ThemeMode, type WhichKeyNode } from '@cloudvoyant/helical-svelte'
 import type { WorkspaceService } from './workspaceService.svelte'
 
 function leaf(
@@ -237,7 +236,6 @@ export class HotkeyService {
   }
 
   readonly commands: Record<string, () => boolean> = {
-    'command.open': () => this.openCommand(),
     'workspace.toggleExplorer': () => this.toggleExplorer(),
     'settings.togglePaneOutline': () => {
       this.workspace.settings.togglePaneOutline()
@@ -279,23 +277,6 @@ export class HotkeyService {
     return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null
   }
 
-  private scheduleAfterClose(callback: () => void): void {
-    void tick().then(() => {
-      if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => callback())
-        })
-      } else {
-        callback()
-      }
-    })
-  }
-
-  openCommand(): boolean {
-    this.workspace.commandOpen = true
-    return true
-  }
-
   private createNewArticle(): boolean {
     const editor = this.workspace.editor
     const previousPath = editor.selected?.path
@@ -305,14 +286,12 @@ export class HotkeyService {
         editor.selected?.path &&
         editor.selected.path !== previousPath
       ) {
-        this.scheduleAfterClose(() => {
-          if (editor.setEditable(true)) {
-            this.controller?.setMode('insert')
-            void tick().then(() => {
-              document.querySelector<HTMLElement>('.ProseMirror')?.focus()
-            })
-          }
-        })
+        if (editor.setEditable(true)) {
+          this.controller?.setMode('insert')
+          void tick().then(() => {
+            document.querySelector<HTMLElement>('.ProseMirror')?.focus()
+          })
+        }
       }
     })
     return true
@@ -320,7 +299,7 @@ export class HotkeyService {
 
   private createNewFolder(): boolean {
     if (!this.workspace.sidebarOpen) this.workspace.sidebarOpen = true
-    this.scheduleAfterClose(() => {
+    void tick().then(() => {
       this.workspace.startCreate('directory')
     })
     return true
@@ -335,19 +314,25 @@ export class HotkeyService {
     this.workspace.sidebarOpen = nextOpen
     const targetPane = nextOpen ? 'workspace' : 'article'
     // Wait for Sidebar's pane registration effect to settle before focusing (see CLO-209).
-    this.scheduleAfterClose(() => {
+    void tick().then(() => {
       this.controller?.focusPane(targetPane)
     })
     return true
   }
 
   focusWorkspacePane(): boolean {
-    if (!this.workspace.sidebarOpen) this.workspace.sidebarOpen = true
-    this.scheduleAfterClose(() => {
-      if (!this.controller?.focusPane('workspace')) {
-        document.querySelector<HTMLElement>('#workspace-sidebar [role="treeitem"]')?.focus()
-      }
-    })
+    if (!this.workspace.sidebarOpen) {
+      this.workspace.sidebarOpen = true
+      void tick().then(() => {
+        if (!this.controller?.focusPane('workspace')) {
+          document.querySelector<HTMLElement>('#workspace-sidebar [role="treeitem"]')?.focus()
+        }
+      })
+      return true
+    }
+    if (!this.controller?.focusPane('workspace')) {
+      document.querySelector<HTMLElement>('#workspace-sidebar [role="treeitem"]')?.focus()
+    }
     return true
   }
 
@@ -383,9 +368,7 @@ export class HotkeyService {
           active: selected?.path === entry.path,
           onSelect: () => {
             void this.workspace.select(entry.path).then(() => {
-              this.scheduleAfterClose(() => {
-                this.focusArticlePane()
-              })
+              this.focusArticlePane()
             })
           },
         }
@@ -403,9 +386,7 @@ export class HotkeyService {
         keywords: ['create', 'file', 'document', 'markdown', 'note'],
         disabled: cannotCreate,
         onSelect: () => {
-          this.scheduleAfterClose(() => {
-            this.createNewArticle()
-          })
+          this.createNewArticle()
         },
       },
       {
@@ -514,9 +495,7 @@ export class HotkeyService {
         shortcut: 'Control+w l',
         keywords: ['editor', 'content', 'pane', 'window'],
         onSelect: () => {
-          this.scheduleAfterClose(() => {
-            this.focusArticlePane()
-          })
+          this.focusArticlePane()
         },
       },
       {
@@ -529,9 +508,7 @@ export class HotkeyService {
         shortcut: 'Space j',
         keywords: ['goto', 'hint', 'label', 'navigation'],
         onSelect: () => {
-          this.scheduleAfterClose(() => {
-            this.controller?.startJumpMode()
-          })
+          this.controller?.startJumpMode()
         },
       },
       {
@@ -761,9 +738,7 @@ export class HotkeyService {
         shortcut: 'Space ?',
         keywords: ['shortcuts', 'chords', 'which-key', 'reference'],
         onSelect: () => {
-          this.scheduleAfterClose(() => {
-            this.controller?.openExplorer()
-          })
+          this.controller?.openExplorer()
         },
       },
     ]
@@ -771,7 +746,7 @@ export class HotkeyService {
 
   handleModeChange(nextMode: KeymapMode): void {
     if (typeof document === 'undefined') return
-    if (this.workspace.commandOpen || this.controller?.getState().explorerOpen) return
+    if (this.controller?.getState().explorerOpen) return
     if (nextMode === 'insert') {
       const active = document.activeElement
       if (
