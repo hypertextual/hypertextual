@@ -1243,13 +1243,17 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         const menu = page.locator('[data-slash-menu-scroll]')
 
         // Act
-        for (let index = 0; index < 30; index++) await page.keyboard.press('ArrowDown')
+        for (let index = 0; index < 14; index++) await page.keyboard.press('ArrowDown')
 
         // Assert
         const selected = page.locator('[data-slash-selected]')
         await expect(selected).toContainText('Bookmark')
         await expect(selected).toBeInViewport()
         await expect.poll(() => menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+        await page.keyboard.press('ArrowDown')
+        await expect(selected).toContainText('Heading 1')
+        await page.keyboard.press('ArrowUp')
+        await expect(selected).toContainText('Bookmark')
 
         // Act
         await page.keyboard.press('Enter')

@@ -46,7 +46,7 @@ export const mermaidTitle =
 export const mermaidToolbar = 'flex items-center gap-1'
 
 export const mermaidToolbarButton =
-  'inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none'
+  'inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 export const mermaidViewerCanvas =
   'relative flex min-h-64 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'

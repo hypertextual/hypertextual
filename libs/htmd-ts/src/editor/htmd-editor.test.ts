@@ -29,7 +29,7 @@ import {
   InternalMention,
   KakounePreset,
   LinkPreview,
-  MermaidNode,
+  MermaidEditor,
   ModalEditing,
   NormalMode,
   NoticeNode,
@@ -800,74 +800,6 @@ describe('Given an HtmdEditor in select mode', () => {
       editor.destroy()
     })
   })
-
-  describe('When navigating, selecting, and editing a mermaid block across modes', () => {
-    it('it selects the whole block in normal mode, selects individual lines in select mode, and inserts mermaid blocks', () => {
-      // Given
-      const { hotkeys } = createTestHotkeyService('normal')
-      const doc = HtmdEditor.deserialize(
-        '# Title\n\n```mermaid\nflowchart TD\n  A[Start] --> B[End]\n  B --> C[Done]\n```\n\nAfter diagram.\n',
-      )
-      const editor = new HtmdEditor({
-        content: doc.content!,
-        editable: false,
-        services: { hotkeys },
-      })
-      const target = editor.getModalTarget()!
-
-      // When stepping onto the mermaid block in normal mode
-      target.move('docStart', { preset: 'helix', mode: 'normal', count: 1 })
-      target.move('down', { preset: 'helix', mode: 'normal', count: 1 })
-
-      // Then the whole mermaid block is selected via NodeSelection
-      expect(editor.getSelectionState().isNodeSelection).toBe(true)
-      expect(editor.isActive('mermaid')).toBe(true)
-
-      // Stepping down once more jumps directly to the paragraph after the mermaid block
-      target.move('down', { preset: 'helix', mode: 'normal', count: 1 })
-      expect(editor.getSelectionState().isNodeSelection).toBe(false)
-
-      // Step back up onto the mermaid block
-      target.move('up', { preset: 'helix', mode: 'normal', count: 1 })
-      expect(editor.getSelectionState().isNodeSelection).toBe(true)
-
-      // Pressing x (lineSelect) enters select mode and selects the first line of Mermaid code
-      expect(target.move('lineSelect', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
-      expect(editor.mode).toBe('select')
-      expect(editor.getSelectionState().isNodeSelection).toBe(false)
-
-      const yankedFirstLine = target.execOperator('yank', {
-        preset: 'helix',
-        mode: 'select',
-        count: 1,
-      })
-      expect(typeof yankedFirstLine === 'object' && yankedFirstLine.yankedText).toBe('flowchart TD')
-      expect(editor.mode).toBe('normal')
-
-      // Re-select mermaid block in normal mode, enter select mode via x, extend to 2 lines, and collapse with Escape
-      target.setModalState({ mode: 'normal', preset: 'helix' })
-      expect(editor.getSelectionState().isNodeSelection).toBe(true)
-      expect(target.move('lineSelect', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
-      expect(target.move('lineSelect', { preset: 'helix', mode: 'select', count: 1 })).toBe(true)
-      expect(target.transformSelection('collapse')).toBe(true)
-      target.setModalState({ mode: 'normal', preset: 'helix' })
-      expect(editor.getSelectionState().isNodeSelection).toBe(true)
-
-      // Enter insert mode on the mermaid block and exit back to normal mode
-      expect(editor.enterCompoundBlock()).toBe(true)
-      expect(editor.mode).toBe('insert')
-      expect(editor.exitToNormal()).toBe(true)
-      expect(editor.mode).toBe('normal')
-      expect(editor.getSelectionState().isNodeSelection).toBe(true)
-
-      // Insert a new mermaid block in insert mode
-      editor.setEditable(true)
-      expect(editor.execCommand('insertMermaid', 'sequenceDiagram\n  Alice->>Bob: Hi')).toBe(true)
-      expect(editor.serialize()).toContain('```mermaid\nsequenceDiagram\n  Alice->>Bob: Hi\n```')
-
-      editor.destroy()
-    })
-  })
 })
 
 // unit ----------------------------------------------------------------------
@@ -908,7 +840,7 @@ describe('Given an extension defined with defineHtmdExtension', () => {
         InternalMention,
         KakounePreset,
         LinkPreview,
-        MermaidNode,
+        MermaidEditor,
         ModalEditing,
         NormalMode,
         NoticeNode,

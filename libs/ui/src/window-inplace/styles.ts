@@ -8,7 +8,7 @@ import {
 } from '@cloudvoyant/helical-ui'
 import { cva, type VariantProps } from 'class-variance-authority'
 
-export const pipWindowVariants = cva(
+export const windowInplaceVariants = cva(
   cn(
     windowContentBase,
     'z-20 flex flex-col overflow-hidden rounded-lg border border-border bg-popover/95 text-popover-foreground shadow-md backdrop-blur-sm transition-[width,height] duration-150',
@@ -38,26 +38,26 @@ export const pipWindowVariants = cva(
   },
 )
 
-export type PipWindowVariants = VariantProps<typeof pipWindowVariants>
+export type WindowInplaceVariants = VariantProps<typeof windowInplaceVariants>
 
-export const pipWindowHeader = cn(
+export const windowInplaceHeader = cn(
   windowHeaderBase,
   'flex h-7 shrink-0 items-center justify-between gap-1.5 border-b border-border/70 bg-muted/60 px-2.5 py-1 text-xs select-none data-[minimized=true]:border-b-0',
 )
 
-export const pipWindowTitle = cn(
+export const windowInplaceTitle = cn(
   windowTitleBase,
   'truncate font-medium text-xs text-muted-foreground',
 )
 
-export const pipWindowControls = 'flex items-center gap-0.5'
+export const windowInplaceControls = 'flex items-center gap-0.5'
 
-export const pipWindowControlButton = cn(
+export const windowInplaceControlButton = cn(
   windowControlBase,
-  'inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+  'inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
 )
 
-export const pipWindowBody = cn(
+export const windowInplaceBody = cn(
   windowBodyBase,
   'relative flex h-28 w-full flex-1 items-center justify-center overflow-hidden bg-background/80 p-2',
 )

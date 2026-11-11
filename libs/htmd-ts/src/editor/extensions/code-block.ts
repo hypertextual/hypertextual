@@ -57,6 +57,7 @@ export const CodeBlock = defineHtmdExtension<CodeBlockOptions>({
     createContainerNodeNavigation({
       controls: [LANG_TRIGGER_SELECTOR],
       defaultControl: 'language',
+      textObject: 'c',
       multilineTextblock: true,
       expandSelectionRange: true,
       bodyOffset: 1,
@@ -72,9 +73,7 @@ export const CodeBlock = defineHtmdExtension<CodeBlockOptions>({
             return true
           }
         }
-        editor.commands.setTextSelection(pos + 1)
-        editor.view?.focus()
-        return true
+        return focusTextPosition(editor, pos + 1)
       },
     }),
   keymap() {

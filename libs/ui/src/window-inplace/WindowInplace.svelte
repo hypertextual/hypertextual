@@ -3,14 +3,14 @@
   import { cn } from '@cloudvoyant/helical-ui'
   import { Maximize2, Minimize2, Minus } from 'lucide-svelte'
   import {
-    pipWindowBody,
-    pipWindowControlButton,
-    pipWindowControls,
-    pipWindowHeader,
-    pipWindowTitle,
-    pipWindowVariants,
+    windowInplaceBody,
+    windowInplaceControlButton,
+    windowInplaceControls,
+    windowInplaceHeader,
+    windowInplaceTitle,
+    windowInplaceVariants,
   } from './styles'
-  import type { PipWindowProps } from './types'
+  import type { WindowInplaceProps } from './types'
 
   // Props ---------------------------------------------------------------------
   let {
@@ -28,7 +28,7 @@
     actions,
     children,
     class: className,
-  }: PipWindowProps = $props()
+  }: WindowInplaceProps = $props()
 
   // State ---------------------------------------------------------------------
   let rootEl = $state<HTMLDivElement | null>(null)
@@ -39,7 +39,7 @@
   // Derived -------------------------------------------------------------------
   const rootClass = $derived(
     cn(
-      pipWindowVariants({ scope, placement, minimized }),
+      windowInplaceVariants({ scope, placement, minimized }),
       resizable && !minimized ? 'resize overflow-auto' : undefined,
       className,
     ),
@@ -106,9 +106,13 @@
   <Portal disabled={scope !== 'viewport'}>
     <div
       bind:this={rootEl}
-      role="region"
+      role="group"
       aria-label={title}
       contenteditable={false}
+      data-window-inplace=""
+      data-window-inplace-scope={scope}
+      data-window-inplace-placement={placement}
+      data-window-inplace-minimized={minimized ? 'true' : 'false'}
       data-pip-window=""
       data-pip-scope={scope}
       data-pip-placement={placement}
@@ -120,50 +124,56 @@
       {#if showHeader}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
+          data-window-inplace-header=""
           data-pip-header=""
-        data-minimized={minimized ? 'true' : 'false'}
-        class={cn(pipWindowHeader, draggable ? 'cursor-grab active:cursor-grabbing' : undefined)}
-        onpointerdown={handleHeaderPointerDown}
-        onpointermove={handleHeaderPointerMove}
-        onpointerup={handleHeaderPointerUp}
-      >
-        <span class={pipWindowTitle}>{title}</span>
-        <div class={pipWindowControls} data-editor-controls>
-          {#if actions}
-            {@render actions()}
-          {/if}
-          <button
-            type="button"
-            data-pip-minimize=""
-            aria-label={minimized ? `Expand ${title}` : `Minimize ${title}`}
-            title={minimized ? `Expand ${title}` : `Minimize ${title}`}
-            class={pipWindowControlButton}
-            onclick={handleToggleMinimize}
-          >
-            {#if minimized}
-              <Maximize2 class="size-3" />
-            {:else}
-              <Minus class="size-3" />
+          data-minimized={minimized ? 'true' : 'false'}
+          class={cn(
+            windowInplaceHeader,
+            draggable ? 'cursor-grab active:cursor-grabbing' : undefined,
+          )}
+          onpointerdown={handleHeaderPointerDown}
+          onpointermove={handleHeaderPointerMove}
+          onpointerup={handleHeaderPointerUp}
+        >
+          <span class={windowInplaceTitle}>{title}</span>
+          <div class={windowInplaceControls} data-editor-controls>
+            {#if actions}
+              {@render actions()}
             {/if}
-          </button>
-          {#if onfullscreen}
             <button
               type="button"
-              data-pip-fullscreen=""
-              aria-label={`Fullscreen ${title}`}
-              title={`Fullscreen ${title}`}
-              class={pipWindowControlButton}
-              onclick={handleFullscreen}
+              data-window-inplace-minimize=""
+              data-pip-minimize=""
+              aria-label={minimized ? `Expand ${title}` : `Minimize ${title}`}
+              title={minimized ? `Expand ${title}` : `Minimize ${title}`}
+              class={windowInplaceControlButton}
+              onclick={handleToggleMinimize}
             >
-              <Minimize2 class="size-3 rotate-45" />
+              {#if minimized}
+                <Maximize2 class="size-3" />
+              {:else}
+                <Minus class="size-3" />
+              {/if}
             </button>
-          {/if}
+            {#if onfullscreen}
+              <button
+                type="button"
+                data-window-inplace-fullscreen=""
+                data-pip-fullscreen=""
+                aria-label={`Fullscreen ${title}`}
+                title={`Fullscreen ${title}`}
+                class={windowInplaceControlButton}
+                onclick={handleFullscreen}
+              >
+                <Minimize2 class="size-3 rotate-45" />
+              </button>
+            {/if}
+          </div>
         </div>
-      </div>
       {/if}
 
       {#if !minimized}
-        <div data-pip-body="" class={pipWindowBody}>
+        <div data-window-inplace-body="" data-pip-body="" class={windowInplaceBody}>
           {@render children()}
         </div>
       {/if}

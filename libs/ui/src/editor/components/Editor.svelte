@@ -24,7 +24,7 @@
   import UrlMentionPill from './UrlMentionPill.svelte'
   import LinkPreviewCard from './LinkPreviewCard.svelte'
   import CodeBlockComponent from './CodeBlockComponent.svelte'
-  import MermaidNodeView from './MermaidNodeView.svelte'
+  import MermaidEditor from './MermaidEditor.svelte'
   import NoticeNodeView from './NoticeNodeView.svelte'
   import MentionList from './MentionList.svelte'
   import CursorOverlay from './CursorOverlay.svelte'
@@ -83,7 +83,7 @@
     urlMention: createSvelteNodeView(UrlMentionPill, { as: 'span' }),
     linkPreview: createSvelteNodeView(LinkPreviewCard),
     codeBlock: createSvelteNodeView(CodeBlockComponent),
-    mermaid: createSvelteNodeView(MermaidNodeView),
+    mermaid: createSvelteNodeView(MermaidEditor),
     notice: createSvelteNodeView(NoticeNodeView),
   }
 

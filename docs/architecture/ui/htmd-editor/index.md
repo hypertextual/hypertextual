@@ -105,15 +105,15 @@ stateDiagram-v2
 
 | Layer | Responsibility |
 | --- | --- |
-| `svelte-node-view.svelte.ts` (`svelteNodeView`) | Mounts Svelte 5 `NodeView` components (`mount` / `unmount`), subscribes once per node view to `editor.subscribe()`, and passes reactive `node`, `editable`, `mode`, and `subtextRange` props to `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, [`MermaidNodeView.svelte`](mermaid.md), `ImageNodeView.svelte`, and `LinkPreviewCard.svelte`. |
-| Extension `keymap` & `navigation` (`htmd-ts`) | Compound-block extensions (`NoticeNode`, `CodeBlock`, `MermaidNode`, `ImageNode`, `LinkPreview`) own their `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter` navigation via `HtmdNodeNavigation`. |
-| Overlay `useKeymap` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`, and fullscreen `MermaidNodeView`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`, pan/zoom). |
+| `svelte-node-view.svelte.ts` (`svelteNodeView`) | Mounts Svelte 5 `NodeView` components (`mount` / `unmount`), subscribes once per node view to `editor.subscribe()`, and passes reactive `node`, `editable`, `mode`, and `subtextRange` props to `NoticeNodeView.svelte`, `CodeBlockComponent.svelte`, [`MermaidEditor.svelte`](mermaid.md), `ImageNodeView.svelte`, and `LinkPreviewCard.svelte`. |
+| Extension `keymap` & `navigation` (`htmd-ts`) | Compound-block extensions (`NoticeNode`, `CodeBlock`, `MermaidEditor`, `ImageNode`, `LinkPreview`) own their `Tab`, `Shift+Tab`, `ArrowUp`, `ArrowDown`, and `Enter` navigation via `HtmdNodeNavigation`. |
+| Overlay `useKeymap` (`libs/ui`) | Floating menus (`SlashMenu`, `MentionList`, `ImageInput`, `BookmarkInput`, `YouTubeInput`, `LinkEditPopover`, and fullscreen `MermaidEditor`) register `overlay`-priority keymaps (`Escape`, `Enter`, `ArrowUp`, `ArrowDown`, pan/zoom). |
 
 ## Editor Subcomponents
 
 | Component | Responsibility |
 | --- | --- |
-| [Mermaid editor and viewer (`MermaidNodeView`)](mermaid.md) | Modal diagram viewer (`normal`), line-selectable source view (`select`), live code + PiP preview (`insert`), and fullscreen viewer / split-pane editor with keyboard pan and zoom |
+| [Mermaid editor (`MermaidEditor`)](mermaid.md) | Modal diagram viewer (`normal`), line-selectable source view (`select`), live code + `WindowInplace` preview (`insert`), and fullscreen viewer / split-pane editor with keyboard pan and zoom |
 
 ## Implementation
 

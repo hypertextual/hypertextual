@@ -2,6 +2,7 @@ export * from './types.js'
 export {
   createAtomNodeNavigation,
   createContainerNodeNavigation,
+  createInplaceWindowNodeNavigation,
   createTextblockNavigation,
   CursorManager,
   defineHtmdExtension,
@@ -14,6 +15,7 @@ export {
   focusControlAtPos,
   focusTextPosition,
   getNodeNavigation,
+  getNodeNavigationForType,
   mergeHtmlAttributes,
   registerNodeNavigation,
   SelectionManager,
@@ -49,13 +51,13 @@ export { InternalMention } from './extensions/internal-mention.js'
 export { LinkPreview } from './extensions/link-preview.js'
 export {
   DEFAULT_MERMAID_SOURCE,
-  MermaidNode,
-  type MermaidNodeCommands,
-  type MermaidNodeOptions,
-  type MermaidNodeStorage,
+  MermaidEditor,
+  type MermaidEditorCommands,
+  type MermaidEditorOptions,
+  type MermaidEditorStorage,
   type MermaidViewportAction,
   type MermaidViewportState,
-} from './extensions/mermaid-node.js'
+} from './extensions/mermaid-editor.js'
 export {
   getEditorModalTarget,
   isEditorInInsertMode,

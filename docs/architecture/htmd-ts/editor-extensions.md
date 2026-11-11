@@ -153,7 +153,7 @@ flowchart TD
 ##### Container vs. Atom `NodeView` Layout
 
 ```text
-1. Container NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte, MermaidNodeView.svelte)
+1. Container / Inplace NodeView (NoticeNodeView.svelte, CodeBlockComponent.svelte, MermaidEditor.svelte)
 +-----------------------------------------------------------------------+
 | .node-notice (NodeView.dom, contenteditable="false" header controls)  |
 | +-------------------------------------------------------------------+ |
@@ -235,11 +235,11 @@ flowchart TD
     Text --> Cont & Atom
 ```
 
-| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `MermaidNode`, `NoticeNode`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
+| Navigation Hook | `createTextblockNavigation` | `createContainerNodeNavigation` (`CodeBlock`, `NoticeNode`) & `createInplaceWindowNodeNavigation` (`MermaidEditor`) | `createAtomNodeNavigation` (`ImageNode`, `LinkPreview`) |
 | --- | --- | --- | --- |
-| `enterFromAbove` (`ArrowDown` / `Tab`) | Caret at start of block | Focuses `controls[0]` in header | Focuses `controls[0]` (`caption` or `url` input) |
+| `enterFromAbove` (`ArrowDown` / `Tab`) | Caret at start of block | `CodeBlock` & `NoticeNode`: focuses `controls[0]`; `MermaidEditor`: caret at start of code | Focuses `controls[0]` (`caption` or `url` input) |
 | `enterFromBelow` (`ArrowUp` / `Shift+Tab`) | Caret at end of block | Caret on last line of `contentDOM` body | Focuses `controls[0]` or last control |
-| `enterCompound` (Normal `Enter` / `i`) | Enters insert mode at caret | `CodeBlock` & `MermaidNode`: body start; `NoticeNode`: `controls[0]` | Focuses `controls[0]` or subtext offset |
+| `enterCompound` (Normal `Enter` / `i`) | Enters insert mode at caret | `CodeBlock` & `MermaidEditor`: body start; `NoticeNode`: `controls[0]` | Focuses `controls[0]` or subtext offset |
 | `stepControl` (`Tab` / `Shift+Tab`) | Moves to adjacent block | Cycles `controls` <-> body <-> adjacent block | Cycles `controls` <-> adjacent block |
 | `subtext` | `undefined` | `undefined` (`NoticeNode` uses `noticeTitle` on header) | `{ kind, attr, textSelector, inputSelector }` |
 

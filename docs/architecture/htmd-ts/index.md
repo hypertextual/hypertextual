@@ -129,7 +129,7 @@ editor.mount(containerElement)
 | --- | --- |
 | Editor keyscope | `editor:htmd` (`editor` priority): `Enter` enters a compound block in normal mode; `Escape` returns to normal mode in insert mode. |
 | Extension keyscope | `extension:<name>` (`extension` priority): declarative `Keymap<HtmdCommandContext>`, overridable via `.configure({ keymap })` and `.extend({ keymap })`. |
-| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, or `createAtomNodeNavigation`. |
+| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, `createInplaceWindowNodeNavigation`, or `createAtomNodeNavigation`. |
 | Custom block views | `NodeViewRenderer` (`HtmdNodeViewFactory`) receives `NodeViewProps` (`editor`, `node`, `getPos`, `updateAttributes`, `deleteNode`) and returns `{ dom, contentDOM?, update?, destroy? }`. |
 
 #### 3. Markdown Syntax and Recovery
@@ -137,7 +137,7 @@ editor.mount(containerElement)
 | Syntax Kind | Markdown Representation | Schema Node / Mark |
 | --- | --- | --- |
 | Standard blocks & inline marks | CommonMark & GFM | `heading`, `paragraph`, `codeBlock`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `bold`, `italic`, `strike`, `code`, `link` |
-| Mermaid diagrams | ```` ```mermaid ```` fenced block | `mermaid` (`MermaidNode`; disallowed as a `codeBlock` language) |
+| Mermaid diagrams | ```` ```mermaid ```` fenced block | `mermaid` (`MermaidEditor`; disallowed as a `codeBlock` language) |
 | Callout notices | `> [!NOTE] Title` | `notice` (`NoticeNode`) |
 | Inline HTML marks | `<u>`, `<span style="color:...">`, `<mark>` | `underline`, `textColor`, `highlight` |
 | Mentions & embeds | `[mention ...]`, `[url-mention ...]`, `:::bookmark`, `:::youtube` | `internalMention`, `urlMention`, `linkPreview` |

@@ -143,9 +143,6 @@ function createDocumentHotkeyService(): EditorHotkeyService | undefined {
               cmdCtx.event ? binding.run(options.getContext(), cmdCtx.event) : false,
           }
           nodes[normalizedKey] = node
-          if (normalizedKey !== rawKey) {
-            nodes[rawKey] = { ...node, key: rawKey, hidden: true }
-          }
         }
         return nodes
       }

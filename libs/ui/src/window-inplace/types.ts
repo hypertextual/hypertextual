@@ -1,20 +1,20 @@
 import type { Snippet } from 'svelte'
 
-export type PipWindowScope = 'container' | 'viewport'
+export type WindowInplaceScope = 'container' | 'viewport'
 
-export type PipWindowPlacement = 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left'
+export type WindowInplacePlacement = 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left'
 
-export interface PipWindowProps {
+export interface WindowInplaceProps {
   /** Window header title text. */
   title?: string
-  /** Whether the PiP window is visible. */
+  /** Whether the in-place window is visible. */
   open?: boolean
   /** Positioning scope (`'container'` for `absolute` inside parent `div`, `'viewport'` for `fixed`). */
-  scope?: PipWindowScope
+  scope?: WindowInplaceScope
   /** Optional explicit boundary container element when `draggable` is enabled. */
   boundaryEl?: HTMLElement | null
   /** Initial corner anchor inside the scoped container or viewport. */
-  placement?: PipWindowPlacement
+  placement?: WindowInplacePlacement
   /** Whether to render the top header bar and window controls. */
   showHeader?: boolean
   /** Whether the body is collapsed to a header-only pill. */

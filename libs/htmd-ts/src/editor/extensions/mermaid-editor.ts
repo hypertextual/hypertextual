@@ -4,7 +4,8 @@ import type { Node as PmNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
-  createContainerNodeNavigation,
+  createInplaceWindowNodeNavigation,
+  CursorManager,
   defineHtmdExtension,
   findNextBlockPos,
   findNodeViewControl,
@@ -37,26 +38,26 @@ export interface MermaidViewportState {
   fullscreen: boolean
 }
 
-export interface MermaidNodeOptions {
+export interface MermaidEditorOptions {
   lowlight?: unknown
   nodeView?: HtmdNodeViewFactory
   HTMLAttributes?: Record<string, unknown>
   keymap?: Keymap<HtmdCommandContext>
 }
 
-export interface MermaidNodeStorage {
+export interface MermaidEditorStorage {
   viewports: Map<number, MermaidViewportState>
   pendingWindowPrefix: boolean
 }
 
-export type MermaidNodeCommands = {
+export type MermaidEditorCommands = {
   insertMermaid: (code?: string) => (ctx: HtmdCommandContext) => boolean
 }
 
 export const DEFAULT_MERMAID_SOURCE = 'flowchart TD\n  A[Start] --> B[End]'
 
 const MERMAID_HEADER_CONTROL_SELECTOR =
-  '[data-mermaid-edit], [data-mermaid-fullscreen], [data-mermaid-copy]'
+  '[data-mermaid-copy], [data-mermaid-edit], [data-mermaid-fullscreen]'
 
 const PAN_STEP = 48
 const ZOOM_STEP = 0.25
@@ -66,10 +67,10 @@ const MAX_ZOOM = 4.0
 // api -----------------------------------------------------------------------
 
 /**
- * Interactive Mermaid diagram block extension with Lowlight syntax highlighting,
+ * Interactive Mermaid diagram editor extension with Lowlight syntax highlighting,
  * normal-mode diagram viewer, select-mode line selection, insert-mode source
- * editor with top-right PiP preview, editor-scoped fullscreen viewer/split-pane,
- * and unified pan/zoom shortcuts:
+ * editor with top-right in-place preview window, editor-scoped fullscreen
+ * viewer/split-pane, and unified pan/zoom shortcuts:
  *
  * ```text
  * Normal mode:
@@ -89,10 +90,10 @@ const MAX_ZOOM = 4.0
  * +------------------------------------------------------------+
  * ```
  */
-export const MermaidNode = defineHtmdExtension<
-  MermaidNodeOptions,
-  MermaidNodeStorage,
-  MermaidNodeCommands
+export const MermaidEditor = defineHtmdExtension<
+  MermaidEditorOptions,
+  MermaidEditorStorage,
+  MermaidEditorCommands
 >({
   name: 'mermaid',
   kind: 'node',
@@ -107,13 +108,13 @@ export const MermaidNode = defineHtmdExtension<
     pendingWindowPrefix: false,
   }),
   navigation: () =>
-    createContainerNodeNavigation({
+    createInplaceWindowNodeNavigation({
       controls: [MERMAID_HEADER_CONTROL_SELECTOR],
       defaultControl: 'body',
+      textObject: 'c',
       multilineTextblock: true,
       expandSelectionRange: true,
       bodyOffset: 1,
-      enterBelowMode: 'endPos',
       serializeModalText: (node) => `\`\`\`mermaid\n${node.textContent}\n\`\`\``,
       focusControl(editor, pos, _node, options) {
         try {
@@ -130,13 +131,7 @@ export const MermaidNode = defineHtmdExtension<
         } catch {
           // Headless editor view
         }
-        editor.commands.setTextSelection(pos + 1)
-        try {
-          editor.view.focus()
-        } catch {
-          // Headless editor view
-        }
-        return true
+        return focusTextPosition(editor, pos + 1)
       },
     }),
   commands: () => ({
@@ -152,11 +147,7 @@ export const MermaidNode = defineHtmdExtension<
         const resolvedPos = Math.min(tr.doc.content.size, from + 1)
         tr.setSelection(TextSelection.create(tr.doc, resolvedPos))
         dispatch?.(tr.scrollIntoView())
-        try {
-          editor.view.focus()
-        } catch {
-          // Headless editor view
-        }
+        CursorManager.focusEditorView(editor)
         return true
       },
   }),
@@ -339,7 +330,7 @@ export const MermaidNode = defineHtmdExtension<
       Tab: {
         id: 'mermaid.indent',
         key: 'Tab',
-        label: 'Insert Tab or Focus Mermaid Code',
+        label: 'Insert Tab or Next Mermaid Toolbar Control',
         mode: 'insert',
         when: whenMermaidActiveOrControl,
         run: handleTab,
@@ -384,7 +375,9 @@ export const MermaidNode = defineHtmdExtension<
           ) {
             return false
           }
-          storage.pendingWindowPrefix = false
+          if (event.key !== 'z') {
+            storage.pendingWindowPrefix = false
+          }
           return false
         },
       },
@@ -396,6 +389,7 @@ export const MermaidNode = defineHtmdExtension<
 // pm ------------------------------------------------------------------------
 
 interface LowlightHastNode {
+  type: string
   value?: string
   properties?: { className?: string[] }
   children?: LowlightHastNode[]
@@ -565,7 +559,13 @@ function whenMermaidActiveOrControl(ctx: HtmdCommandContext, event: KeyboardEven
 }
 
 function whenMermaidArrowKey({ state }: HtmdCommandContext, event: KeyboardEvent): boolean {
-  if (event.target instanceof HTMLElement && event.target.closest('[contenteditable="false"]')) {
+  const rawTarget =
+    event.target instanceof HTMLElement
+      ? event.target
+      : typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+  if (rawTarget && rawTarget.closest('[contenteditable="false"]')) {
     return Boolean(findNodeViewControl(state, event, 'mermaid'))
   }
   return true
@@ -574,7 +574,7 @@ function whenMermaidArrowKey({ state }: HtmdCommandContext, event: KeyboardEvent
 function handleViewportAction(
   ctx: HtmdCommandContext,
   event: KeyboardEvent,
-  storage: MermaidNodeStorage,
+  storage: MermaidEditorStorage,
   action: MermaidViewportAction,
 ): boolean {
   const pos = findActiveMermaidPos(ctx, event)
@@ -656,11 +656,21 @@ function handleViewportAction(
   return true
 }
 
+function getToolbarButtons(wrapper: HTMLElement): HTMLElement[] {
+  return Array.from(
+    wrapper.querySelectorAll<HTMLElement>(
+      '[data-editor-controls] button:not([disabled]), button[data-mermaid-copy], button[data-mermaid-edit], button[data-mermaid-fullscreen]',
+    ),
+  )
+}
+
 function focusMermaidHeaderAt(editor: TiptapEditor, pos: number): boolean {
   const dom = editor.view?.nodeDOM(pos)
   if (dom instanceof HTMLElement) {
-    const btn = dom.querySelector<HTMLElement>(MERMAID_HEADER_CONTROL_SELECTOR)
+    const buttons = getToolbarButtons(dom)
+    const btn = buttons[0] ?? dom.querySelector<HTMLElement>(MERMAID_HEADER_CONTROL_SELECTOR)
     if (btn) {
+      CursorManager.setActiveCompoundBlockPos(editor, pos)
       btn.focus()
       return true
     }
@@ -685,7 +695,14 @@ function focusMermaidHeader(editor: TiptapEditor): boolean {
 function handleTab({ editor, state }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'mermaid')
   if (ctrl) {
-    if (ctrl.target.closest('button')) {
+    const currentBtn = ctrl.target.closest<HTMLElement>('button')
+    if (currentBtn) {
+      const buttons = getToolbarButtons(ctrl.wrapper)
+      const idx = buttons.indexOf(currentBtn)
+      if (idx !== -1 && idx + 1 < buttons.length) {
+        buttons[idx + 1]!.focus()
+        return true
+      }
       return focusTextPosition(editor, ctrl.pos + 1)
     }
     return false
@@ -699,7 +716,14 @@ function handleTab({ editor, state }: HtmdCommandContext, event: KeyboardEvent):
 function handleShiftTab({ editor, state }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'mermaid')
   if (ctrl) {
-    if (ctrl.target.closest('button')) {
+    const currentBtn = ctrl.target.closest<HTMLElement>('button')
+    if (currentBtn) {
+      const buttons = getToolbarButtons(ctrl.wrapper)
+      const idx = buttons.indexOf(currentBtn)
+      if (idx > 0) {
+        buttons[idx - 1]!.focus()
+        return true
+      }
       return focusTextPosition(editor, ctrl.pos + 1)
     }
     return false
@@ -762,8 +786,10 @@ function handleArrowDown(
     return focusTextPosition(editor, selection.from + 1)
   }
   if (editor.isActive('mermaid')) {
-    if (!isAtLastVisualLine(view, state)) return false
+    if (!selection.empty) return false
     const { $from } = selection
+    const textAfter = $from.parent.textBetween($from.parentOffset, $from.parent.content.size)
+    if (textAfter.includes('\n')) return false
     for (let depth = $from.depth; depth > 0; depth -= 1) {
       if ($from.node(depth).type.name === 'mermaid') {
         return focusBlockAtPos(editor, $from.after(depth), 'down', true)
@@ -774,7 +800,7 @@ function handleArrowDown(
   if (isAtLastVisualLine(view, state)) {
     const nextPos = findNextBlockPos(state)
     if (nextPos !== null && state.doc.nodeAt(nextPos)?.type.name === 'mermaid') {
-      return focusTextPosition(editor, nextPos + 1)
+      return focusBlockAtPos(editor, nextPos, 'down')
     }
   }
   return false

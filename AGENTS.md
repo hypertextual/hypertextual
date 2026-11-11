@@ -88,10 +88,14 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
 - [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
 - [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
+- [Proposed] Compose complex editor NodeViews from reusable primitives in `libs/ui` (such as `WindowInplace` and `MermaidViewer`) rather than embedding viewport pan/zoom or floating window logic inside the NodeView.
+- [Proposed] Keep shared modal editing and motion extensions (`ModalEditing`, `NormalMode`, `SelectMode`, `InsertMode`) node-agnostic; define node-specific modal behavior through `HtmdNodeNavigation` and the owning extension in `libs/htmd-ts/src/editor/extensions`.
+- [Proposed] Loop `ArrowDown` and `ArrowUp` navigation in suggestion menus (`SlashCommands`) between the first and last list items.
 
 ### Documentation
 
 - Use the installed Difflab software architecture and UI component templates.
+- Write documentation in short, plain English without filler prose or restating style-guide rules.
 - Keep diagrams inline in Markdown using Mermaid (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`) and aligned ASCII UI skeletons grounded in actual styles.
 - Put `Public API` and `State and Data Flow` under `Design` in Svelte component docs, and model interactive behavior with `stateDiagram-v2`.
 - Keep research and comparison docs to concise facts, links, and tables without filler prose.
@@ -101,7 +105,8 @@ let { ... }: ComponentProps = $props()
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
-- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`) and `htmd-ts` editor integration and unit tests in `libs/htmd-ts/src/editor/htmd-editor.test.ts`. Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
+- Keep Playwright E2E tests in `e2e/hypertextual-desktop/` (`workspace-file-tree.spec.ts`, `editor.spec.ts`, `modal-editing.spec.ts`) and `htmd-ts` editor integration and unit tests in `libs/htmd-ts/src/editor/htmd-editor.test.ts` (focused on whole-editor contracts rather than node-specific cases). Do not place tests inside `libs/htmd-ts/src/editor/extensions`.
+- Structure modal block E2E suites in `modal-editing.spec.ts` by starting mode (`Given normal`, `Given edit`, `Given select`) and granular `When ... -> it ...` user actions across all interactive block types.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:
 
 ```ts

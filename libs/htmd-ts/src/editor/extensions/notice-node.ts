@@ -55,6 +55,7 @@ export const NoticeNode = defineHtmdExtension<
         '[aria-label="Notice type"][data-part="trigger"]',
       ],
       defaultControl: 'type',
+      textObject: 'n',
       expandSelectionRange: true,
       subtext: {
         kind: 'noticeTitle',

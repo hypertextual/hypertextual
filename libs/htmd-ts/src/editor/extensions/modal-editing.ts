@@ -126,7 +126,6 @@ const NON_TEXT_MODAL_NODE_TYPES = new Set([
   'notice',
   'blockquote',
   'codeBlock',
-  'mermaid',
   'imageNode',
   'image',
   'linkPreview',
@@ -690,7 +689,8 @@ function createModalEditingPlugin(
           const $head = doc.resolve(Math.min(doc.content.size, Math.max(0, head)))
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
-            if (getNodeNavigationForType(ancestor.type.name)?.kind === 'container') {
+            const navKind = getNodeNavigationForType(ancestor.type.name)?.kind
+            if (navKind === 'container' || navKind === 'inplace') {
               const ancestorPos = $head.before(d)
               decos.push(
                 Decoration.node(ancestorPos, ancestorPos + ancestor.nodeSize, {
@@ -707,7 +707,8 @@ function createModalEditingPlugin(
           const $head = doc.resolve(Math.min(doc.content.size, primaryRange.head))
           for (let d = $head.depth; d >= 1; d -= 1) {
             const ancestor = $head.node(d)
-            if (getNodeNavigationForType(ancestor.type.name)?.kind === 'container') {
+            const navKind = getNodeNavigationForType(ancestor.type.name)?.kind
+            if (navKind === 'container' || navKind === 'inplace') {
               const ancestorPos = $head.before(d)
               const alreadyDecorated =
                 ancestorPos >= primaryRange.from &&
@@ -819,7 +820,7 @@ export function enterModalCompoundBlock(editor: TiptapEditor): boolean {
     for (let d = resolvedFrom.depth; d >= 1; d -= 1) {
       const node = resolvedFrom.node(d)
       const nav = getNodeNavigation(editor, node.type.name)
-      if (nav?.kind === 'container') {
+      if (nav?.kind === 'container' || nav?.kind === 'inplace') {
         blockPos = resolvedFrom.before(d)
         control = nav.defaultControl
         break
@@ -1069,7 +1070,7 @@ export function collectLeafBlocks(doc: PMNode, mode: KeymapMode = 'normal'): Blo
   const blocks: BlockDescriptor[] = []
   doc.descendants((node, pos) => {
     const nav = getNodeNavigationForType(node.type.name)
-    if (node.type.name === 'mermaid' && mode !== 'select') {
+    if (nav?.kind === 'inplace' && mode !== 'select') {
       blocks.push({
         node,
         pos,
@@ -1829,10 +1830,12 @@ function executeModalOperator(
       }
 
       const firstInserted = slice.content.firstChild
+      const insertedKind = firstInserted
+        ? getNodeNavigationForType(firstInserted.type.name)?.kind
+        : undefined
       if (
         firstInserted &&
-        (firstInserted.isAtom ||
-          getNodeNavigationForType(firstInserted.type.name)?.kind === 'container') &&
+        (firstInserted.isAtom || insertedKind === 'container' || insertedKind === 'inplace') &&
         NodeSelection.isSelectable(firstInserted)
       ) {
         tr = tr.setSelection(NodeSelection.create(tr.doc, insertPos))

@@ -19,7 +19,7 @@ pm run hypertextual-svelte:dev
 pm run hypertextual:run
 ```
 
-Run one frontend server at a time. Desktop development starts its own server on port `1430` (or the next free port via `HYPERTEXTUAL_DEV_PORT` if `1430` is busy). The browser frontend needs Tauri for local workspace access.
+Run one frontend server at a time. Desktop development starts its own server on port `1420`. The browser frontend needs Tauri for local workspace access.
 
 ## Lint, build, and integration tests
 

@@ -1,7 +1,7 @@
 import type { ModalMotion, ModalSelectionTransform } from '@cloudvoyant/helical-ui'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state'
-import { defineHtmdExtension } from '../define-htmd-extension.js'
+import { defineHtmdExtension, getNodeNavigation } from '../define-htmd-extension.js'
 import {
   collectLeafBlocks,
   collectWords,
@@ -63,16 +63,14 @@ export function executeSelectLines(editor: TiptapEditor, count: number): boolean
   const blocks = collectLeafBlocks(doc, 'select')
   if (blocks.length === 0) return false
 
-  const isMermaidNodeSelection =
-    !pluginState?.extendedRange && sel instanceof NodeSelection && sel.node.type.name === 'mermaid'
   const currentFrom = pluginState?.extendedRange
     ? Math.min(pluginState.extendedRange.anchor, pluginState.extendedRange.head)
-    : isMermaidNodeSelection
+    : sel instanceof NodeSelection && sel.node.isTextblock
       ? sel.from + 1
       : sel.from
   const currentTo = pluginState?.extendedRange
     ? Math.max(pluginState.extendedRange.anchor, pluginState.extendedRange.head)
-    : isMermaidNodeSelection
+    : sel instanceof NodeSelection && sel.node.isTextblock
       ? sel.from + 1
       : sel.to
 
@@ -426,11 +424,11 @@ export function executeSelectionTransform(
       sel instanceof NodeSelection ? sel : TextSelection.create(doc, getCursorCharPos(doc, sel))
     const $from = nextSelection.$from
     for (let d = $from.depth; d >= 1; d -= 1) {
-      if ($from.node(d).type.name === 'mermaid') {
-        const mermaidPos = $from.before(d)
-        const mermaidNode = doc.nodeAt(mermaidPos)
-        if (mermaidNode && NodeSelection.isSelectable(mermaidNode)) {
-          nextSelection = NodeSelection.create(doc, mermaidPos)
+      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'inplace') {
+        const blockPos = $from.before(d)
+        const blockNode = doc.nodeAt(blockPos)
+        if (blockNode && NodeSelection.isSelectable(blockNode)) {
+          nextSelection = NodeSelection.create(doc, blockPos)
         }
         break
       }

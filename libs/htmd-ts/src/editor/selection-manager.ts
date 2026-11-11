@@ -46,7 +46,8 @@ export class SelectionManager {
     }
     const { $from } = selection
     for (let d = $from.depth; d >= 1; d -= 1) {
-      if (getNodeNavigation(undefined, $from.node(d).type.name)?.kind === 'container') {
+      const navKind = getNodeNavigation(undefined, $from.node(d).type.name)?.kind
+      if (navKind === 'container' || navKind === 'inplace') {
         return null
       }
       const beforePos = $from.before(d)
@@ -130,7 +131,7 @@ export class SelectionManager {
     if (!selection) return false
     CursorManager.clearActiveCompoundBlockPos(editor)
     editor.commands.setTextSelection(selection.from)
-    editor.view?.focus()
+    CursorManager.focusEditorView(editor)
     return true
   }
 
@@ -147,7 +148,7 @@ export class SelectionManager {
     if (!selection) return false
     CursorManager.clearActiveCompoundBlockPos(editor)
     editor.commands.setTextSelection(selection.from)
-    editor.view?.focus()
+    CursorManager.focusEditorView(editor)
     return true
   }
 }

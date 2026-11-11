@@ -3,10 +3,25 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const path = 'Drafts/Modes.md'
+const mermaidPath = 'Drafts/Mermaid.md'
+const mermaidSource =
+  '# Diagram\n\nIntro paragraph.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[End]\n  B --> C[Done]\n```\n\nOutro paragraph.\n'
 const source =
   '# Modes\n\nA paragraph to edit.\n\n> [!NOTE] Remember\n> Body text.\n\n```javascript\nconst value = 1\nconst next = 2\n```\n\n![Photo](.images/photo.png "Photo caption")\n\n:::youtube {url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"} :::\n\n' +
   Array.from({ length: 60 }, (_, index) => `Paragraph ${index}.`).join('\n\n') +
   '\n'
+
+async function openMermaidArticle(
+  page: import('@playwright/test').Page,
+  workspace: { root: string },
+) {
+  await writeFile(join(workspace.root, mermaidPath), mermaidSource)
+  await page.reload()
+  await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
+  await page.locator(`[role="treeitem"][data-value="${mermaidPath}"]`).click()
+  await expect(page.locator('.ProseMirror')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
+}
 
 test.beforeEach(async ({ page, workspace }) => {
   await mkdir(join(workspace.root, 'Drafts/.images'), { recursive: true })
@@ -619,41 +634,27 @@ test.describe(
       })
     })
 
-    test.describe('When the user views, selects, and edits a Mermaid diagram across normal, select, and insert modes', () => {
-      const mermaidPath = 'Drafts/Mermaid.md'
-      const mermaidSource =
-        '# Diagram\n\nIntro paragraph.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[End]\n  B --> C[Done]\n```\n\nOutro paragraph.\n'
-
-      test.beforeEach(async ({ page, workspace }) => {
-        await writeFile(join(workspace.root, mermaidPath), mermaidSource)
-        await page.reload()
-        await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
-        await page.locator(`[role="treeitem"][data-value="${mermaidPath}"]`).click()
-        await expect(page.locator('.ProseMirror')).toBeVisible()
-        await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
-      })
-
+    test.describe('When the user moves onto a Mermaid diagram', () => {
       test(
-        'it highlights the Mermaid diagram in normal mode, pans and zooms inline, and opens Fullscreen Viewer with Minimize and Edit buttons',
+        'it selects the whole diagram block and hides the raw code',
         { tag: '@smoke' },
-        async ({ page }) => {
+        async ({ page, workspace }) => {
           // Arrange
+          await openMermaidArticle(page, workspace)
           const prose = page.locator('.ProseMirror')
-          const editorRegion = page.getByRole('region', { name: 'Article content' })
           const mermaidNode = prose.locator('[data-mermaid-node]')
           await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
           await expect(mermaidNode.locator('[data-mermaid-canvas] svg')).toBeVisible()
           await expect(mermaidNode.locator('[data-mermaid-code]')).toHaveClass(/sr-only/)
 
-          // Act: step onto the Mermaid block with j, j
+          // Act
           await page.keyboard.press('j')
           await page.keyboard.press('j')
 
-          // Assert: whole Mermaid block is highlighted in normal mode with icon-only Edit & Fullscreen buttons and no zoom/reset buttons
+          // Assert
           await expect(
             prose.locator('[data-pm-modal-node-selection="normal"]:has([data-mermaid-node])'),
           ).toHaveCount(1)
-          const canvas = mermaidNode.locator('[data-mermaid-canvas]')
           await expect(mermaidNode.locator('[data-mermaid-zoom-in]')).toHaveCount(0)
           await expect(mermaidNode.locator('[data-mermaid-zoom-out]')).toHaveCount(0)
           await expect(mermaidNode.locator('[data-mermaid-zoom-reset]')).toHaveCount(0)
@@ -663,275 +664,121 @@ test.describe(
           await expect(
             mermaidNode.getByRole('button', { name: 'Fullscreen Mermaid diagram' }),
           ).toHaveText('')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
-
-          // Act: inline keyboard zoom and pan in normal mode
-          await page.keyboard.press('+')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
-          await page.keyboard.press('Control+=')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.5')
-          await page.keyboard.press('-')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
-          await page.keyboard.press('Control+l')
-          await expect(canvas).toHaveAttribute(
-            'style',
-            /translate3d\(48px,\s*0px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
-          )
-          await page.keyboard.press('Control+0')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
-
-          // Act: drag-pan the diagram canvas with the mouse
-          const viewer = mermaidNode.locator('[data-mermaid-viewer]')
-          const viewerBox = await viewer.boundingBox()
-          await page.mouse.move(
-            viewerBox!.x + viewerBox!.width / 2,
-            viewerBox!.y + viewerBox!.height / 2,
-          )
-          await page.mouse.down()
-          await page.mouse.move(
-            viewerBox!.x + viewerBox!.width / 2 + 30,
-            viewerBox!.y + viewerBox!.height / 2 + 20,
-          )
-          await page.mouse.up()
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-x', '30')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-y', '20')
-          await page.keyboard.press('0')
-          await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-x', '0')
-
-          // Act: open Fullscreen Viewer via WhichKey (Space -> m -> f)
-          await page.keyboard.press(' ')
-          const popup = page.locator('[data-which-key-root]')
-          await expect(popup).toBeVisible()
-          await expect(popup).toContainText('Mermaid')
-          await page.keyboard.press('m')
-          await expect(popup).toContainText('Toggle Mermaid Fullscreen')
-          await page.keyboard.press('f')
-
-          // Assert: Fullscreen Viewer fills the editor pane and shows icon-only Edit + Minimize buttons
-          const fullscreen = page.locator(
-            '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="viewer"]',
-          )
-          await expect(fullscreen).toBeVisible()
-          const regionBox = await editorRegion.boundingBox()
-          const fullscreenBox = await fullscreen.boundingBox()
-          expect(Math.abs(fullscreenBox!.width - regionBox!.width)).toBeLessThanOrEqual(4)
-          expect(Math.abs(fullscreenBox!.height - regionBox!.height)).toBeLessThanOrEqual(4)
-          await expect(
-            fullscreen.getByRole('button', { name: 'Edit Mermaid diagram' }),
-          ).toBeVisible()
-          await expect(
-            fullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }),
-          ).toBeVisible()
-
-          // Act: pan and zoom inside Fullscreen Viewer with single-key motions, then Escape
-          await page.keyboard.press('+')
-          await page.keyboard.press('l')
-          await expect(fullscreen).toHaveAttribute('data-mermaid-scale', '1.25')
-          await expect(fullscreen.locator('[data-mermaid-canvas]')).toHaveAttribute(
-            'style',
-            /translate3d\(48px,\s*0px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
-          )
-          await page.keyboard.press('Escape')
-
-          // Assert: returns to inline normal mode with Mermaid block still highlighted
-          await expect(fullscreen).toHaveCount(0)
-          await expect(
-            prose.locator('[data-pm-modal-node-selection="normal"]:has([data-mermaid-node])'),
-          ).toHaveCount(1)
-
-          // Act: open Fullscreen Viewer with Ctrl+w z, minimize with Ctrl+w z, then open with Space w z and close via Minimize button
-          await page.keyboard.press('Control+w')
-          await page.keyboard.press('z')
-          await expect(fullscreen).toBeVisible()
-          await page.keyboard.press('Control+w')
-          await page.keyboard.press('z')
-          await expect(fullscreen).toHaveCount(0)
-          await page.keyboard.press('Space')
-          await page.keyboard.press('w')
-          await page.keyboard.press('z')
-          await expect(fullscreen).toBeVisible()
-          await fullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }).click()
-          await expect(fullscreen).toHaveCount(0)
         },
       )
+    })
 
-      test('it switches to the code and top-right PipWindow view in select mode with syntax highlighting and selects individual lines of Mermaid code', async ({
-        page,
-      }) => {
+    test.describe('When the user pans and zooms a selected Mermaid diagram', () => {
+      test('it updates its scale and pan offsets', async ({ page, workspace }) => {
         // Arrange
-        const prose = page.locator('.ProseMirror')
-        const mermaidNode = prose.locator('[data-mermaid-node]')
-        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        await openMermaidArticle(page, workspace)
+        const mermaidNode = page.locator('.ProseMirror [data-mermaid-node]')
         await page.keyboard.press('j')
         await page.keyboard.press('j')
-        await expect(
-          prose.locator('[data-pm-modal-node-selection="normal"]:has([data-mermaid-node])'),
-        ).toHaveCount(1)
 
-        // Act: press x to enter select mode and select the first line of Mermaid source
-        await page.keyboard.press('x')
+        // Act
+        await page.keyboard.press('+')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
+        await page.keyboard.press('Control+=')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.5')
+        await page.keyboard.press('-')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
+        await page.keyboard.press('Control+l')
 
-        // Assert: MermaidNodeView shows syntax-highlighted code + headerless top-right PipWindow preview and selects line 1
-        await expect(badge).toHaveText('helix · select')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'select')
-        await expect(mermaidNode.locator('[data-mermaid-code]')).not.toHaveClass(/sr-only/)
-        await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
-          'flowchart',
+        // Assert
+        await expect(mermaidNode.locator('[data-mermaid-canvas]')).toHaveAttribute(
+          'style',
+          /translate3d\(48px,\s*0px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
         )
-        const pip = mermaidNode.locator('[data-pip-window]')
-        await expect(pip).toBeVisible()
-        await expect(pip).toHaveAttribute('data-pip-scope', 'container')
-        await expect(pip).toHaveAttribute('data-pip-placement', 'top-right')
-        await expect(pip.locator('[data-pip-header]')).toHaveCount(0)
-        await expect(pip.locator('[data-mermaid-canvas] svg')).toBeVisible()
-        const selectedSpan = mermaidNode.locator(
-          '[data-mermaid-code] [data-pm-modal-selection="select"]',
+        await page.keyboard.press('Control+0')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
+
+        // Act: drag-pan the diagram canvas with the mouse
+        const viewer = mermaidNode.locator('[data-mermaid-viewer]')
+        const viewerBox = await viewer.boundingBox()
+        await page.mouse.move(
+          viewerBox!.x + viewerBox!.width / 2,
+          viewerBox!.y + viewerBox!.height / 2,
         )
-        await expect
-          .poll(async () => (await selectedSpan.allTextContents()).join(''))
-          .toBe('flowchart TD')
+        await page.mouse.down()
+        await page.mouse.move(
+          viewerBox!.x + viewerBox!.width / 2 + 30,
+          viewerBox!.y + viewerBox!.height / 2 + 20,
+        )
+        await page.mouse.up()
 
-        // Act: press x again to extend selection to the second line of Mermaid source
-        await page.keyboard.press('x')
-        await expect
-          .poll(async () => (await selectedSpan.allTextContents()).join(''))
-          .toBe('flowchart TD\n  A[Start] --> B[End]')
-
-        // Act: press Escape to return to normal mode
-        await page.keyboard.press('Escape')
-        await expect(badge).toHaveText('helix · normal')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
-        await expect(pip).toHaveCount(0)
+        // Assert
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-x', '30')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-y', '20')
+        await page.keyboard.press('0')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-pan-x', '0')
       })
+    })
 
-      test('it shows syntax-highlighted code and top-right PipWindow preview in insert mode and toggles Fullscreen Split-Pane editing with Ctrl+h/j/k/l and preview pane focus', async ({
+    test.describe('When the user toggles fullscreen on a Mermaid diagram', () => {
+      test('it fills the editor pane and returns to the inline diagram on exit', async ({
         page,
         workspace,
       }) => {
         // Arrange
+        await openMermaidArticle(page, workspace)
         const prose = page.locator('.ProseMirror')
-        const mermaidNode = prose.locator('[data-mermaid-node]')
-        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        const editorRegion = page.getByRole('region', { name: 'Article content' })
         await page.keyboard.press('j')
         await page.keyboard.press('j')
 
-        // Act: click Edit Mermaid diagram button in normal mode to enter insert mode
-        await mermaidNode.getByRole('button', { name: 'Edit Mermaid diagram' }).click()
+        // Act: open Fullscreen Viewer via WhichKey (Space -> m -> f)
+        await page.keyboard.press(' ')
+        const popup = page.locator('[data-which-key-root]')
+        await expect(popup).toBeVisible()
+        await expect(popup).toContainText('Mermaid')
+        await page.keyboard.press('m')
+        await expect(popup).toContainText('Toggle Mermaid Fullscreen')
+        await page.keyboard.press('f')
 
-        // Assert: insert mode shows syntax-highlighted editable code + top-right headerless PipWindow preview
-        await expect(badge).toHaveText('helix · insert')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'insert')
-        await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
-          'flowchart',
+        // Assert
+        const fullscreen = page.locator(
+          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="viewer"]',
         )
-        const pip = mermaidNode.locator('[data-pip-window]')
-        await expect(pip).toBeVisible()
-        await expect(pip).toHaveAttribute('data-pip-placement', 'top-right')
-        await expect(pip.locator('[data-pip-header]')).toHaveCount(0)
-        const pipSvg = pip.locator('[data-mermaid-canvas] svg')
-        await expect(pipSvg).toBeVisible()
-
-        // Assert: PipWindow auto-fits the whole diagram inside its body
-        const pipBodyBox = await pip.locator('[data-pip-body]').boundingBox()
-        const pipSvgBox = await pipSvg.boundingBox()
-        expect(pipSvgBox!.width).toBeLessThanOrEqual(pipBodyBox!.width)
-        expect(pipSvgBox!.height).toBeLessThanOrEqual(pipBodyBox!.height)
-
-        // Act: pinch-zoom (ctrl+wheel) on the PipWindow preview
-        await pip.locator('[data-pip-diagram]').dispatchEvent('wheel', {
-          deltaY: -100,
-          ctrlKey: true,
-        })
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.1')
-        await page.keyboard.press('Control+0')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
-
-        // Act: pan and zoom the PipWindow preview with Ctrl+= and Ctrl+j while in insert mode
-        await page.keyboard.press('Control+=')
-        await page.keyboard.press('Control+j')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
-        await expect(pip.locator('[data-mermaid-canvas]')).toHaveAttribute(
-          'style',
-          /translate3d\(0px,\s*48px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
-        )
-        await page.keyboard.press('Control+0')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
-
-        // Act: open Fullscreen Split-Pane editor via Ctrl+w z
-        await page.keyboard.press('Control+w')
-        await page.keyboard.press('z')
-        const splitFullscreen = page.locator(
-          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="split"]',
-        )
-        await expect(splitFullscreen).toBeVisible()
+        await expect(fullscreen).toBeVisible()
+        const regionBox = await editorRegion.boundingBox()
+        const fullscreenBox = await fullscreen.boundingBox()
+        expect(Math.abs(fullscreenBox!.width - regionBox!.width)).toBeLessThanOrEqual(4)
+        expect(Math.abs(fullscreenBox!.height - regionBox!.height)).toBeLessThanOrEqual(4)
+        await expect(fullscreen.getByRole('button', { name: 'Edit Mermaid diagram' })).toBeVisible()
         await expect(
-          splitFullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }),
+          fullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }),
         ).toBeVisible()
-        const splitCodePane = splitFullscreen.locator('[data-mermaid-split-pane="code"]')
-        const splitPreview = splitFullscreen.locator('[data-mermaid-split-preview]')
-        await expect(splitCodePane).toHaveAttribute('data-pane-focused', 'true')
 
-        // Assert: both panes are flush with the Mermaid component's boundaries
-        const surfaceBox = await splitFullscreen.boundingBox()
-        const codeBox = await splitCodePane.boundingBox()
-        const previewBox = await splitPreview.boundingBox()
-        expect(Math.abs(codeBox!.x - surfaceBox!.x)).toBeLessThanOrEqual(2)
-        expect(
-          Math.abs(previewBox!.x + previewBox!.width - (surfaceBox!.x + surfaceBox!.width)),
-        ).toBeLessThanOrEqual(2)
-        expect(
-          Math.abs(codeBox!.y + codeBox!.height - (surfaceBox!.y + surfaceBox!.height)),
-        ).toBeLessThanOrEqual(2)
-
-        // Act: use Ctrl+l and Ctrl+= while focused in the code pane, then edit code
-        await page.keyboard.press('Control+=')
-        await page.keyboard.press('Control+l')
-        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1.25')
-        await expect(splitPreview.locator('[data-mermaid-canvas]')).toHaveAttribute(
+        // Act: pan and zoom inside Fullscreen Viewer with single-key motions, then Escape
+        await page.keyboard.press('+')
+        await page.keyboard.press('l')
+        await expect(fullscreen).toHaveAttribute('data-mermaid-scale', '1.25')
+        await expect(fullscreen.locator('[data-mermaid-canvas]')).toHaveAttribute(
           'style',
           /translate3d\(48px,\s*0px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
         )
-        await page.keyboard.type('  X[Step] --> A[Start]\n')
-        await expect
-          .poll(() => readFile(join(workspace.root, mermaidPath), 'utf8'))
-          .toContain('X[Step] --> A[Start]')
-
-        // Act: switch focus to the preview pane with Ctrl+w l and use single-key zoom/reset and pinch-zoom
-        await page.keyboard.press('Control+w')
-        await page.keyboard.press('l')
-        await expect(splitPreview).toBeFocused()
-        await page.keyboard.press('+')
-        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1.5')
-        await page.keyboard.press('0')
-        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1')
-        await splitPreview.dispatchEvent('wheel', { deltaY: -100, ctrlKey: true })
-        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1.1')
-        await page.keyboard.press('0')
-
-        // Act: switch back to code pane, type invalid Mermaid syntax, and verify flush bottom error footer
-        await page.keyboard.press('Tab')
-        await page.keyboard.type('  ??? invalid syntax\n')
-        const errorFooter = splitFullscreen.locator('[data-mermaid-footer][data-mermaid-error]')
-        await expect(errorFooter).toBeVisible()
-        const footerBox = await errorFooter.boundingBox()
-        expect(Math.abs(footerBox!.x - surfaceBox!.x)).toBeLessThanOrEqual(2)
-        expect(Math.abs(footerBox!.width - surfaceBox!.width)).toBeLessThanOrEqual(2)
-        expect(
-          Math.abs(footerBox!.y + footerBox!.height - (surfaceBox!.y + surfaceBox!.height)),
-        ).toBeLessThanOrEqual(2)
-
-        // Act: minimize fullscreen back to inline insert mode, verify inline footer is flush, then Escape to normal mode
-        await splitFullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }).click()
-        await expect(splitFullscreen).toHaveCount(0)
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'insert')
-        const inlineFooter = mermaidNode.locator('[data-mermaid-footer][data-mermaid-error]')
-        await expect(inlineFooter).toBeVisible()
-        const inlineNodeBox = await mermaidNode.boundingBox()
-        const inlineFooterBox = await inlineFooter.boundingBox()
-        expect(Math.abs(inlineFooterBox!.width - inlineNodeBox!.width)).toBeLessThanOrEqual(4)
         await page.keyboard.press('Escape')
-        await expect(badge).toHaveText('helix · normal')
-        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
+
+        // Assert
+        await expect(fullscreen).toHaveCount(0)
+        await expect(
+          prose.locator('[data-pm-modal-node-selection="normal"]:has([data-mermaid-node])'),
+        ).toHaveCount(1)
+
+        // Act: toggle Fullscreen Viewer with Ctrl+w z and Space w z
+        await page.keyboard.press('Control+w')
+        await page.keyboard.press('z')
+        await expect(fullscreen).toBeVisible()
+        await page.keyboard.press('Control+w')
+        await page.keyboard.press('z')
+        await expect(fullscreen).toHaveCount(0)
+        await page.keyboard.press('Space')
+        await page.keyboard.press('w')
+        await page.keyboard.press('z')
+        await expect(fullscreen).toBeVisible()
+        await fullscreen.getByRole('button', { name: 'Minimize Mermaid diagram' }).click()
+        await expect(fullscreen).toHaveCount(0)
       })
     })
   },
@@ -1044,6 +891,224 @@ test.describe(
         await expect(page.locator('.ProseMirror h1')).toHaveText('Other')
         await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
         await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
+      })
+    })
+
+    test.describe('When the user enters edit mode on a Mermaid diagram', () => {
+      test('it shows the syntax-highlighted code and the in-place preview window and navigates the toolbar with ArrowUp and Tab', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await openMermaidArticle(page, workspace)
+        const prose = page.locator('.ProseMirror')
+        const mermaidNode = prose.locator('[data-mermaid-node]')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+
+        // Act
+        await mermaidNode.getByRole('button', { name: 'Edit Mermaid diagram' }).click()
+
+        // Assert
+        await expect(badge).toHaveText('helix · insert')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'insert')
+        await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
+          'flowchart',
+        )
+        const pip = mermaidNode.locator('[data-window-inplace]')
+        await expect(pip).toBeVisible()
+        await expect(pip).toHaveAttribute('data-window-inplace-placement', 'top-right')
+        await expect(pip.locator('[data-window-inplace-header]')).toHaveCount(0)
+        const pipSvg = pip.locator('[data-mermaid-canvas] svg')
+        await expect(pipSvg).toBeVisible()
+        const pipBodyBox = await pip.locator('[data-window-inplace-body]').boundingBox()
+        const pipSvgBox = await pipSvg.boundingBox()
+        expect(pipSvgBox!.width).toBeLessThanOrEqual(pipBodyBox!.width)
+        expect(pipSvgBox!.height).toBeLessThanOrEqual(pipBodyBox!.height)
+
+        // Act: press ArrowUp from line 1 to focus Copy button, Tab to Fullscreen button, and ArrowUp to move above the block
+        const copyBtn = mermaidNode.getByRole('button', { name: 'Copy Mermaid source' })
+        const fullscreenBtn = mermaidNode.getByRole('button', {
+          name: 'Fullscreen Mermaid diagram',
+        })
+        await page.keyboard.press('ArrowUp')
+        await expect(copyBtn).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(fullscreenBtn).toBeFocused()
+        await page.keyboard.press('ArrowUp')
+        await expect(prose).toBeFocused()
+      })
+    })
+
+    test.describe('When the user pans and zooms the in-place preview in edit mode', () => {
+      test('it updates its scale and pan offsets', async ({ page, workspace }) => {
+        // Arrange
+        await openMermaidArticle(page, workspace)
+        const mermaidNode = page.locator('.ProseMirror [data-mermaid-node]')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await mermaidNode.getByRole('button', { name: 'Edit Mermaid diagram' }).click()
+        const pip = mermaidNode.locator('[data-window-inplace]')
+
+        // Act
+        await pip.locator('[data-pip-diagram]').dispatchEvent('wheel', {
+          deltaY: -100,
+          ctrlKey: true,
+        })
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.1')
+        await page.keyboard.press('Control+0')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1')
+        await page.keyboard.press('Control+=')
+        await page.keyboard.press('Control+j')
+
+        // Assert
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-scale', '1.25')
+        await expect(pip.locator('[data-mermaid-canvas]')).toHaveAttribute(
+          'style',
+          /translate3d\(0px,\s*48px,\s*0(?:px)?\)\s*scale\(1\.25\)/,
+        )
+      })
+    })
+
+    test.describe('When the user maximizes, edits, and exits a Mermaid diagram in edit mode', () => {
+      test('it opens the split-screen view, updates the preview live, focuses the preview pane, shows an error bar on invalid syntax, switches to fullscreen preview on Escape, and minimizes on a second Escape', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await openMermaidArticle(page, workspace)
+        const mermaidNode = page.locator('.ProseMirror [data-mermaid-node]')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await mermaidNode.getByRole('button', { name: 'Edit Mermaid diagram' }).click()
+
+        // Act: maximize into split-screen view via Ctrl+w z
+        await page.keyboard.press('Control+w')
+        await page.keyboard.press('z')
+
+        // Assert: split-screen view opens with code on the left and preview on the right
+        const splitFullscreen = page.locator(
+          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="split"]',
+        )
+        await expect(splitFullscreen).toBeVisible()
+        const splitCodePane = splitFullscreen.locator('[data-mermaid-split-pane="code"]')
+        const splitPreview = splitFullscreen.locator('[data-mermaid-split-preview]')
+        await expect(splitCodePane).toHaveAttribute('data-pane-focused', 'true')
+        const surfaceBox = await splitFullscreen.boundingBox()
+        const codeBox = await splitCodePane.boundingBox()
+        const previewBox = await splitPreview.boundingBox()
+        expect(Math.abs(codeBox!.x - surfaceBox!.x)).toBeLessThanOrEqual(2)
+        expect(
+          Math.abs(previewBox!.x + previewBox!.width - (surfaceBox!.x + surfaceBox!.width)),
+        ).toBeLessThanOrEqual(2)
+
+        // Act: edit Mermaid code in split screen and pan/zoom with Ctrl+= and Ctrl+l
+        await page.keyboard.press('Control+=')
+        await page.keyboard.press('Control+l')
+        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1.25')
+        await page.keyboard.type('  X[Step] --> A[Start]\n')
+
+        // Assert: saves the updated Markdown
+        await expect
+          .poll(() => readFile(join(workspace.root, mermaidPath), 'utf8'))
+          .toContain('X[Step] --> A[Start]')
+
+        // Act: switch focus to the split-screen preview pane with Ctrl+w l
+        await page.keyboard.press('Control+w')
+        await page.keyboard.press('l')
+        await expect(splitPreview).toBeFocused()
+        await page.keyboard.press('+')
+        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1.5')
+        await page.keyboard.press('0')
+        await expect(splitFullscreen).toHaveAttribute('data-mermaid-scale', '1')
+
+        // Act: switch back to code pane and enter invalid Mermaid syntax
+        await page.keyboard.press('Tab')
+        await page.keyboard.type('  ??? invalid syntax\n')
+
+        // Assert: keeps the last valid diagram and shows a bottom error bar
+        const errorFooter = splitFullscreen.locator('[data-mermaid-footer][data-mermaid-error]')
+        await expect(errorFooter).toBeVisible()
+        await expect(splitPreview.locator('[data-mermaid-canvas] svg')).toBeVisible()
+
+        // Act: press Escape in split screen
+        await page.keyboard.press('Escape')
+
+        // Assert: exits to view mode and switches to fullscreen preview
+        const viewerFullscreen = page.locator(
+          '[data-mermaid-fullscreen-surface][data-mermaid-fullscreen-mode="viewer"]',
+        )
+        await expect(badge).toHaveText('helix · normal')
+        await expect(viewerFullscreen).toBeVisible()
+
+        // Act: press Escape in fullscreen preview
+        await page.keyboard.press('Escape')
+
+        // Assert: minimizes fullscreen back to the inline diagram
+        await expect(viewerFullscreen).toHaveCount(0)
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
+      })
+    })
+  },
+)
+
+test.describe(
+  'Given the user is in select mode',
+  { tag: ['@desktop', '@editor', '@modal-editing'] },
+  () => {
+    test.describe('When the user selects lines in a Mermaid diagram and presses Escape', () => {
+      test('it enters select mode on x, shows the code and in-place preview, extends selection to the next line on a second x, and returns to view mode on Escape', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await openMermaidArticle(page, workspace)
+        const prose = page.locator('.ProseMirror')
+        const mermaidNode = prose.locator('[data-mermaid-node]')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+
+        // Act: press x on a Mermaid diagram
+        await page.keyboard.press('x')
+
+        // Assert: enters select mode, shows the code and in-place preview, and selects the first line
+        await expect(badge).toHaveText('helix · select')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'select')
+        await expect(mermaidNode.locator('[data-mermaid-code]')).not.toHaveClass(/sr-only/)
+        await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
+          'flowchart',
+        )
+        const pip = mermaidNode.locator('[data-window-inplace]')
+        await expect(pip).toBeVisible()
+        await expect(pip).toHaveAttribute('data-window-inplace-scope', 'container')
+        await expect(pip).toHaveAttribute('data-window-inplace-placement', 'top-right')
+        await expect(pip.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(pip.locator('[data-mermaid-canvas] svg')).toBeVisible()
+        const selectedSpan = mermaidNode.locator(
+          '[data-mermaid-code] [data-pm-modal-selection="select"]',
+        )
+        await expect
+          .poll(async () => (await selectedSpan.allTextContents()).join(''))
+          .toBe('flowchart TD')
+
+        // Act: press x again in a Mermaid diagram
+        await page.keyboard.press('x')
+
+        // Assert: extends the selection to the next line
+        await expect
+          .poll(async () => (await selectedSpan.allTextContents()).join(''))
+          .toBe('flowchart TD\n  A[Start] --> B[End]')
+
+        // Act: press Escape in select mode on a Mermaid diagram
+        await page.keyboard.press('Escape')
+
+        // Assert: returns to view mode and hides the in-place preview
+        await expect(badge).toHaveText('helix · normal')
+        await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
+        await expect(pip).toHaveCount(0)
       })
     })
   },

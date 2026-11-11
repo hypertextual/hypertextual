@@ -85,16 +85,44 @@ export class CursorManager {
     event: KeyboardEvent,
     nodeTypeName: string,
   ): { target: HTMLElement; wrapper: HTMLElement; pos: number; node: PMNode } | null {
-    if (!(event.target instanceof HTMLElement)) return null
-    const wrapper = event.target.closest<HTMLElement & { __htmdGetPos?: () => number | undefined }>(
+    const rawTarget =
+      event.target instanceof HTMLElement
+        ? event.target
+        : typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null
+    if (!rawTarget) return null
+    const wrapper = rawTarget.closest<HTMLElement & { __htmdGetPos?: () => number | undefined }>(
       `.node-${nodeTypeName}`,
     )
-    if (!wrapper || !event.target.closest('[contenteditable="false"]')) return null
+    if (!wrapper || !rawTarget.closest('[contenteditable="false"]')) return null
     const pos = wrapper.__htmdGetPos?.()
     if (typeof pos !== 'number') return null
     const node = state.doc.nodeAt(pos)
     if (!node || node.type.name !== nodeTypeName) return null
-    return { target: event.target, wrapper, pos, node }
+    return { target: rawTarget, wrapper, pos, node }
+  }
+
+  /**
+   * Blurs any focused descendant control inside the ProseMirror root before
+   * focusing the editor view so WebKit and Chromium reliably return focus to `.ProseMirror`.
+   */
+  static focusEditorView(editor: TiptapEditor): void {
+    try {
+      const viewDom = editor.view?.dom
+      const activeEl = typeof document !== 'undefined' ? document.activeElement : null
+      if (
+        viewDom &&
+        activeEl instanceof HTMLElement &&
+        activeEl !== viewDom &&
+        viewDom.contains(activeEl)
+      ) {
+        activeEl.blur()
+      }
+      editor.view?.focus()
+    } catch {
+      // Headless editor view
+    }
   }
 
   /**
@@ -104,7 +132,7 @@ export class CursorManager {
   static focusTextPosition(editor: TiptapEditor, position: number): boolean {
     const clamped = Math.max(0, Math.min(editor.state.doc.content.size, position))
     editor.commands.setTextSelection(clamped)
-    editor.view?.focus()
+    CursorManager.focusEditorView(editor)
     return true
   }
 }

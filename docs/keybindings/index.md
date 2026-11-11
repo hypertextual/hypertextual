@@ -27,8 +27,8 @@ stateDiagram-v2
 | Mode | Badge | Entry | Behavior |
 | --- | --- | --- | --- |
 | **Normal** | `NORMAL` | Default when opening an existing article; press `Escape` from `insert` or `select` mode | Single-key motions, operators, and prefix menus are active. Unbound printable keys are blocked from mutating the document. `.ProseMirror` renders a block cursor (`[data-pm-modal-cursor]`). Node views (notices, images, link previews, code blocks, Mermaid diagrams) render clean reading chrome without form inputs or remove buttons. |
-| **Select** | `SELECT` | Press `v` or `x` (`V` in Vim) in `normal` mode | Motions extend the active selection from its anchor across text and non-text blocks (`notice`, `imageNode`, `linkPreview`, `codeBlock`, `mermaid`, `urlMention`, `internalMention`). On a `mermaid` block, `select` mode reveals the syntax-highlighted Mermaid source lines alongside the compact top-right `PipWindow` preview so `x` and `j`/`k` select individual lines of Mermaid code. Selected text renders `[data-pm-modal-selection="select"]` and selected non-text nodes render `[data-pm-modal-node-selection="select"]`. |
-| **Insert** | `INSERT` | Press `i`, `a`, `I`, `A`, `o`, `O`, `c`, click editable article text, or create a `New article` | Standard text typing, slash commands (`/`), internal mentions (`@`), the selection `BubbleMenu` toolbar, and node-view editing controls (`Notice title` input, `Notice type` select, `Code language` select, Mermaid source editor + top-right `PipWindow` preview, image `caption` input, and `Remove` buttons) are active. |
+| **Select** | `SELECT` | Press `v` or `x` (`V` in Vim) in `normal` mode | Motions extend the active selection from its anchor across text and non-text blocks (`notice`, `imageNode`, `linkPreview`, `codeBlock`, `mermaid`, `urlMention`, `internalMention`). On a `mermaid` block, `select` mode reveals the syntax-highlighted Mermaid source lines alongside the compact top-right `WindowInplace` preview so `x` and `j`/`k` select individual lines of Mermaid code. Selected text renders `[data-pm-modal-selection="select"]` and selected non-text nodes render `[data-pm-modal-node-selection="select"]`. |
+| **Insert** | `INSERT` | Press `i`, `a`, `I`, `A`, `o`, `O`, `c`, click editable article text, or create a `New article` | Standard text typing, slash commands (`/`), internal mentions (`@`), the selection `BubbleMenu` toolbar, and node-view editing controls (`Notice title` input, `Notice type` select, `Code language` select, Mermaid source editor + top-right `WindowInplace` preview, image `caption` input, and `Remove` buttons) are active. |
 | **Jump** | `JUMP` | Press `gw`, `<leader>j` (`Space j`), or `s` (in Vim preset) | Overlays 2D home-row jump badges (`[data-which-key-jump-overlay]`) over visible interactive targets in both the Workspace Explorer tree and the Article pane. Typing a badge's characters focuses or activates that target and returns to `normal` mode. |
 
 ---
@@ -206,9 +206,9 @@ All operators work uniformly on inline text selections, textblocks, and non-text
 
 ---
 
-## Mermaid Diagram Editor & Viewer Shortcuts (`MermaidNode` & `MermaidNodeView`)
+## Mermaid Diagram Editor & Viewer Shortcuts (`MermaidEditor`)
 
-Fenced ```` ```mermaid ```` blocks use a dedicated `mermaid` block node (`MermaidNodeView.svelte`) separate from `codeBlock` (`mermaid` is disallowed as a `codeBlock` language).
+Fenced ```` ```mermaid ```` blocks use a dedicated `mermaid` block node (`MermaidEditor.svelte`) separate from `codeBlock` (`mermaid` is disallowed as a `codeBlock` language).
 
 | Context | Key Sequence | Behavior |
 | --- | --- | --- |
@@ -219,11 +219,12 @@ Fenced ```` ```mermaid ```` blocks use a dedicated `mermaid` block node (`Mermai
 | **Normal Mode (inline `mermaid` block highlighted)** | `f` / `Space m f` | Open the editor-scoped **Fullscreen Viewer** filling the `HtmdEditor` pane (with `Edit` and `Minimize` header buttons) |
 | **Normal Mode (inline `mermaid` block highlighted)** | `+` / `=` / `-` / `0` | Zoom in, zoom out, or reset zoom/pan inline without leaving `normal` mode |
 | **Normal Mode (inline `mermaid` block highlighted)** | `H` / `J` / `K` / `L` | Pan the inline Mermaid diagram canvas left, down, up, or right while keeping `j`/`k` free for block navigation |
-| **Normal Mode (inline `mermaid` block highlighted)** | `Enter` / `i` | Enter `insert` mode inside the Mermaid source editor (showing the live top-right `PipWindow` preview) |
-| **Select Mode (`v` or `x` on a `mermaid` block)** | `x` / `j` / `k` | Switches to the Mermaid source + top-right `PipWindow` preview layout and selects or extends across individual lines of Mermaid code |
+| **Normal Mode (inline `mermaid` block highlighted)** | `Enter` / `i` | Enter `insert` mode inside the Mermaid source editor (showing the live top-right `WindowInplace` preview) |
+| **Select Mode (`v` or `x` on a `mermaid` block)** | `x` / `j` / `k` | Switches to the Mermaid source + top-right `WindowInplace` preview layout and selects or extends across individual lines of Mermaid code |
 | **Fullscreen Viewer (`normal` mode)** | `h` / `j` / `k` / `l` / Arrow keys, `+` / `-` / `0` | Pan and zoom the fullscreen diagram canvas |
 | **Fullscreen Viewer (`normal` mode)** | `Enter` / `i` | Transition directly into `insert` mode in the Fullscreen Split-Pane Editor |
-| **Fullscreen Viewer / Split-Pane Editor** | `Escape` / `f` / `q` (Viewer) or `Escape` (Split-Pane) | Minimize fullscreen and return to the inline `mermaid` block |
+| **Fullscreen Split-Pane Editor (`insert` / `select` mode)** | `Escape` | Exit `insert`/`select` mode to `normal` mode and switch to the Fullscreen Viewer |
+| **Fullscreen Viewer (`normal` mode)** | `Escape` / `f` / `q` | Minimize fullscreen and return to the inline `mermaid` block |
 | **Fullscreen Split-Pane Editor (`insert` mode)** | `Ctrl-w l` / `Ctrl-w h` / `Ctrl-w w` / `Tab` | Switch focus between the left `Code` pane and the right `Preview` pane (where single-key `h`/`j`/`k`/`l` and `+`/`-`/`0` are active) |
 
 ---

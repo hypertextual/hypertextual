@@ -155,27 +155,7 @@ run = '''
 set -eu
 if [ "${PREMISE_TEMPLATE_TEST:-}" = "1" ]; then
   cargo tauri build --debug --no-bundle
-  exit 0
-fi
-
-dev_port="$(node -e '
-  const net = require("node:net");
-  const preferred = Number(process.env.HYPERTEXTUAL_DEV_PORT) || 1430;
-  const probe = (port) => new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.unref();
-    srv.on("error", reject);
-    srv.listen(port, "127.0.0.1", () => {
-      const picked = srv.address().port;
-      srv.close(() => resolve(picked));
-    });
-  });
-  probe(preferred).catch(() => probe(0)).then((p) => process.stdout.write(String(p)));
-')"
-export HYPERTEXTUAL_DEV_PORT="$dev_port"
-tauri_dev_config="{\"build\":{\"devUrl\":\"http://127.0.0.1:$dev_port\"}}"
-
-if [ "$(uname -s)" = "Darwin" ] && [ "$(launchctl managername 2>/dev/null || true)" != "Aqua" ]; then
+elif [ "$(uname -s)" = "Darwin" ] && [ "$(launchctl managername 2>/dev/null || true)" != "Aqua" ]; then
   uid="$(id -u)"
   label="com.hypertextual.desktop.dev.$$"
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/hypertextual-aqua.XXXXXX")"
@@ -210,14 +190,12 @@ if [ "$(uname -s)" = "Darwin" ] && [ "$(launchctl managername 2>/dev/null || tru
     <string>${RUSTUP_HOME:-$HOME/.rustup}</string>
     <key>RUST_LOG</key>
     <string>${RUST_LOG:-}</string>
-    <key>HYPERTEXTUAL_DEV_PORT</key>
-    <string>$HYPERTEXTUAL_DEV_PORT</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>cargo tauri dev --config '$tauri_dev_config'; echo \$? > "$done_file"</string>
+    <string>cargo tauri dev; echo \$? > "$done_file"</string>
   </array>
   <key>WorkingDirectory</key>
   <string>$PWD</string>
@@ -240,7 +218,7 @@ EOF
   sleep 0.1
   exit "$rc"
 else
-  cargo tauri dev --config "$tauri_dev_config"
+  cargo tauri dev
 fi
 '''
 

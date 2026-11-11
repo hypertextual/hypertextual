@@ -114,7 +114,9 @@
           <CodeBlockTitle>{currentLanguageLabel}</CodeBlockTitle>
         {/if}
       </div>
-      <CodeBlockCopyButton class="ml-auto" />
+      <CodeBlockCopyButton
+        class="ml-auto focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      />
     </CodeBlockHeader>
     <div class={codeBlockBodyBase}>
       <pre class={cn(codeBlockContentBase, codeContent)}><code

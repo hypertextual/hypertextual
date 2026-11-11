@@ -1,23 +1,16 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte'
-  import {
-    cn,
-    codeBlockBodyBase,
-    codeBlockContentBase,
-    mermaidLoadingBase,
-    mermaidSvgBase,
-    renderMermaidSource,
-  } from '@cloudvoyant/helical-ui'
+  import { tick } from 'svelte'
+  import { cn, codeBlockBodyBase, codeBlockContentBase } from '@cloudvoyant/helical-ui'
   import { useKeymap } from '@cloudvoyant/helical-svelte'
   import { Check, Copy, GitFork, Maximize2, Minimize2, Pencil } from 'lucide-svelte'
-  import PipWindow from '../../pip-window/PipWindow.svelte'
+  import MermaidViewer from '../../mermaid-viewer/MermaidViewer.svelte'
+  import WindowInplace from '../../window-inplace/WindowInplace.svelte'
   import {
     codeContent,
     mermaidCodeContainer,
     mermaidErrorFooter,
     mermaidFullscreenOverlay,
     mermaidHeader,
-    mermaidPipSvgFit,
     mermaidRootVariants,
     mermaidSplitCodePane,
     mermaidSplitPreviewPane,
@@ -26,10 +19,10 @@
     mermaidToolbarButton,
     mermaidViewerCanvas,
   } from './styles'
-  import type { MermaidNodeViewProps } from './types'
+  import type { MermaidEditorProps } from './types'
 
   // Props ---------------------------------------------------------------------
-  let { editor, node, mode, getPos }: MermaidNodeViewProps = $props()
+  let { editor, node, selected, mode, getPos }: MermaidEditorProps = $props()
 
   // State ---------------------------------------------------------------------
   const PAN_STEP = 48
@@ -38,37 +31,24 @@
   const MAX_ZOOM = 4.0
 
   let wrapperEl = $state<HTMLDivElement | null>(null)
-  let splitPreviewEl = $state<HTMLDivElement | null>(null)
+  let mainViewer = $state<ReturnType<typeof MermaidViewer> | null>(null)
 
-  let svgMarkup = $state('')
-  let lastValidSvg = $state('')
   let renderError = $state<string | null>(null)
-  let isRendering = $state(false)
-
   let scale = $state(1)
   let panX = $state(0)
   let panY = $state(0)
   let isFullscreen = $state(false)
+  let isBlockActive = $state(false)
   let fullscreenRect = $state<{ top: number; left: number; width: number; height: number } | null>(
     null,
   )
   let splitFocusPane = $state<'code' | 'preview'>('code')
   let pendingWindowPrefix = false
   let copied = $state(false)
-  let isPointerPanning = $state(false)
-  let pointerPanStart = { clientX: 0, clientY: 0, startX: 0, startY: 0 }
-  let activePointers = new Map<number, { clientX: number; clientY: number }>()
-  let pinchStartDistance = 0
-  let pinchStartScale = 1
-  let renderSeq = 0
 
   // Derived -------------------------------------------------------------------
   const sourceCode = $derived(node.textContent)
   const isCodeMode = $derived(mode === 'insert' || mode === 'select')
-  const displaySvg = $derived(svgMarkup || lastValidSvg)
-  const canvasTransformStyle = $derived(
-    `transform: translate3d(${panX}px, ${panY}px, 0) scale(${scale}); transform-origin: center center;`,
-  )
   const wrapperStyle = $derived(
     isFullscreen && fullscreenRect
       ? `white-space: normal; top: ${fullscreenRect.top}px; left: ${fullscreenRect.left}px; width: ${fullscreenRect.width}px; height: ${fullscreenRect.height}px;`
@@ -77,17 +57,8 @@
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
-    const code = sourceCode.trim()
-    if (!code) {
-      svgMarkup = ''
-      renderError = null
-      return
-    }
-    const delay = untrack(() => (isCodeMode && lastValidSvg ? 120 : 0))
-    const timer = setTimeout(() => {
-      void renderDiagram(code)
-    }, delay)
-    return () => clearTimeout(timer)
+    syncActiveState()
+    return editor.subscribe(syncActiveState)
   })
 
   $effect(() => {
@@ -155,23 +126,71 @@
         splitFocusPane = 'code'
         focusCodeEditor()
       } else {
-        splitPreviewEl?.focus()
+        mainViewer?.focus()
       }
     })
   })
 
-  $effect(() => {
-    if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return
-    const observer = new MutationObserver(() => {
-      const code = sourceCode.trim()
-      if (code) void renderDiagram(code)
-    })
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-    return () => observer.disconnect()
-  })
+  useKeymap(
+    () => ({
+      Space: {
+        key: 'Space',
+        label: '+leader',
+        group: 'Leader',
+        category: 'Leader',
+        mode: ['normal', 'select'],
+        children: {
+          m: {
+            key: 'm',
+            label: '+mermaid',
+            group: 'Mermaid',
+            category: 'Mermaid',
+            children: {
+              f: {
+                key: 'f',
+                label: 'Toggle Mermaid Fullscreen',
+                category: 'Mermaid',
+                action: () => toggleFullscreen(),
+              },
+            },
+          },
+          w: {
+            key: 'w',
+            label: '+window',
+            group: 'Window',
+            category: 'Window',
+            children: {
+              z: {
+                key: 'z',
+                label: 'Toggle Mermaid Maximize',
+                category: 'Window',
+                action: () => toggleFullscreen(),
+              },
+            },
+          },
+        },
+      },
+      'Control+w': {
+        key: 'Control+w',
+        label: '+window',
+        group: 'Window',
+        category: 'Window',
+        mode: ['normal', 'select', 'insert'],
+        children: {
+          z: {
+            key: 'z',
+            label: 'Toggle Mermaid Maximize',
+            category: 'Window',
+            action: () => toggleFullscreen(),
+          },
+        },
+      },
+    }),
+    {
+      priority: 'extension',
+      enabled: () => isBlockActive || isFullscreen,
+    },
+  )
 
   useKeymap(
     () => ({
@@ -419,23 +438,14 @@
   )
 
   // Methods -------------------------------------------------------------------
-  async function renderDiagram(code: string) {
-    const seq = ++renderSeq
-    isRendering = true
-    try {
-      const rendered = await renderMermaidSource(code)
-      if (seq !== renderSeq) return
-      svgMarkup = rendered
-      lastValidSvg = rendered
-      renderError = null
-    } catch (err) {
-      if (seq !== renderSeq) return
-      renderError = err instanceof Error ? err.message : 'Invalid Mermaid syntax'
-    } finally {
-      if (seq === renderSeq) {
-        isRendering = false
-      }
+  function syncActiveState() {
+    const pos = getPos?.()
+    if (typeof pos !== 'number') {
+      isBlockActive = Boolean(selected)
+      return
     }
+    const sel = editor.getSelectionState()
+    isBlockActive = Boolean(selected) || (sel.from >= pos && sel.to <= pos + node.nodeSize)
   }
 
   function syncDatasetState() {
@@ -497,13 +507,13 @@
     return true
   }
 
+  function toggleFullscreen(): boolean {
+    return isFullscreen ? closeFullscreen() : openFullscreen()
+  }
+
   function handleToggleFullscreenClick(event: MouseEvent) {
     event.stopPropagation()
-    if (isFullscreen) {
-      closeFullscreen()
-    } else {
-      openFullscreen()
-    }
+    toggleFullscreen()
   }
 
   function enterEditMode(): boolean {
@@ -532,7 +542,7 @@
       splitFocusPane = 'code'
       focusCodeEditor()
     } else {
-      splitPreviewEl?.focus()
+      mainViewer?.focus()
     }
   }
 
@@ -542,7 +552,7 @@
       if (pane === 'code') {
         focusCodeEditor()
       } else {
-        splitPreviewEl?.focus()
+        mainViewer?.focus()
       }
     })
     return true
@@ -729,80 +739,6 @@
       })
     }
   }
-
-  function getTouchDistance(): number {
-    const pts = Array.from(activePointers.values())
-    if (pts.length < 2) return 0
-    return Math.hypot(pts[1]!.clientX - pts[0]!.clientX, pts[1]!.clientY - pts[0]!.clientY)
-  }
-
-  function handleCanvasWheel(event: WheelEvent) {
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault()
-      event.stopPropagation()
-      const factor = event.deltaY < 0 ? 1.1 : 0.9
-      const next = Math.round(scale * factor * 100) / 100
-      scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
-      syncDatasetState()
-    }
-  }
-
-  function handleCanvasPointerDown(event: PointerEvent) {
-    if (event.button !== 0 && event.pointerType === 'mouse') return
-    const target = event.target as HTMLElement | null
-    if (target?.closest('button, input, textarea, select')) return
-    event.preventDefault()
-    event.stopPropagation()
-    activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
-    ;(event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId)
-
-    if (activePointers.size === 2) {
-      isPointerPanning = false
-      pinchStartDistance = getTouchDistance()
-      pinchStartScale = scale
-      return
-    }
-
-    if (activePointers.size === 1) {
-      isPointerPanning = true
-      pointerPanStart = {
-        clientX: event.clientX,
-        clientY: event.clientY,
-        startX: panX,
-        startY: panY,
-      }
-    }
-  }
-
-  function handleCanvasPointerMove(event: PointerEvent) {
-    if (activePointers.has(event.pointerId)) {
-      activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
-    }
-    if (activePointers.size >= 2 && pinchStartDistance > 0) {
-      const dist = getTouchDistance()
-      if (dist > 0) {
-        const next = Math.round(pinchStartScale * (dist / pinchStartDistance) * 100) / 100
-        scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next))
-        syncDatasetState()
-      }
-      return
-    }
-    if (!isPointerPanning) return
-    panX = pointerPanStart.startX + (event.clientX - pointerPanStart.clientX)
-    panY = pointerPanStart.startY + (event.clientY - pointerPanStart.clientY)
-    syncDatasetState()
-  }
-
-  function handleCanvasPointerUp(event: PointerEvent) {
-    activePointers.delete(event.pointerId)
-    if (activePointers.size < 2) {
-      pinchStartDistance = 0
-    }
-    if (activePointers.size === 0) {
-      isPointerPanning = false
-    }
-    ;(event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId)
-  }
 </script>
 
 <div
@@ -877,21 +813,24 @@
 
   <div
     data-mermaid-body=""
-    class={cn('relative flex min-h-0 w-full flex-1', isFullscreen && isCodeMode ? 'flex-row' : 'flex-col')}
+    class={cn(
+      'relative flex min-h-0 w-full flex-1',
+      isFullscreen && isCodeMode ? 'flex-row' : 'flex-col',
+    )}
   >
     <div
       data-mermaid-code=""
       data-mermaid-split-pane={isFullscreen && isCodeMode ? 'code' : undefined}
       data-mermaid-split-code={isFullscreen && isCodeMode ? '' : undefined}
-      data-pane-focused={isFullscreen && isCodeMode ? (splitFocusPane === 'code' ? 'true' : 'false') : undefined}
+      data-pane-focused={isFullscreen && isCodeMode
+        ? splitFocusPane === 'code'
+          ? 'true'
+          : 'false'
+        : undefined}
       onfocusin={handleCodePaneFocus}
       class={cn(
         codeBlockBodyBase,
-        !isCodeMode
-          ? 'sr-only'
-          : isFullscreen
-            ? mermaidSplitCodePane
-            : mermaidCodeContainer,
+        !isCodeMode ? 'sr-only' : isFullscreen ? mermaidSplitCodePane : mermaidCodeContainer,
       )}
     >
       <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
@@ -900,87 +839,57 @@
           style="white-space: pre-wrap;"></code></pre>
 
       {#if isCodeMode && !isFullscreen}
-        <PipWindow
+        <WindowInplace
           title="Preview"
           scope="container"
           placement="top-right"
           showHeader={false}
           boundaryEl={wrapperEl}
         >
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
+          <MermaidViewer
+            code={sourceCode}
+            debounceMs={120}
+            fit="contain"
+            bind:scale
+            bind:panX
+            bind:panY
+            bind:error={renderError}
+            onviewportchange={syncDatasetState}
             data-pip-diagram=""
-            data-mermaid-viewport=""
-            class="relative flex h-full w-full cursor-grab items-center justify-center overflow-hidden touch-none active:cursor-grabbing"
-            onwheel={handleCanvasWheel}
-            onpointerdown={handleCanvasPointerDown}
-            onpointermove={handleCanvasPointerMove}
-            onpointerup={handleCanvasPointerUp}
-            onpointercancel={handleCanvasPointerUp}
-          >
-            <div
-              data-mermaid-canvas=""
-              class={cn(mermaidSvgBase, mermaidPipSvgFit, 'transition-transform duration-75')}
-              style={canvasTransformStyle}
-            >
-              {#if displaySvg}
-                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                {@html displaySvg}
-              {:else}
-                <span class="text-xs text-muted-foreground">Empty diagram</span>
-              {/if}
-            </div>
-          </div>
-        </PipWindow>
+          />
+        </WindowInplace>
       {/if}
     </div>
 
     {#if !isCodeMode || isFullscreen}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div
-        bind:this={splitPreviewEl}
+      <MermaidViewer
+        bind:this={mainViewer}
+        code={sourceCode}
+        debounceMs={isCodeMode ? 120 : 0}
+        fit="auto"
         tabindex={isFullscreen ? 0 : -1}
-        role="region"
-        aria-label="Mermaid diagram preview"
-        contenteditable={false}
+        bind:scale
+        bind:panX
+        bind:panY
+        bind:error={renderError}
+        onviewportchange={syncDatasetState}
+        onfocus={handlePreviewPaneFocus}
+        onkeydown={handlePreviewKeyDown}
         data-mermaid-viewer={!isFullscreen && !isCodeMode ? '' : undefined}
         data-mermaid-fullscreen-viewer={isFullscreen && !isCodeMode ? '' : undefined}
         data-mermaid-split-pane={isFullscreen && isCodeMode ? 'preview' : undefined}
         data-mermaid-split-preview={isFullscreen && isCodeMode ? '' : undefined}
-        data-mermaid-viewport=""
-        data-pane-focused={isFullscreen && isCodeMode ? (splitFocusPane === 'preview' ? 'true' : 'false') : undefined}
-        data-modal-ignore-pointer=""
-        class={cn(
-          isFullscreen
-            ? isCodeMode
-              ? mermaidSplitPreviewPane
-              : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
-            : mermaidViewerCanvas,
-          'cursor-grab touch-none active:cursor-grabbing',
-        )}
-        onfocus={handlePreviewPaneFocus}
-        onkeydown={handlePreviewKeyDown}
-        onwheel={handleCanvasWheel}
-        onpointerdown={handleCanvasPointerDown}
-        onpointermove={handleCanvasPointerMove}
-        onpointerup={handleCanvasPointerUp}
-        onpointercancel={handleCanvasPointerUp}
-      >
-        {#if displaySvg}
-          <div
-            data-mermaid-fullscreen-canvas={isFullscreen ? '' : undefined}
-            data-mermaid-canvas=""
-            class={cn(mermaidSvgBase, 'transition-transform duration-75')}
-            style={canvasTransformStyle}
-          >
-            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-            {@html displaySvg}
-          </div>
-        {:else if isRendering}
-          <div class={mermaidLoadingBase}>Rendering diagram...</div>
-        {/if}
-      </div>
+        data-pane-focused={isFullscreen && isCodeMode
+          ? splitFocusPane === 'preview'
+            ? 'true'
+            : 'false'
+          : undefined}
+        class={isFullscreen
+          ? isCodeMode
+            ? mermaidSplitPreviewPane
+            : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
+          : mermaidViewerCanvas}
+      />
     {/if}
   </div>
 

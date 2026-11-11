@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "mise run //apps/hypertextual-svelte:dev",
     "beforeBuildCommand": "mise run //apps/hypertextual-svelte:build",
-    "devUrl": "http://127.0.0.1:1430",
+    "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../hypertextual-svelte/dist"
   },
   "app": {

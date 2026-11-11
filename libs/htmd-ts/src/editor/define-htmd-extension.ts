@@ -69,9 +69,10 @@ export interface HtmdControlFocusOptions {
 }
 
 export interface HtmdNodeNavigation {
-  kind: 'textblock' | 'container' | 'atom'
+  kind: 'textblock' | 'container' | 'atom' | 'inplace'
   controls?: readonly string[]
   defaultControl?: string
+  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   subtext?: HtmdSubtextSpec
@@ -230,12 +231,14 @@ export function defineHtmdExtension<
  * from above and at the end from below.
  */
 export function createTextblockNavigation(config?: {
+  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   serializeModalText?: (node: PMNode) => string
 }): HtmdNodeNavigation {
   return {
     kind: 'textblock',
+    textObject: config?.textObject,
     multilineTextblock: config?.multilineTextblock,
     expandSelectionRange: config?.expandSelectionRange,
     serializeModalText: config?.serializeModalText,
@@ -245,7 +248,7 @@ export function createTextblockNavigation(config?: {
       if (!selection) return false
       CursorManager.clearActiveCompoundBlockPos(editor)
       editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
     enterFromBelow(editor, pos, node) {
@@ -255,7 +258,7 @@ export function createTextblockNavigation(config?: {
       if (!selection) return false
       CursorManager.clearActiveCompoundBlockPos(editor)
       editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
   }
@@ -268,6 +271,7 @@ export function createTextblockNavigation(config?: {
 export function createContainerNodeNavigation(config: {
   controls: readonly string[]
   defaultControl?: string
+  textObject?: 'p' | 'c' | 'n' | 'l'
   multilineTextblock?: boolean
   expandSelectionRange?: boolean
   subtext?: HtmdSubtextSpec
@@ -289,6 +293,7 @@ export function createContainerNodeNavigation(config: {
     kind: 'container',
     controls: config.controls,
     defaultControl: config.defaultControl,
+    textObject: config.textObject,
     multilineTextblock: config.multilineTextblock,
     expandSelectionRange: config.expandSelectionRange ?? true,
     subtext: config.subtext,
@@ -308,7 +313,7 @@ export function createContainerNodeNavigation(config: {
           return true
         }
       }
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
     enterFromBelow(editor, pos, node) {
@@ -317,16 +322,66 @@ export function createContainerNodeNavigation(config: {
       if (enterBelowMode === 'endPos') {
         const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
         editor.commands.setTextSelection(endPos)
-        editor.view?.focus()
+        CursorManager.focusEditorView(editor)
         return true
       }
       const selection = Selection.findFrom(doc.resolve(pos + node.nodeSize - 1), -1, true)
       if (selection) {
         editor.commands.setTextSelection(selection.from)
-        editor.view?.focus()
+        CursorManager.focusEditorView(editor)
         return true
       }
       return false
+    },
+    focusControl: config.focusControl,
+  }
+}
+
+/**
+ * Creates an `inplace` navigation contract for complex code/diagram blocks
+ * (`mermaid`) that render an in-place window preview in edit/select modes,
+ * select as a whole block in `normal` mode, and enter at the first line from
+ * above or the last line from below in `insert` mode.
+ */
+export function createInplaceWindowNodeNavigation(config: {
+  controls: readonly string[]
+  defaultControl?: string
+  textObject?: 'p' | 'c' | 'n' | 'l'
+  multilineTextblock?: boolean
+  expandSelectionRange?: boolean
+  bodyOffset?: number
+  focusControl?: (
+    editor: TiptapEditor,
+    pos: number,
+    node: PMNode,
+    options?: HtmdControlFocusOptions,
+  ) => boolean
+  serializeModalText?: (node: PMNode) => string
+}): HtmdNodeNavigation {
+  const bodyOffset = config.bodyOffset ?? 1
+
+  return {
+    kind: 'inplace',
+    controls: config.controls,
+    defaultControl: config.defaultControl ?? 'body',
+    textObject: config.textObject ?? 'c',
+    multilineTextblock: config.multilineTextblock ?? true,
+    expandSelectionRange: config.expandSelectionRange ?? true,
+    serializeModalText: config.serializeModalText,
+    enterFromAbove(editor, pos) {
+      const { doc } = editor.state
+      CursorManager.setActiveCompoundBlockPos(editor, pos)
+      const targetPos = Math.min(pos + bodyOffset, doc.content.size)
+      editor.commands.setTextSelection(targetPos)
+      CursorManager.focusEditorView(editor)
+      return true
+    },
+    enterFromBelow(editor, pos, node) {
+      CursorManager.setActiveCompoundBlockPos(editor, pos)
+      const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
+      editor.commands.setTextSelection(endPos)
+      CursorManager.focusEditorView(editor)
+      return true
     },
     focusControl: config.focusControl,
   }
