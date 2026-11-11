@@ -111,7 +111,7 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Keep each BDD leaf test focused on a single behavior or transition and hoist shared setup into the enclosing `Given` scope (`beforeEach` / `beforeAll`).
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Prefer Playwright E2E tests with real DOM, persistence checks, and env-gated screenshot outputs (`E2E_SCREENSHOTS=1` into gitignored `test-results/`) over hand-rolled `window`/`document`/`localStorage` mocks in service tests; never check E2E screenshots into git.
-- [Proposed] Do not duplicate upstream `@cloudvoyant/helical-ui` component behavior tests in Hypertextual E2E suites; restrict app E2E tests to Hypertextual integration, persistence, and side effects.
+- Do not duplicate upstream `@cloudvoyant/helical-ui` component behavior tests in Hypertextual E2E suites; focus on testing custom additions and fragile integrations (such as custom editor behaviors, persistence, and side effects).
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:

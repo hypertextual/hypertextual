@@ -1,4 +1,3 @@
-import { tick } from 'svelte'
 import { DefaultEmbeddedEditorRegistry, type EditorHostServices } from 'core-ts'
 import type { TreeNode, ContextMenuItem } from '@hypertextual/ui'
 import { WorkspaceNodeViewModel } from '../models/workspaceNodeViewModel'
@@ -158,10 +157,7 @@ export class WorkspaceService {
   startRename(path = this.editor.selected?.path): boolean {
     if (!path || this.blocked) return false
     this.sidebarOpen = true
-    this.renamingPath = null
-    void tick().then(() => {
-      this.renamingPath = path
-    })
+    this.renamingPath = path
     return true
   }
 
