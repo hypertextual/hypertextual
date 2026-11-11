@@ -1,3 +1,4 @@
+import { tick } from 'svelte'
 import { DefaultEmbeddedEditorRegistry, type EditorHostServices } from 'core-ts'
 import type { TreeNode, ContextMenuItem } from '@hypertextual/ui'
 import { WorkspaceNodeViewModel } from '../models/workspaceNodeViewModel'
@@ -25,6 +26,9 @@ export class WorkspaceService {
   creationError = $state<string | null>(null)
   pendingEntry = $state<WorkspaceNode | null>(null)
   pendingParent = $state('')
+  renamingPath = $state<string | null>(null)
+  sidebarOpen = $state(true)
+  commandOpen = $state(false)
   refreshFolder = $state<FolderRefresh | undefined>()
   treeVersion = $state(0)
   busy = $state(false)
@@ -151,6 +155,16 @@ export class WorkspaceService {
     this.pendingEntry = { path: '__hypertextual-new__', name, kind }
   }
 
+  startRename(path = this.editor.selected?.path): boolean {
+    if (!path || this.blocked) return false
+    this.sidebarOpen = true
+    this.renamingPath = null
+    void tick().then(() => {
+      this.renamingPath = path
+    })
+    return true
+  }
+
   async commitEntry(path: string, name: string) {
     if (this.blocked) throw new Error('Wait for the current operation to finish.')
     this.busy = true
@@ -194,6 +208,7 @@ export class WorkspaceService {
       }
     } finally {
       this.busy = false
+      if (this.renamingPath === path) this.renamingPath = null
     }
     if (openNext) await this.editor.open(openNext)
   }

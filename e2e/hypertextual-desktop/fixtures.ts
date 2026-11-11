@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type Page, type TestInfo } from '@playwright/test'
 import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, rename, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -309,4 +309,17 @@ export async function createArticle(page: Page) {
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
   await page.locator('.ProseMirror').click()
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
+}
+
+export async function captureScreenshot(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+): Promise<void> {
+  if (process.env.E2E_SCREENSHOTS !== '1' && process.env.HYPERTEXTUAL_E2E_SCREENSHOTS !== '1') {
+    return
+  }
+  const path = testInfo.outputPath(`${name}.png`)
+  await page.screenshot({ path })
+  await testInfo.attach(name, { path, contentType: 'image/png' })
 }

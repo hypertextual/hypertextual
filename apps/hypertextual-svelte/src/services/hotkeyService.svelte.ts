@@ -22,9 +22,6 @@ function leaf(
 
 /** Application keyboard shortcuts, leader menu, command catalog, and pane focus navigation. */
 export class HotkeyService {
-  sidebarOpen = $state(true)
-  commandOpen = $state(false)
-
   readonly keymap: Record<string, WhichKeyNode> = {
     ':': leaf(
       ':',
@@ -295,7 +292,7 @@ export class HotkeyService {
   }
 
   openCommand(): boolean {
-    this.commandOpen = true
+    this.workspace.commandOpen = true
     return true
   }
 
@@ -322,7 +319,7 @@ export class HotkeyService {
   }
 
   private createNewFolder(): boolean {
-    if (!this.sidebarOpen) this.sidebarOpen = true
+    if (!this.workspace.sidebarOpen) this.workspace.sidebarOpen = true
     this.scheduleAfterClose(() => {
       this.workspace.startCreate('directory')
     })
@@ -330,24 +327,12 @@ export class HotkeyService {
   }
 
   private renameSelected(): boolean {
-    const selectedPath = this.workspace.editor.selected?.path
-    if (!selectedPath) return false
-    if (!this.sidebarOpen) this.sidebarOpen = true
-    this.scheduleAfterClose(() => {
-      const item = document.querySelector<HTMLElement>(
-        `[role="treeitem"][data-value=${JSON.stringify(selectedPath)}]`,
-      )
-      item?.focus()
-      item?.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'F2', bubbles: true, cancelable: true }),
-      )
-    })
-    return true
+    return this.workspace.startRename()
   }
 
   toggleExplorer(): boolean {
-    const nextOpen = !this.sidebarOpen
-    this.sidebarOpen = nextOpen
+    const nextOpen = !this.workspace.sidebarOpen
+    this.workspace.sidebarOpen = nextOpen
     const targetPane = nextOpen ? 'workspace' : 'article'
     // Wait for Sidebar's pane registration effect to settle before focusing (see CLO-209).
     this.scheduleAfterClose(() => {
@@ -357,7 +342,7 @@ export class HotkeyService {
   }
 
   focusWorkspacePane(): boolean {
-    if (!this.sidebarOpen) this.sidebarOpen = true
+    if (!this.workspace.sidebarOpen) this.workspace.sidebarOpen = true
     this.scheduleAfterClose(() => {
       if (!this.controller?.focusPane('workspace')) {
         document.querySelector<HTMLElement>('#workspace-sidebar [role="treeitem"]')?.focus()
@@ -625,17 +610,17 @@ export class HotkeyService {
         ],
       },
       {
-        value: 'which-key',
-        label: 'Change WhichKey Popup',
+        value: 'which-key-activation',
+        label: 'WhichKey Activation',
         description: 'Configure when the WhichKey chord helper popup appears',
         group: 'Preferences',
-        command: 'which-key',
-        aliases: ['wk', 'leader-only'],
+        command: 'which-key-activation',
+        aliases: ['which-key', 'wk', 'leader-only'],
         shortcut: 'Space t w',
-        keywords: ['leader', 'popup', 'prefix', 'chords', 'whichkey'],
+        keywords: ['leader', 'popup', 'prefix', 'chords', 'whichkey', 'activation'],
         children: [
           {
-            value: 'which-key:all',
+            value: 'which-key-activation:all',
             label: 'All Prefixes',
             description: 'Show WhichKey popup for all multi-key prefixes (g, z, Ctrl+w, Space)',
             command: 'all',
@@ -646,7 +631,7 @@ export class HotkeyService {
             },
           },
           {
-            value: 'which-key:leader',
+            value: 'which-key-activation:leader',
             label: 'Leader Only',
             description: 'Show WhichKey popup only when pressing <leader> (Space)',
             command: 'leader',
@@ -786,14 +771,15 @@ export class HotkeyService {
 
   handleModeChange(nextMode: KeymapMode): void {
     if (typeof document === 'undefined') return
-    if (this.commandOpen || this.controller?.getState().explorerOpen) return
+    if (this.workspace.commandOpen || this.controller?.getState().explorerOpen) return
     if (nextMode === 'insert') {
       const active = document.activeElement
       if (
         !active?.closest('#workspace-sidebar') &&
         !active?.closest('[data-which-key-explorer]') &&
         !active?.closest('[data-command-palette], [data-command-menu]') &&
-        !this.workspace.pendingEntry
+        !this.workspace.pendingEntry &&
+        !this.workspace.renamingPath
       ) {
         this.workspace.editor.setEditable(true)
       }

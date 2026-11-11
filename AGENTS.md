@@ -87,6 +87,13 @@ let { ... }: ComponentProps = $props()
 - Extract extension keymap handlers into named helper functions (`handleTab`, `handleShiftTab`, `handleArrowUp`, `handleArrowDown`, `handleEnter`) under `// helpers ---`.
 - Decompose modal editing in `libs/htmd-ts/src/editor/extensions` into dedicated mode (`NormalMode`, `SelectMode`, `InsertMode`) and preset (`Helix`, `Vim`, `Kakoune`) extensions composed by a parent `ModalEditing` extension.
 - Favor composition and separation of concerns across UI primitives, editor NodeViews, and HTMD extensions.
+- [Proposed] Name HTMD extensions after their node or behavior without superfluous suffixes like `Custom`.
+- [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
+- [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
+- [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
+- [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
+- [Proposed] Keep shell and layout state (such as sidebar and command surface open state) on `WorkspaceService` rather than `HotkeyService`.
+- [Proposed] Use a single generic persistence helper in `SettingsService` rather than per-setting read and write functions.
 
 ### Documentation
 
@@ -103,6 +110,8 @@ let { ... }: ComponentProps = $props()
 - Structure BDD `Given` / `When` / `it` clauses as a logical hierarchy that reflects the component or application behavior tree, narrowing down paths so branch coverage is clear.
 - [Proposed] Keep each BDD leaf test focused on a single behavior or transition and hoist shared setup into the enclosing `Given` scope (`beforeEach` / `beforeAll`).
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
+- Prefer Playwright E2E tests with real DOM, persistence checks, and env-gated screenshot outputs (`E2E_SCREENSHOTS=1` into gitignored `test-results/`) over hand-rolled `window`/`document`/`localStorage` mocks in service tests; never check E2E screenshots into git.
+- [Proposed] Do not duplicate upstream `@cloudvoyant/helical-ui` component behavior tests in Hypertextual E2E suites; restrict app E2E tests to Hypertextual integration, persistence, and side effects.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:

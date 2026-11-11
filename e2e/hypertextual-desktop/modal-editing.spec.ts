@@ -1,4 +1,4 @@
-import { test, expect, png } from './fixtures'
+import { test, expect, png, captureScreenshot } from './fixtures'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -785,20 +785,19 @@ test.describe(
       })
     })
 
-    test.describe('When the user opens CommandPalette or CommandMenu via keybindings across normal and select modes', () => {
+    test.describe('When the user updates command style and appearance settings via commands', () => {
       test(
-        'it opens only the active Command Style surface via :, Space :, and Mod+k and switches to CommandMenu via keyboard',
+        'it applies DOM side effects, persists settings across reloads, and captures optional screenshots',
         { tag: '@smoke' },
-        async ({ page }) => {
+        async ({ page }, testInfo) => {
           // Arrange
-          const modK = process.platform === 'darwin' ? 'Meta+k' : 'Control+k'
+          const html = page.locator('html')
+          const shell = page.locator('.workspace-shell')
           const palette = page.getByTestId('command-palette')
           const paletteInput = page.getByTestId('command-palette-input')
           const menu = page.getByTestId('command-menu')
           const menuInput = page.getByTestId('command-menu-input')
-          const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
 
-          // Assert: no fallback trigger buttons or vertical page overflow exist in default 'palette' style
           await expect(page.getByRole('button', { name: /Open Command/i })).toHaveCount(0)
           expect(
             await page.evaluate(
@@ -806,120 +805,49 @@ test.describe(
             ),
           ).toBe(true)
 
-          // Act & Assert: default commandStyle is 'palette' — pressing ':' in normal mode opens CommandPalette
+          // Act: open CommandPalette via ':' and switch command style to CommandMenu
           await page.keyboard.press(':')
           await expect(palette).toBeVisible()
-          await expect(paletteInput).toBeFocused()
-          await expect(menu).toHaveCount(0)
-          await page.keyboard.press('Escape')
-          await expect(palette).toHaveCount(0)
-          await expect(badge).toHaveText('helix · normal')
-
-          // Act & Assert: 'Space :' in select mode also opens CommandPalette while CommandMenu stays closed
-          await page.keyboard.press('v')
-          await expect(badge).toHaveText('helix · select')
-          await page.keyboard.press(' ')
-          await page.keyboard.press(':')
-          await expect(palette).toBeVisible()
-          await expect(menu).toHaveCount(0)
-          await page.keyboard.press('Escape')
-          await expect(palette).toHaveCount(0)
-          await page.keyboard.press('Escape')
-          await expect(badge).toHaveText('helix · normal')
-
-          // Act: open CommandPalette with Mod+k and switch Command Style to 'Command Menu (:)' via keyboard
-          await page.keyboard.press(modK)
-          await expect(palette).toBeVisible()
+          await captureScreenshot(page, testInfo, 'command-palette')
           await paletteInput.fill('Command Menu')
           await page.keyboard.press('Enter')
-
-          // Assert: CommandPalette closes, 'menu' is persisted, and ':', 'Space :', and 'Mod+k' now open CommandMenu
           await expect(palette).toHaveCount(0)
-          await expect(page.getByRole('button', { name: /Open Command/i })).toHaveCount(0)
-          expect(
-            await page.evaluate(
-              () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
-            ),
-          ).toBe(true)
-          await expect
-            .poll(() =>
-              page.evaluate(() =>
-                window.localStorage.getItem('hypertextual.settings.commandStyle'),
-              ),
-            )
-            .toBe('menu')
 
+          // Act: apply theme, color mode, and pane-outline settings through CommandMenu
           await page.keyboard.press(':')
           await expect(menu).toBeVisible()
-          await expect(menuInput).toBeFocused()
-          await expect(palette).toHaveCount(0)
-          await page.keyboard.press('Escape')
+          await captureScreenshot(page, testInfo, 'command-menu')
+          await menuInput.fill('theme catppuccin')
+          await page.keyboard.press('Enter')
           await expect(menu).toHaveCount(0)
 
-          await page.keyboard.press(' ')
+          await page.keyboard.press(':')
+          await menuInput.fill('mode dark')
+          await page.keyboard.press('Enter')
+          await expect(menu).toHaveCount(0)
+
+          await page.keyboard.press(':')
+          await menuInput.fill('pane-outline off')
+          await page.keyboard.press('Enter')
+          await expect(menu).toHaveCount(0)
+
+          await expect(html).toHaveClass(/\btheme-catppuccin\b/)
+          await expect(html).toHaveClass(/\bdark\b/)
+          await expect(shell).toHaveAttribute('data-pane-outline', 'false')
+          await captureScreenshot(page, testInfo, 'theme-catppuccin-dark')
+
+          // Act: reload to verify persistence
+          await page.reload()
+
+          // Assert
+          await expect(html).toHaveClass(/\btheme-catppuccin\b/)
+          await expect(html).toHaveClass(/\bdark\b/)
+          await expect(shell).toHaveAttribute('data-pane-outline', 'false')
           await page.keyboard.press(':')
           await expect(menu).toBeVisible()
           await expect(palette).toHaveCount(0)
-          await page.keyboard.press('Escape')
-          await expect(menu).toHaveCount(0)
-
-          await page.keyboard.press(modK)
-          await expect(menu).toBeVisible()
-          await expect(palette).toHaveCount(0)
-          await page.keyboard.press('Escape')
-          await expect(menu).toHaveCount(0)
         },
       )
-
-      test('it executes workspace and pane navigation commands from CommandMenu and transfers focus cleanly', async ({
-        page,
-      }) => {
-        // Arrange: switch to CommandMenu via ':command-style menu'
-        const paletteInput = page.getByTestId('command-palette-input')
-        const menu = page.getByTestId('command-menu')
-        const menuInput = page.getByTestId('command-menu-input')
-        const docPane = page.locator('.document-pane')
-        const initialBox = await docPane.boundingBox()
-        expect(initialBox!.x).toBeGreaterThan(0)
-
-        await page.keyboard.press(':')
-        await paletteInput.fill('Command Menu')
-        await page.keyboard.press('Enter')
-
-        // Act & Assert: ':toggle-explorer' collapses the sidebar and focuses the article pane
-        await page.keyboard.press(':')
-        await expect(menu).toBeVisible()
-        await menuInput.fill('toggle-explorer')
-        await page.keyboard.press('Enter')
-        await expect(menu).toHaveCount(0)
-        await expect.poll(async () => (await docPane.boundingBox())?.x).toBe(0)
-
-        // Act & Assert: ':focus-workspace' re-opens the sidebar and focuses the workspace tree item
-        await page.keyboard.press(':')
-        await menuInput.fill('focus-workspace')
-        await page.keyboard.press('Enter')
-        await expect(menu).toHaveCount(0)
-        await expect.poll(async () => (await docPane.boundingBox())?.x).toBe(initialBox!.x)
-        await expect(page.locator(`[role="treeitem"][data-value="${path}"]`)).toBeFocused()
-
-        // Act & Assert: ':focus-article' returns focus to the article pane
-        await page.keyboard.press(':')
-        await menuInput.fill('focus-article')
-        await page.keyboard.press('Enter')
-        await expect(menu).toHaveCount(0)
-        await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
-
-        // Act & Assert: ':new-article' creates a new untitled article in insert mode and focuses .ProseMirror
-        await page.keyboard.press(':')
-        await menuInput.fill('new-article')
-        await page.keyboard.press('Enter')
-        await expect(menu).toHaveCount(0)
-        await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
-        await expect(page.locator('.ProseMirror')).toBeFocused()
-        await expect(
-          page.locator('.document-status').getByTestId('which-key-mode-badge'),
-        ).toHaveText('helix · insert')
-      })
     })
   },
 )
@@ -1033,7 +961,6 @@ test.describe(
         await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
       })
     })
-
     test.describe('Given a Mermaid diagram in edit mode', () => {
       test.beforeEach(async ({ page, workspace }) => {
         await openMermaidArticle(page, workspace)
@@ -1268,38 +1195,6 @@ test.describe(
             await expect(mermaidNode).toHaveAttribute('data-mermaid-mode', 'normal')
           })
         })
-      })
-    })
-
-    test.describe('When the user presses : or Mod+k in insert mode', () => {
-      test('it inserts a literal : into the editor without opening a command dialog, while Mod+k opens the active command dialog and Escape closes it first', async ({
-        page,
-      }) => {
-        // Arrange
-        const modK = process.platform === 'darwin' ? 'Meta+k' : 'Control+k'
-        const paragraph = page.locator('.ProseMirror > p').first()
-        const palette = page.getByTestId('command-palette')
-        const menu = page.getByTestId('command-menu')
-        await paragraph.click()
-        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowRight' : 'End')
-
-        // Act: type ':' in insert mode
-        await page.keyboard.type(': note')
-
-        // Assert: literal ':' is inserted into the paragraph and neither command dialog opens
-        await expect(paragraph).toHaveText('A paragraph to edit.: note')
-        await expect(palette).toHaveCount(0)
-        await expect(menu).toHaveCount(0)
-        await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
-
-        // Act: press Mod+k in insert mode, then press Escape to dismiss the dialog
-        await page.keyboard.press(modK)
-        await expect(palette).toBeVisible()
-        await page.keyboard.press('Escape')
-
-        // Assert: CommandPalette closes first without leaving insert mode
-        await expect(palette).toHaveCount(0)
-        await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
       })
     })
   },

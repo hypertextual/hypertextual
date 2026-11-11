@@ -104,7 +104,7 @@
   }
 
   function handleSidebarOpenChange(next: boolean): void {
-    hotkeys.sidebarOpen = next
+    workspace.sidebarOpen = next
   }
 
   function handleCommandStyleChange(next: CommandStyle): void {
@@ -112,7 +112,7 @@
   }
 
   function handleCommandOpenChange(next: boolean): void {
-    hotkeys.commandOpen = next
+    workspace.commandOpen = next
   }
 
   function handleRecoveryClose(): void {
@@ -133,12 +133,12 @@
 >
   <CommandProvider
     items={hotkeys.commandItems}
-    bind:open={hotkeys.commandOpen}
+    bind:open={workspace.commandOpen}
     style={settings.commandStyle}
     onStyleChange={handleCommandStyleChange}
   >
     <SidebarProvider
-      open={hotkeys.sidebarOpen}
+      open={workspace.sidebarOpen}
       onOpenChange={handleSidebarOpenChange}
       class="workspace-shell"
       style="--sidebar-width: 236px"
@@ -206,12 +206,12 @@
       <StatusBar {workspace} />
 
       <CommandPalette
-        open={settings.commandStyle === 'palette' && hotkeys.commandOpen}
+        open={settings.commandStyle === 'palette' && workspace.commandOpen}
         onOpenChange={handleCommandOpenChange}
         hotkey={settings.commandStyle === 'palette' ? 'Mod+k' : false}
       />
       <CommandMenu
-        open={settings.commandStyle === 'menu' && hotkeys.commandOpen}
+        open={settings.commandStyle === 'menu' && workspace.commandOpen}
         onOpenChange={handleCommandOpenChange}
         hotkey={settings.commandStyle === 'menu' ? 'Mod+k' : false}
       />
