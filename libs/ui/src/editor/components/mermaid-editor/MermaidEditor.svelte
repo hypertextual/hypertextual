@@ -2,20 +2,19 @@
   import { tick } from 'svelte'
   import { cn, codeBlockBodyBase, codeBlockContentBase } from '@cloudvoyant/helical-ui'
   import { useKeymap } from '@cloudvoyant/helical-svelte'
-  import { Check, Copy, GitFork, Maximize2, Minimize2, Pencil } from 'lucide-svelte'
-  import MermaidViewer from '../../mermaid-viewer/MermaidViewer.svelte'
-  import PipWindow from '../../pip-window/PipWindow.svelte'
-  import WindowInplace from '../../window-inplace/WindowInplace.svelte'
+  import { GitFork } from 'lucide-svelte'
+  import MermaidViewer from '../../../mermaid-viewer/MermaidViewer.svelte'
+  import { PipWindow, PipWindowBody } from '../../../pip-window'
   import {
-    codeContent,
-    mermaidCodeContainer,
-    mermaidErrorFooter,
-    mermaidRootVariants,
-    mermaidSplitCodePane,
-    mermaidSplitPreviewPane,
-    mermaidToolbarButton,
-    mermaidViewerCanvas,
-  } from './styles'
+    WindowInplace,
+    WindowInplaceBody,
+    WindowInplaceHeader,
+    WindowInplaceTitle,
+  } from '../../../window-inplace'
+  import { codeContent } from '../styles'
+  import MermaidErrorBar from './MermaidErrorBar.svelte'
+  import MermaidToolbar from './MermaidToolbar.svelte'
+  import { mermaidEditorStyles } from './styles'
   import type { MermaidEditorProps } from './types'
 
   // Props ---------------------------------------------------------------------
@@ -38,7 +37,6 @@
   let isBlockActive = $state(false)
   let splitFocusPane = $state<'code' | 'preview'>('code')
   let pendingWindowPrefix = false
-  let copied = $state(false)
 
   // Derived -------------------------------------------------------------------
   const sourceCode = $derived(node.textContent)
@@ -687,23 +685,10 @@
       }
     }
   }
-
-  function handleCopyClick(event: MouseEvent) {
-    event.stopPropagation()
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      void navigator.clipboard.writeText(sourceCode).then(() => {
-        copied = true
-        setTimeout(() => {
-          copied = false
-        }, 1500)
-      })
-    }
-  }
 </script>
 
 <WindowInplace
   bind:this={windowInplace}
-  title="Mermaid"
   bind:fullscreen={isFullscreen}
   data-node-view-wrapper=""
   data-mermaid-node=""
@@ -713,133 +698,97 @@
   data-mermaid-pan-y={panY}
   data-mermaid-fullscreen={isFullscreen ? 'true' : 'false'}
   role="none"
-  class={mermaidRootVariants({ mode })}
-  bodyClass={isFullscreen && isCodeMode ? 'flex-row' : 'flex-col'}
+  class={mermaidEditorStyles.rootVariants({ mode })}
 >
-  {#snippet icon()}
-    <GitFork class="size-3.5" />
-  {/snippet}
+  <WindowInplaceHeader>
+    <WindowInplaceTitle>
+      <GitFork class="size-3.5" />
+      <span>Mermaid</span>
+    </WindowInplaceTitle>
 
-  {#snippet toolbar()}
-    {#if !isCodeMode}
-      <button
-        type="button"
-        data-mermaid-edit=""
-        aria-label="Edit Mermaid diagram"
-        title="Edit Mermaid diagram (Enter / i)"
-        class={mermaidToolbarButton}
-        onclick={handleEditClick}
-      >
-        <Pencil class="size-3.5" />
-      </button>
-    {:else}
-      <button
-        type="button"
-        data-mermaid-copy=""
-        aria-label="Copy Mermaid source"
-        title="Copy Mermaid source"
-        class={mermaidToolbarButton}
-        onclick={handleCopyClick}
-      >
-        {#if copied}
-          <Check class="size-3.5" />
-        {:else}
-          <Copy class="size-3.5" />
-        {/if}
-      </button>
-    {/if}
-
-    <button
-      type="button"
-      data-mermaid-fullscreen=""
-      aria-label={isFullscreen ? 'Minimize Mermaid diagram' : 'Fullscreen Mermaid diagram'}
-      title={isFullscreen ? 'Minimize (Esc)' : 'Fullscreen (f / Mod+Enter)'}
-      class={mermaidToolbarButton}
-      onclick={handleToggleFullscreenClick}
-    >
-      {#if isFullscreen}
-        <Minimize2 class="size-3.5" />
-      {:else}
-        <Maximize2 class="size-3.5" />
-      {/if}
-    </button>
-  {/snippet}
-
-  <div
-    data-mermaid-code=""
-    data-pane-focused={isFullscreen && isCodeMode
-      ? splitFocusPane === 'code'
-        ? 'true'
-        : 'false'
-      : undefined}
-    onfocusin={handleCodePaneFocus}
-    class={cn(
-      codeBlockBodyBase,
-      !isCodeMode ? 'sr-only' : isFullscreen ? mermaidSplitCodePane : mermaidCodeContainer,
-    )}
-  >
-    <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
-        data-node-view-content=""
-        class={node.textContent.length === 0 ? 'block' : undefined}
-        style="white-space: pre-wrap;"></code></pre>
-
-    {#if isCodeMode && !isFullscreen}
-      <PipWindow
-        title="Preview"
-        scope="container"
-        placement="top-right"
-        showHeader={false}
-        boundaryEl={windowInplace?.getElement() ?? null}
-      >
-        <MermaidViewer
-          code={sourceCode}
-          debounceMs={120}
-          fit="contain"
-          bind:scale
-          bind:panX
-          bind:panY
-          bind:error={renderError}
-          onviewportchange={syncDatasetState}
-        />
-      </PipWindow>
-    {/if}
-  </div>
-
-  {#if !isCodeMode || isFullscreen}
-    <MermaidViewer
-      bind:this={mainViewer}
-      code={sourceCode}
-      debounceMs={isCodeMode ? 120 : 0}
-      fit="auto"
-      tabindex={isFullscreen ? 0 : -1}
-      bind:scale
-      bind:panX
-      bind:panY
-      bind:error={renderError}
-      onviewportchange={syncDatasetState}
-      onfocus={handlePreviewPaneFocus}
-      onkeydown={handlePreviewKeyDown}
-      class={isFullscreen
-        ? isCodeMode
-          ? cn(
-              mermaidSplitPreviewPane,
-              splitFocusPane === 'preview' ? 'ring-2 ring-inset ring-ring/50' : undefined,
-            )
-          : 'relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
-        : mermaidViewerCanvas}
+    <MermaidToolbar
+      {isCodeMode}
+      {isFullscreen}
+      {sourceCode}
+      onedit={handleEditClick}
+      ontogglefullscreen={handleToggleFullscreenClick}
     />
-  {/if}
+  </WindowInplaceHeader>
 
-  {#snippet footer()}
-    {#if renderError}
-      <div
-        contenteditable={false}
-        role="alert"
-        data-mermaid-error=""
-        class={cn(mermaidErrorFooter, isFullscreen ? 'rounded-b-none' : 'rounded-b-lg')}
-      >
-        {renderError}
-      </div>
+  <WindowInplaceBody class={isFullscreen && isCodeMode ? 'flex-row' : 'flex-col'}>
+    <div
+      data-mermaid-code=""
+      data-code-block=""
+      data-pane-focused={isFullscreen && isCodeMode
+        ? splitFocusPane === 'code'
+          ? 'true'
+          : 'false'
+        : undefined}
+      onfocusin={handleCodePaneFocus}
+      class={cn(
+        codeBlockBodyBase,
+        !isCodeMode
+          ? 'sr-only'
+          : isFullscreen
+            ? mermaidEditorStyles.splitCodePane
+            : mermaidEditorStyles.codeContainer,
+      )}
+    >
+      <pre class={cn(codeBlockContentBase, codeContent, 'h-full min-h-64 w-full flex-1')}><code
+          data-node-view-content=""
+          class={node.textContent.length === 0 ? 'block' : undefined}
+          style="white-space: pre-wrap;"></code></pre>
+
+      {#if isCodeMode && !isFullscreen}
+        <PipWindow
+          title="Preview"
+          scope="container"
+          placement="top-right"
+          boundaryEl={windowInplace?.getElement() ?? null}
+        >
+          <PipWindowBody>
+            <MermaidViewer
+              code={sourceCode}
+              debounceMs={120}
+              fit="contain"
+              bind:scale
+              bind:panX
+              bind:panY
+              bind:error={renderError}
+              onviewportchange={syncDatasetState}
+            />
+          </PipWindowBody>
+        </PipWindow>
+      {/if}
+    </div>
+
+    {#if !isCodeMode || isFullscreen}
+      <MermaidViewer
+        bind:this={mainViewer}
+        code={sourceCode}
+        debounceMs={isCodeMode ? 120 : 0}
+        fit="auto"
+        tabindex={isFullscreen ? 0 : -1}
+        bind:scale
+        bind:panX
+        bind:panY
+        bind:error={renderError}
+        onviewportchange={syncDatasetState}
+        onfocus={handlePreviewPaneFocus}
+        onkeydown={handlePreviewKeyDown}
+        class={isFullscreen
+          ? isCodeMode
+            ? cn(
+                mermaidEditorStyles.splitPreviewPane,
+                splitFocusPane === 'preview' ? 'ring-2 ring-inset ring-ring/50' : undefined,
+              )
+            : mermaidEditorStyles.fullscreenViewerCanvas
+          : mermaidEditorStyles.viewerCanvas}
+      />
     {/if}
-  {/snippet}
+  </WindowInplaceBody>
+
+  {#if renderError}
+    <MermaidErrorBar error={renderError} {isFullscreen} />
+  {/if}
 </WindowInplace>

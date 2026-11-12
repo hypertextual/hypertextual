@@ -431,7 +431,7 @@ function ensureMermaidGrammarRegistered(lowlight: LowlightLike): boolean {
           case_insensitive: false,
           keywords: {
             keyword:
-              'flowchart graph sequenceDiagram stateDiagram stateDiagram-v2 classDiagram erDiagram gantt pie mindmap timeline gitGraph C4Context C4Container C4Component C4Dynamic C4Deployment xychart-beta subgraph end direction participant actor activate deactivate loop alt else opt par and critical break rect note over as state class style classDef click linkStyle autonumber title section dateFormat axisFormat',
+              'flowchart graph sequenceDiagram stateDiagram classDiagram erDiagram gantt pie mindmap timeline gitGraph C4Context C4Container C4Component C4Dynamic C4Deployment subgraph end direction participant actor activate deactivate loop alt else opt par and critical break rect note over as state class style classDef click linkStyle autonumber title section dateFormat axisFormat',
             literal: 'TB TD BT RL LR true false',
             built_in: 'left right top bottom of',
           },
@@ -442,6 +442,10 @@ function ensureMermaidGrammarRegistered(lowlight: LowlightLike): boolean {
             hljs.C_NUMBER_MODE,
             {
               className: 'keyword',
+              begin: /\b(?:stateDiagram-v2|xychart-beta)\b/,
+            },
+            {
+              className: 'keyword',
               begin: /<?--+>?|==+>|-\.+->?|--[xo]|<<?->>?|->>|-->>|-[x)]|--[x)]|:::/,
             },
             {
@@ -450,7 +454,8 @@ function ensureMermaidGrammarRegistered(lowlight: LowlightLike): boolean {
             },
             {
               className: 'title',
-              begin: /\b[A-Za-z_][A-Za-z0-9_]*(?=\s*[[({])/,
+              begin:
+                /\b[A-Za-z_][A-Za-z0-9_]*(?=[ \t]*(?:[[({]|<?--+>?|==+>|-\.+->?|--[xo]|<<?->>?|->>|-->>))/,
             },
             {
               className: 'string',
@@ -714,7 +719,7 @@ function handleTab({ editor, state }: HtmdCommandContext, event: KeyboardEvent):
     return false
   }
   if (editor.isActive('mermaid')) {
-    return editor.commands.insertContent('\t')
+    return editor.commands.insertContent('  ')
   }
   return false
 }
@@ -737,6 +742,12 @@ function handleShiftTab({ editor, state }: HtmdCommandContext, event: KeyboardEv
   if (!editor.isActive('mermaid')) return false
   const { $from } = state.selection
   const textBefore = $from.parent.textBetween(0, $from.parentOffset)
+  if (textBefore.endsWith('  ')) {
+    return editor.commands.deleteRange({
+      from: $from.pos - 2,
+      to: $from.pos,
+    })
+  }
   if (textBefore.endsWith('\t')) {
     return editor.commands.deleteRange({
       from: $from.pos - 1,

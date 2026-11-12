@@ -2,28 +2,26 @@
 
 ## Overview
 
-`PipWindow` (`libs/ui/src/pip-window/PipWindow.svelte`) is a floating Picture-in-Picture preview window that anchors inside a parent container (`scope="container"`) or portals to the viewport (`scope="viewport"`). [`MermaidEditor`](htmd-editor/mermaid.md) uses `PipWindow` to display a live diagram preview at the top-right corner of the code block in `insert` and `select` modes.
+`PipWindow` (`libs/ui/src/pip-window/`) is a compound Picture-in-Picture preview window family (`PipWindow`, `PipWindowHeader`, `PipWindowTitle`, `PipWindowControls`, `PipWindowBody`) that anchors inside a parent container (`scope="container"`) or portals to the viewport (`scope="viewport"`). [`MermaidEditor`](htmd-editor/mermaid.md) composes `PipWindow` and `PipWindowBody` to display a live diagram preview at the top-right corner of the code block in `insert` and `select` modes.
 
 ## Design
 
 ### Public API
 
-| Prop | Type | Default | Purpose |
+| Component / Prop | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `title` | `string` | `'Preview'` | Header title or `aria-label` when `showHeader={false}`. |
-| `open` | `boolean` | `true` | Controls whether the window is rendered. |
-| `scope` | `'container' \| 'viewport'` | `'container'` | `'container'` positions absolutely inside the parent; `'viewport'` portals to `document.body`. |
-| `boundaryEl` | `HTMLElement \| null` | `null` | Boundary element for drag clamping when `draggable` is enabled. |
-| `placement` | `'bottom-right' \| 'top-right' \| 'bottom-left' \| 'top-left'` | `'top-right'` | Corner anchor inside the container or viewport. |
-| `showHeader` | `boolean` | `true` | Shows the header bar and window controls. |
-| `minimized` | `boolean` (`$bindable`) | `false` | Collapses the body to a header pill. |
-| `draggable` | `boolean` | `false` | Enables pointer dragging on the header bar. |
-| `resizable` | `boolean` | `false` | Enables CSS resize handles on the window body. |
-| `onminimizechange` | `(minimized: boolean) => void` | `undefined` | Called when the minimize button is toggled. |
-| `onfullscreen` | `() => void` | `undefined` | Called when the fullscreen button is clicked. |
-| `actions` | `Snippet` | `undefined` | Extra header buttons rendered before minimize and fullscreen. |
-| `children` | `Snippet` | — | Window body content. |
-| `class` | `string` | `undefined` | Caller class overrides merged via `cn`. |
+| `PipWindow` (`title`) | `string` | `'Preview'` | Accessible `aria-label` for the group and default `PipWindowTitle` text. |
+| `PipWindow` (`open`) | `boolean` | `true` | Controls whether the window is rendered. |
+| `PipWindow` (`scope`) | `'container' \| 'viewport'` | `'container'` | `'container'` positions absolutely inside the parent; `'viewport'` portals to `document.body`. |
+| `PipWindow` (`boundaryEl`) | `HTMLElement \| null` | `null` | Boundary element for drag clamping when `draggable` is enabled. |
+| `PipWindow` (`placement`) | `'bottom-right' \| 'top-right' \| 'bottom-left' \| 'top-left'` | `'top-right'` | Corner anchor inside the container or viewport. |
+| `PipWindow` (`minimized`) | `boolean` (`$bindable`) | `false` | Collapses `PipWindowBody` to a header pill. |
+| `PipWindow` (`draggable`) | `boolean` | `false` | Enables pointer dragging on `PipWindowHeader`. |
+| `PipWindow` (`resizable`) | `boolean` | `false` | Enables CSS resize handles on the window. |
+| `PipWindowHeader` | `class?: string`, `children?: Snippet` | — | Optional header bar with pointer drag listeners. |
+| `PipWindowTitle` | `class?: string`, `children?: Snippet` | — | Header title text (defaults to context `title`). |
+| `PipWindowControls` | `class?: string`, `children?: Snippet` | — | Header action buttons plus Minimize and Fullscreen triggers. |
+| `PipWindowBody` | `class?: string`, `children?: Snippet` | — | Window body rendered when `minimized` is `false`. |
 
 ### Layout
 
@@ -31,9 +29,8 @@
 +-------------------------------------------------------------------+
 | Parent Container (position: relative, min-h-64)                   |
 |                                         +-----------------------+ |
+|                                         | PipWindowBody         | |
 |                                         | [Client] ---> [Server]| |
-|                                         |                  |    | |
-|                                         |                [(DB)] | |
 |                                         +-----------------------+ |
 +-------------------------------------------------------------------+
 ```
@@ -43,7 +40,7 @@
 ```mermaid
 stateDiagram-v2
     [*] --> Expanded: open = true, minimized = false
-    Expanded --> Dragging: pointer down on header
+    Expanded --> Dragging: pointer down on PipWindowHeader
     Dragging --> Expanded: pointer up
     Expanded --> Minimized: click Minimize
     Minimized --> Expanded: click Expand
@@ -52,5 +49,5 @@ stateDiagram-v2
 ### Behavior
 
 - **Container scope**: Renders inside the parent container (`position: absolute`) anchored `12px` from the chosen corner (`w-44`).
-- **Headerless mode**: When `showHeader={false}`, omits the title bar so all action buttons stay in the parent block's toolbar.
+- **Headerless composition**: Omitting `PipWindowHeader` renders a body-only preview card (`<PipWindow><PipWindowBody>...</PipWindowBody></PipWindow>`) so all action buttons stay in the parent block's toolbar.
 - **Accessibility**: Uses `role="group"` with `aria-label={title}` so parent `.closest('[role="region"]')` lookups always resolve the outer article scroll region.

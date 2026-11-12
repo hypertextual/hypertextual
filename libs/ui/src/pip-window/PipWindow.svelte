@@ -1,15 +1,8 @@
 <script lang="ts">
   import { Portal } from '@ark-ui/svelte/portal'
   import { cn } from '@cloudvoyant/helical-ui'
-  import { Maximize2, Minimize2, Minus } from 'lucide-svelte'
-  import {
-    pipWindowBody,
-    pipWindowControlButton,
-    pipWindowControls,
-    pipWindowHeader,
-    pipWindowTitle,
-    pipWindowVariants,
-  } from './styles'
+  import { setPipWindowContext } from './PipWindowContext.svelte'
+  import { pipWindowVariants } from './styles'
   import type { PipWindowProps } from './types'
 
   // Props ---------------------------------------------------------------------
@@ -19,13 +12,11 @@
     scope = 'container',
     boundaryEl = null,
     placement = 'top-right',
-    showHeader = true,
     minimized = $bindable(false),
     draggable = false,
     resizable = false,
     onminimizechange,
     onfullscreen,
-    actions,
     children,
     class: className,
   }: PipWindowProps = $props()
@@ -35,6 +26,26 @@
   let dragOffset = $state<{ x: number; y: number }>({ x: 0, y: 0 })
   let isDragging = $state(false)
   let dragStart = { clientX: 0, clientY: 0, startX: 0, startY: 0 }
+
+  setPipWindowContext({
+    get title() {
+      return title
+    },
+    get minimized() {
+      return minimized
+    },
+    get draggable() {
+      return draggable
+    },
+    get hasFullscreen() {
+      return Boolean(onfullscreen)
+    },
+    toggleMinimize: handleToggleMinimize,
+    triggerFullscreen: handleFullscreen,
+    onHeaderPointerDown: handleHeaderPointerDown,
+    onHeaderPointerMove: handleHeaderPointerMove,
+    onHeaderPointerUp: handleHeaderPointerUp,
+  })
 
   // Derived -------------------------------------------------------------------
   const rootClass = $derived(
@@ -117,59 +128,7 @@
       class={rootClass}
       style={transformStyle}
     >
-      {#if showHeader}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-          data-pip-header=""
-          data-minimized={minimized ? 'true' : 'false'}
-          class={cn(
-            pipWindowHeader,
-            draggable ? 'cursor-grab active:cursor-grabbing' : undefined,
-          )}
-          onpointerdown={handleHeaderPointerDown}
-          onpointermove={handleHeaderPointerMove}
-          onpointerup={handleHeaderPointerUp}
-        >
-          <span class={pipWindowTitle}>{title}</span>
-          <div class={pipWindowControls} data-editor-controls>
-            {#if actions}
-              {@render actions()}
-            {/if}
-            <button
-              type="button"
-              data-pip-minimize=""
-              aria-label={minimized ? `Expand ${title}` : `Minimize ${title}`}
-              title={minimized ? `Expand ${title}` : `Minimize ${title}`}
-              class={pipWindowControlButton}
-              onclick={handleToggleMinimize}
-            >
-              {#if minimized}
-                <Maximize2 class="size-3" />
-              {:else}
-                <Minus class="size-3" />
-              {/if}
-            </button>
-            {#if onfullscreen}
-              <button
-                type="button"
-                data-pip-fullscreen=""
-                aria-label={`Fullscreen ${title}`}
-                title={`Fullscreen ${title}`}
-                class={pipWindowControlButton}
-                onclick={handleFullscreen}
-              >
-                <Minimize2 class="size-3 rotate-45" />
-              </button>
-            {/if}
-          </div>
-        </div>
-      {/if}
-
-      {#if !minimized}
-        <div data-pip-body="" class={pipWindowBody}>
-          {@render children()}
-        </div>
-      {/if}
+      {@render children?.()}
     </div>
   </Portal>
 {/if}

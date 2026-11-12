@@ -16,41 +16,15 @@ export const editorSurface = cva(
   'editor-container relative [&_.ProseMirror]:relative [&_.ProseMirror]:outline-none [&_.ProseMirror_ul]:my-4 [&_.ProseMirror_ul]:pl-5 [&_.ProseMirror_ol]:my-4 [&_.ProseMirror_ol]:pl-5 [&_.ProseMirror_ul>li]:list-disc [&_.ProseMirror_ol>li]:list-decimal [&_.ProseMirror_li]:my-1 [&_.ProseMirror_li]:pl-1 [&_.ProseMirror_li_p]:m-0 [&_.ProseMirror_li_p]:inline [&_.ProseMirror_ul[data-type=taskList]]:list-none [&_.ProseMirror_ul[data-type=taskList]]:pl-0 [&_.ProseMirror_ul[data-type=taskList]_li]:flex [&_.ProseMirror_ul[data-type=taskList]_li]:list-none [&_.ProseMirror_ul[data-type=taskList]_li]:items-start [&_.ProseMirror_ul[data-type=taskList]_li]:gap-2 [&_.ProseMirror_ul[data-type=taskList]_li>label]:mt-1 [&_.ProseMirror_ul[data-type=taskList]_li>label]:shrink-0 [&_.ProseMirror_ul[data-type=taskList]_li>div]:flex-1 [&_.ProseMirror_mark]:text-inherit',
 )
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
+// TODO: Group remaining component styles into component-scoped style objects.
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
 
-export const mermaidRootVariants = cva('mermaid-node-view min-h-64', {
-  variants: {
-    mode: {
-      normal: 'select-none',
-      jump: 'select-none',
-      select: '',
-      insert: '',
-    },
-  },
-  defaultVariants: {
-    mode: 'normal',
-  },
-})
-export type MermaidRootVariants = VariantProps<typeof mermaidRootVariants>
-
-export const mermaidToolbarButton =
-  'inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
-
-export const mermaidViewerCanvas =
-  'relative flex min-h-64 w-full flex-1 items-center justify-center overflow-hidden bg-card p-6 outline-none'
-
-export const mermaidCodeContainer =
-  'relative flex min-h-64 w-full flex-1 flex-col overflow-auto bg-card'
-
-export const mermaidSplitCodePane =
-  'relative flex h-full min-h-0 w-1/2 flex-1 flex-col overflow-auto border-r border-border bg-card data-[pane-focused=true]:ring-2 data-[pane-focused=true]:ring-inset data-[pane-focused=true]:ring-ring/50'
-
-export const mermaidSplitPreviewPane =
-  'relative flex h-full min-h-0 w-1/2 flex-1 flex-col items-center justify-center overflow-hidden bg-card p-6 outline-none'
-
-export const mermaidErrorFooter =
-  'flex w-full shrink-0 items-center border-t border-danger/40 bg-danger/10 px-3 py-2 font-mono text-xs text-danger rounded-t-none rounded-b-lg'
+export {
+  mermaidEditorStyles,
+  mermaidRootVariants,
+  type MermaidRootVariants,
+} from './mermaid-editor/styles'
 export const youtubeSurface = 'my-0 [&>button]:block [&>iframe]:block [&>button>img]:my-0'
 export const noticeBody =
   "min-h-6 [&_p]:m-0 data-[empty=true]:before:pointer-events-none data-[empty=true]:before:float-left data-[empty=true]:before:h-0 data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:content-['Add_the_notice_body_here.']"

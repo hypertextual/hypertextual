@@ -172,7 +172,7 @@ function handleTab({ editor, state }: HtmdCommandContext, event: KeyboardEvent):
     return false
   }
   if (editor.isActive('codeBlock')) {
-    return editor.commands.insertContent('\t')
+    return editor.commands.insertContent('  ')
   }
   return false
 }
@@ -199,6 +199,12 @@ function handleShiftTab({ editor, state }: HtmdCommandContext, event: KeyboardEv
   const { selection } = state
   const { $from } = selection
   const textBefore = $from.parent.textBetween(0, $from.parentOffset)
+  if (textBefore.endsWith('  ')) {
+    return editor.commands.deleteRange({
+      from: $from.pos - 2,
+      to: $from.pos,
+    })
+  }
   if (textBefore.endsWith('\t')) {
     return editor.commands.deleteRange({
       from: $from.pos - 1,

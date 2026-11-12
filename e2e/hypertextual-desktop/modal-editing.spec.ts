@@ -652,6 +652,9 @@ test.describe(
           await page.keyboard.press('j')
 
           // Assert
+          const proseBox = await prose.boundingBox()
+          const mermaidBox = await mermaidNode.boundingBox()
+          expect(Math.abs(mermaidBox!.width - proseBox!.width)).toBeLessThanOrEqual(4)
           await expect(
             prose.locator('[data-pm-modal-node-selection="normal"]:has([data-mermaid-node])'),
           ).toHaveCount(1)
@@ -916,6 +919,18 @@ test.describe(
         await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
           'flowchart',
         )
+        const highlightStyles = await mermaidNode.locator('[data-mermaid-code]').evaluate((el) => {
+          const codeEl = el.querySelector('code')!
+          const kwEl = el.querySelector('.hljs-keyword')!
+          return {
+            codeBg: getComputedStyle(el).backgroundColor,
+            bodyBg: getComputedStyle(document.body).backgroundColor,
+            codeColor: getComputedStyle(codeEl).color,
+            kwColor: getComputedStyle(kwEl).color,
+          }
+        })
+        expect(highlightStyles.codeBg).toBe(highlightStyles.bodyBg)
+        expect(highlightStyles.kwColor).not.toBe(highlightStyles.codeColor)
         const pip = mermaidNode.locator('[data-pip-window]')
         await expect(pip).toBeVisible()
         await expect(pip).toHaveAttribute('data-pip-placement', 'top-right')
@@ -1081,6 +1096,18 @@ test.describe(
         await expect(mermaidNode.locator('[data-mermaid-code] .hljs-keyword').first()).toHaveText(
           'flowchart',
         )
+        const highlightStyles = await mermaidNode.locator('[data-mermaid-code]').evaluate((el) => {
+          const codeEl = el.querySelector('code')!
+          const kwEl = el.querySelector('.hljs-keyword')!
+          return {
+            codeBg: getComputedStyle(el).backgroundColor,
+            bodyBg: getComputedStyle(document.body).backgroundColor,
+            codeColor: getComputedStyle(codeEl).color,
+            kwColor: getComputedStyle(kwEl).color,
+          }
+        })
+        expect(highlightStyles.codeBg).toBe(highlightStyles.bodyBg)
+        expect(highlightStyles.kwColor).not.toBe(highlightStyles.codeColor)
         const pip = mermaidNode.locator('[data-pip-window]')
         await expect(pip).toBeVisible()
         await expect(pip).toHaveAttribute('data-pip-scope', 'container')

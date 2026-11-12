@@ -24,7 +24,7 @@
   import UrlMentionPill from './UrlMentionPill.svelte'
   import LinkPreviewCard from './LinkPreviewCard.svelte'
   import CodeBlockComponent from './CodeBlockComponent.svelte'
-  import MermaidEditor from './MermaidEditor.svelte'
+  import { MermaidEditor } from './mermaid-editor'
   import NoticeNodeView from './NoticeNodeView.svelte'
   import MentionList from './MentionList.svelte'
   import CursorOverlay from './CursorOverlay.svelte'

@@ -1,24 +1,13 @@
 <script lang="ts">
   import { cn } from '@cloudvoyant/helical-ui'
-  import {
-    windowInplaceBody,
-    windowInplaceHeader,
-    windowInplaceTitle,
-    windowInplaceToolbar,
-    windowInplaceVariants,
-  } from './styles'
+  import { windowInplaceVariants } from './styles'
   import type { WindowInplaceProps } from './types'
 
   // Props ---------------------------------------------------------------------
   let {
-    title,
-    icon,
     fullscreen = $bindable(false),
-    toolbar,
-    footer,
     children,
     class: className,
-    bodyClass,
     style: callerStyle,
     ...rest
   }: WindowInplaceProps = $props()
@@ -85,30 +74,5 @@
   class={cn(windowInplaceVariants({ fullscreen }), className)}
   {...rest}
 >
-  <div contenteditable={false} data-window-inplace-header="" class={windowInplaceHeader} data-editor-controls>
-    <span class={windowInplaceTitle}>
-      {#if icon}
-        {@render icon()}
-      {/if}
-      {#if typeof title === 'string'}
-        <span>{title}</span>
-      {:else if title}
-        {@render title()}
-      {/if}
-    </span>
-
-    {#if toolbar}
-      <div class={windowInplaceToolbar}>
-        {@render toolbar()}
-      </div>
-    {/if}
-  </div>
-
-  <div data-window-inplace-body="" class={cn(windowInplaceBody, bodyClass)}>
-    {@render children()}
-  </div>
-
-  {#if footer}
-    {@render footer()}
-  {/if}
+  {@render children?.()}
 </div>

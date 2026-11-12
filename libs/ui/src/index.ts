@@ -13,9 +13,37 @@ export type { EditorFont, FontSelectorProps } from './font-selector/types'
 export { default as ThemeToggle } from './theme/ThemeToggle.svelte'
 export { ThemeService, themeService } from './theme/themeService.svelte'
 export type { ThemeMode, ThemeServiceOptions, ThemeToggleProps } from './theme/types'
-export { default as WindowInplace } from './window-inplace/WindowInplace.svelte'
-export type { WindowInplaceProps } from './window-inplace/types'
-export { default as PipWindow } from './pip-window/PipWindow.svelte'
-export type { PipWindowPlacement, PipWindowProps, PipWindowScope } from './pip-window/types'
+export {
+  WindowInplace,
+  WindowInplaceHeader,
+  WindowInplaceTitle,
+  WindowInplaceToolbar,
+  WindowInplaceBody,
+  WindowInplaceFooter,
+} from './window-inplace'
+export type {
+  WindowInplaceProps,
+  WindowInplaceHeaderProps,
+  WindowInplaceTitleProps,
+  WindowInplaceToolbarProps,
+  WindowInplaceBodyProps,
+  WindowInplaceFooterProps,
+} from './window-inplace/types'
+export {
+  PipWindow,
+  PipWindowHeader,
+  PipWindowTitle,
+  PipWindowControls,
+  PipWindowBody,
+} from './pip-window'
+export type {
+  PipWindowPlacement,
+  PipWindowProps,
+  PipWindowHeaderProps,
+  PipWindowTitleProps,
+  PipWindowControlsProps,
+  PipWindowBodyProps,
+  PipWindowScope,
+} from './pip-window/types'
 export { default as MermaidViewer } from './mermaid-viewer/MermaidViewer.svelte'
 export type { MermaidViewerFit, MermaidViewerProps } from './mermaid-viewer/types'

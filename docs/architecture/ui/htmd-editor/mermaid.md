@@ -2,13 +2,13 @@
 
 ## Overview
 
-`MermaidEditor` (`libs/ui/src/editor/components/MermaidEditor.svelte`) is the Svelte 5 `NodeView` for `mermaid` blocks (`libs/htmd-ts/src/editor/extensions/mermaid-editor.ts` and `libs/htmd-ts/src/nodes.ts`). It composes [`WindowInplace`](../window-inplace.md), [`PipWindow`](../pip-window.md), and [`MermaidViewer`](../mermaid-viewer.md) across `normal`, `select`, and `insert` modes.
+`MermaidEditor` (`libs/ui/src/editor/components/mermaid-editor/MermaidEditor.svelte`) is the Svelte 5 `NodeView` for `mermaid` blocks (`libs/htmd-ts/src/editor/extensions/mermaid-editor.ts` and `libs/htmd-ts/src/nodes.ts`). It composes [`WindowInplace`](../window-inplace.md), `MermaidToolbar`, `MermaidErrorBar`, [`PipWindow`](../pip-window.md), and [`MermaidViewer`](../mermaid-viewer.md) across `normal`, `select`, and `insert` modes.
 
 ## Design
 
 ### Public API
 
-`MermaidEditorProps` in `libs/ui/src/editor/components/types.ts` extends `SvelteNodeViewProps<HtmdEditor>`:
+`MermaidEditorProps` in `libs/ui/src/editor/components/mermaid-editor/types.ts` extends `SvelteNodeViewProps<HtmdEditor>`:
 
 | Prop | Type | Purpose |
 | --- | --- | --- |

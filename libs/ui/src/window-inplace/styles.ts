@@ -1,17 +1,17 @@
 import {
   cn,
-  windowBodyBase,
-  windowContentBase,
+  codeBlockHeaderBase,
+  codeBlockHeaderInfoBase,
+  codeBlockRootBase,
+  codeBlockTitleBase,
   windowControlBase,
-  windowHeaderBase,
-  windowTitleBase,
 } from '@cloudvoyant/helical-ui'
 import { cva, type VariantProps } from 'class-variance-authority'
 
 export const windowInplaceVariants = cva(
   cn(
-    windowContentBase,
-    'relative my-4 flex flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground transition-colors',
+    codeBlockRootBase,
+    'relative my-4 flex w-full flex-col overflow-hidden rounded-lg border border-border bg-background text-foreground transition-colors',
   ),
   {
     variants: {
@@ -29,12 +29,13 @@ export const windowInplaceVariants = cva(
 export type WindowInplaceVariants = VariantProps<typeof windowInplaceVariants>
 
 export const windowInplaceHeader = cn(
-  windowHeaderBase,
-  'flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-1.5 text-xs select-none',
+  codeBlockHeaderBase,
+  'flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/50 px-4 text-xs select-none',
 )
 
 export const windowInplaceTitle = cn(
-  windowTitleBase,
+  codeBlockHeaderInfoBase,
+  codeBlockTitleBase,
   'inline-flex items-center gap-1.5 font-mono text-xs font-medium text-muted-foreground',
 )
 
@@ -45,7 +46,7 @@ export const windowInplaceControlButton = cn(
   'inline-flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:ring-2 focus:ring-ring focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 )
 
-export const windowInplaceBody = cn(
-  windowBodyBase,
-  'relative flex min-h-0 w-full flex-1 flex-col p-0',
-)
+export const windowInplaceBody = 'relative flex min-h-0 w-full flex-1 flex-col p-0'
+
+export const windowInplaceFooter =
+  'flex w-full shrink-0 items-center border-t border-border px-3 py-2 text-xs'
