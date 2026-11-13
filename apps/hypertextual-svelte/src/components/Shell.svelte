@@ -128,6 +128,7 @@
   onModeChange={handleModeChange}
 >
   <CommandProvider
+    bind:open={workspace.commandOpen}
     items={hotkeys.commandItems}
     style={settings.commandStyle}
     onStyleChange={handleCommandStyleChange}

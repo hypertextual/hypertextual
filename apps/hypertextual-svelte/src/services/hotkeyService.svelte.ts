@@ -236,6 +236,7 @@ export class HotkeyService {
   }
 
   readonly commands: Record<string, () => boolean> = {
+    'command.open': () => this.openCommand(),
     'workspace.toggleExplorer': () => this.toggleExplorer(),
     'settings.togglePaneOutline': () => {
       this.workspace.settings.togglePaneOutline()
@@ -275,6 +276,11 @@ export class HotkeyService {
 
   private get controller() {
     return typeof document !== 'undefined' ? getDocumentWhichKeyController(document) : null
+  }
+
+  openCommand(): boolean {
+    this.workspace.commandOpen = true
+    return true
   }
 
   private createNewArticle(): boolean {

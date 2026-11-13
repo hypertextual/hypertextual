@@ -1,7 +1,7 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { CommandStyle } from '@cloudvoyant/helical-ui'
-import { themeService, type ThemeMode, type ThemeName } from '@cloudvoyant/helical-svelte'
+import { themeService, useTheme, type ThemeMode, type ThemeName } from '@cloudvoyant/helical-svelte'
 
 // TODO(HYPE-176): Move settings persistence from window.localStorage to filesystem config via hyped-fs
 // (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
@@ -51,19 +51,20 @@ export class SettingsService {
     }
     const initialTheme = readSetting<ThemeName>(THEME_KEY, 'hypertextual')
     const initialMode = readSetting<ThemeMode>(THEME_MODE_KEY, 'system')
-    themeService.registerThemes([{ name: 'hypertextual', label: 'Hypertextual' }], {
+    useTheme({
+      customThemes: [{ name: 'hypertextual', label: 'Hypertextual' }],
       defaultTheme: 'hypertextual',
+      defaultMode: initialMode,
+      onThemeChange: (theme) => {
+        writeSetting(THEME_KEY, theme)
+      },
+      onModeChange: (mode) => {
+        writeSetting(THEME_MODE_KEY, mode)
+        this.syncTauriTheme(mode)
+      },
     })
     themeService.setTheme(initialTheme, false)
-    themeService.setThemeMode(initialMode, false)
     this.syncTauriTheme(initialMode)
-    themeService.onThemeChange((theme) => {
-      writeSetting(THEME_KEY, theme)
-    })
-    themeService.onModeChange((mode) => {
-      writeSetting(THEME_MODE_KEY, mode)
-      this.syncTauriTheme(mode)
-    })
     if (isTauri()) {
       void getCurrentWindow()
         .onThemeChanged(({ payload }) => {

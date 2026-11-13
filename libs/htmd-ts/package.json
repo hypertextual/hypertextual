@@ -29,7 +29,7 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "@cloudvoyant/helical-ui": "0.23.0-rc.202611112328.51ef623",
+    "@cloudvoyant/helical-ui": "^0.23.1",
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-character-count": "3.31.4",
     "@tiptap/extension-code-block-lowlight": "3.31.4",

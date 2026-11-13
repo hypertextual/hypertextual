@@ -69,7 +69,7 @@ let { ... }: ComponentProps = $props()
 
 ### Svelte and Helical
 
-- Compose published Helical components (`Sidebar`, `Select`, `Button`, `WhichKeyProvider`, `ThemeToggle`, `ThemeService`) and wrap missing primitives around Ark UI in `libs/ui`.
+- Compose published Helical components (`Sidebar`, `Select`, `Button`, `WhichKeyProvider`, `LightSwitch`, `ThemeSelector`, `ThemeService`) and wrap missing primitives around Ark UI in `libs/ui`.
 - Delegate behavior, accessibility, keyboard navigation, and interaction state to Ark UI and Helical controllers rather than custom DOM handlers.
 - Define framework-neutral base classes and CVA variants in `styles.ts`, derive variant types with `VariantProps`, and merge caller classes with Helical `cn`.
 - [Proposed] Group component style exports in `styles.ts` into a component-scoped object.
@@ -77,7 +77,7 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Style keyboard focus rings at the theme level rather than adding per-instance focus utility classes on controls.
 - Prefer compound subcomponents over named snippet props for multi-part Svelte components.
 - Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`, and register scoped widget, extension, and editor keymaps through `WhichKeyController.registerKeymap` (`useKeymap` in Svelte components).
-- Keep theme state and toggle controls (`ThemeService`, `ThemeToggle`) in `@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`, with `SettingsService` only syncing persisted preferences when needed.
+- Keep theme state and toggle controls (`ThemeService`, `useTheme`, `LightSwitch`, `ThemeSelector`) in `@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`, with `SettingsService` only syncing persisted preferences when needed.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
 - Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
