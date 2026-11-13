@@ -77,7 +77,7 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Style keyboard focus rings at the theme level rather than adding per-instance focus utility classes on controls.
 - Prefer compound subcomponents over named snippet props for multi-part Svelte components.
 - Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`, and register scoped widget, extension, and editor keymaps through `WhichKeyController.registerKeymap` (`useKeymap` in Svelte components).
-- Keep theme state and toggle controls (`ThemeService`, `useTheme`, `LightSwitch`, `ThemeSelector`) in `@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`, with `SettingsService` only syncing persisted preferences when needed.
+- Delegate theming to `@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`; implement theme changes upstream rather than in this repository.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
 - Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
@@ -87,13 +87,6 @@ let { ... }: ComponentProps = $props()
 - Extract extension keymap handlers into named helper functions (`handleTab`, `handleShiftTab`, `handleArrowUp`, `handleArrowDown`, `handleEnter`) under `// helpers ---`.
 - Decompose modal editing in `libs/htmd-ts/src/editor/extensions` into dedicated mode (`NormalMode`, `SelectMode`, `InsertMode`) and preset (`Helix`, `Vim`, `Kakoune`) extensions composed by a parent `ModalEditing` extension.
 - Favor composition and separation of concerns across UI primitives, editor NodeViews, and HTMD extensions.
-- [Proposed] Name HTMD extensions after their node or behavior without superfluous suffixes like `Custom`.
-- [Proposed] Keep node-level keyboard shortcuts, navigation specs, and control-focus handlers inside their owning HTMD extensions in `libs/htmd-ts/src/editor/extensions` rather than splitting them across `define-htmd-extension.ts`, `HtmdEditor`, or Svelte NodeViews.
-- [Proposed] Encapsulate extension option wiring inside each HTMD extension and `buildExtensions` so `HtmdEditor` stays a thin host façade over Tiptap.
-- [Proposed] Use Lucide icons in Svelte NodeViews rather than custom inline SVG paths in HTMD extension HTML renderers.
-- [Proposed] Decompose multi-step Svelte lifecycle hooks (`onMount`, `$effect`) into named helper methods under `// Methods ---` rather than inline promise chains.
-- [Proposed] Keep shell and layout state (such as sidebar open state) on `WorkspaceService` rather than `HotkeyService`, and let Helical providers (`CommandProvider`) own their internal overlay open state.
-- [Proposed] Use a single generic persistence helper in `SettingsService` rather than per-setting read and write functions.
 
 ### Documentation
 
