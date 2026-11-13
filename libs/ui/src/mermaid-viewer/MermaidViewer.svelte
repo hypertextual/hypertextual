@@ -78,6 +78,9 @@
     isRendering = true
     try {
       const rendered = await renderMermaidSource(source)
+      if (!lastValidSvg) {
+        lastValidSvg = rendered
+      }
       if (seq !== renderSeq) return
       svgMarkup = rendered
       lastValidSvg = rendered

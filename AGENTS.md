@@ -101,6 +101,7 @@ let { ... }: ComponentProps = $props()
 - Prefer E2E tests unless integration and unit tests add value or reduce testing burden.
 - Cover all modal editing modes in BDD suites for all editor blocks.
 - Structure BDD `Given` / `When` / `it` clauses as a logical hierarchy that reflects the component or application behavior tree, narrowing down paths so branch coverage is clear.
+- [Proposed] Keep each BDD leaf test focused on a single behavior or transition and hoist shared setup into the enclosing `Given` scope (`beforeEach` / `beforeAll`).
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
