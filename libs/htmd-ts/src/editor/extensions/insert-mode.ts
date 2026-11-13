@@ -113,12 +113,12 @@ export function executeInsertModeEntry(
       nextSel = sel
     } else if (sel instanceof NodeSelection) {
       const nav = getNodeNavigation(editor, sel.node.type.name)
-      if (nav?.kind === 'container') {
+      storage.activeCompoundBlockPos = sel.from
+      if (nav?.kind === 'container' || nav?.kind === 'custom') {
         const { firstTextStart, lastTextEnd } = getContainerInnerTextBounds(sel.node, sel.from)
         const dest = isAppend ? (lastTextEnd !== -1 ? lastTextEnd : sel.to) : firstTextStart
         nextSel = dest !== -1 ? TextSelection.create(doc, dest) : sel
       } else {
-        storage.activeCompoundBlockPos = sel.from
         storage.focusControlRequest = {
           pos: sel.from,
           type: sel.node.type.name,
@@ -213,12 +213,26 @@ export function applyModalStateTransition(
     }
     storage.activeCompoundBlockPos = null
   }
+  if (nextMode === 'normal' && compoundPosToSelect === null) {
+    const $from = editor.state.selection.$from
+    for (let d = $from.depth; d >= 1; d -= 1) {
+      if (getNodeNavigation(editor, $from.node(d).type.name)?.kind === 'custom') {
+        compoundPosToSelect = $from.before(d)
+        break
+      }
+    }
+  }
+  const enteringCustomSelect =
+    nextMode === 'select' &&
+    editor.state.selection instanceof NodeSelection &&
+    getNodeNavigation(editor, editor.state.selection.node.type.name)?.kind === 'custom'
   if (
     storage.mode === nextMode &&
     storage.preset === nextPreset &&
     prev?.mode === nextMode &&
     prev?.preset === nextPreset &&
-    compoundPosToSelect === null
+    compoundPosToSelect === null &&
+    !enteringCustomSelect
   ) {
     return
   }
@@ -229,18 +243,24 @@ export function applyModalStateTransition(
     prev.mode === nextMode &&
     prev.preset === nextPreset &&
     prev.secondaryRanges.length === 0 &&
-    compoundPosToSelect === null
+    compoundPosToSelect === null &&
+    !enteringCustomSelect
   ) {
     return
   }
   try {
     let tr = editor.state.tr
     let restoredSubtextCursor: SubtextCursorState | null = null
-    if (compoundPosToSelect !== null) {
+    if (enteringCustomSelect && editor.state.selection instanceof NodeSelection) {
+      const startPos = Math.min(editor.state.doc.content.size, editor.state.selection.from + 1)
+      tr = tr.setSelection(TextSelection.create(editor.state.doc, startPos))
+    } else if (compoundPosToSelect !== null) {
       const node = editor.state.doc.nodeAt(compoundPosToSelect)
       if (node) {
         const nav = getNodeNavigation(editor, node.type.name)
-        if (nav?.kind === 'container') {
+        if (nav?.kind === 'custom' && NodeSelection.isSelectable(node)) {
+          tr = tr.setSelection(NodeSelection.create(editor.state.doc, compoundPosToSelect))
+        } else if (nav?.kind === 'container') {
           const $cur = editor.state.selection.$from
           let insideThisBlock = false
           for (let d = $cur.depth; d >= 1; d -= 1) {

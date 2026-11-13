@@ -65,6 +65,13 @@ function checkNode(node: JSONContent): void {
       Number(node.attrs?.level ?? 1) > 6)
   )
     throw new InvalidDocumentError('Heading level must be between 1 and 6.')
+  if (
+    node.type === 'codeBlock' &&
+    node.attrs?.language != null &&
+    (/\s/.test(String(node.attrs.language)) ||
+      ['htmd', 'chart', 'mermaid', 'manim'].includes(String(node.attrs.language)))
+  )
+    throw new InvalidDocumentError('Unsupported codeBlock language.')
   for (const mark of node.marks ?? []) {
     const type = schema.marks[mark.type]
     if (!type) throw new InvalidDocumentError(`Unsupported ${mark.type} mark.`)
@@ -221,6 +228,7 @@ function protectWhitespace(node: JSONContent, parent?: JSONContent): EngineJSON 
     node.type === 'text' &&
     !node.marks?.length &&
     parent?.type !== 'codeBlock' &&
+    parent?.type !== 'mermaid' &&
     parent?.type !== 'unparsedBlock' &&
     parent?.type !== 'unparsedInline'
   ) {

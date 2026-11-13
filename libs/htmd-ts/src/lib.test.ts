@@ -160,6 +160,16 @@ describe('When input cannot be represented by the supported format', () => {
       type: 'doc',
       content: [
         {
+          type: 'codeBlock',
+          attrs: { language: 'mermaid' },
+          content: [{ type: 'text', text: 'flowchart TD' }],
+        },
+      ],
+    },
+    {
+      type: 'doc',
+      content: [
+        {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Draft', marks: [{ type: 'futureMark' }] }],
         },

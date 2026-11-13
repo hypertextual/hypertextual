@@ -21,7 +21,7 @@
   const listbox = useListbox(() => ({
     collection,
     defaultHighlightedValue: items[0]?.title,
-    loopFocus: false,
+    loopFocus: true,
     selectionMode: 'single',
     onValueChange: ({ items: selected }) => {
       if (selected[0]) command(selected[0])

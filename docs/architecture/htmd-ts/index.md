@@ -37,7 +37,7 @@ flowchart TD
     subgraph HTMD["libs/htmd-ts Internal Modules"]
         HE["editor/htmd-editor.ts<br/>Interactive Editor Controller"]
         HD["editor/htmd-document.ts<br/>Document & Asset Transform"]
-        EXT["editor/define-htmd-extension.ts & extensions/*<br/>18 Node, Behavior, & Modal Extensions"]
+        EXT["editor/define-htmd-extension.ts & extensions/*<br/>19 Node, Behavior, & Modal Extensions"]
         BE["editor/build-extensions.ts<br/>Schema Bridge, KeyScope & Navigation Compiler"]
         Schema["nodes.ts, marks.ts, syntax.ts, lib.ts<br/>Canonical HTMD Schema & Markdown Codec"]
         Engines["Private Engines<br/>ProseMirror View/State + Tiptap + Marked"]
@@ -55,7 +55,7 @@ flowchart TD
 | `src/index.ts` | Exports `HtmdEditor`, `HtmdDocument`, `htmdCodec`, `defineHtmdExtension`, navigation presets, `NodeView` types, and error classes. |
 | `src/nodes.ts`, `marks.ts`, `syntax.ts`, `lib.ts` | Own the canonical HTMD node and mark schemas, Markdown parsing/serialization, document validation, and issue recovery. |
 | `src/editor/htmd-document.ts` | Implements `HtmdDocument` (`EditorDocument<JSONContent>`). Extracts the H1 title and maps image URLs between portable paths and display URLs. |
-| `src/editor/define-htmd-extension.ts` | Defines `defineHtmdExtension` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`). |
+| `src/editor/define-htmd-extension.ts` | Defines `defineHtmdExtension` (`commands`, `keymap`, `navigation`, `nodeView`, `pmPlugins`) and navigation presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, `createCustomNodeNavigation`). |
 | `src/editor/build-extensions.ts` | Extends canonical nodes from `nodes.ts`, merges `.configure({ keymap })` overrides, and registers `HtmdNodeNavigation` specs. |
 | `src/editor/htmd-editor.ts` | Implements `HtmdEditor` (`Editor<JSONContent, HtmdCommandMap>`), mounts ProseMirror `EditorView`, and connects `EditorHostServices`. |
 
@@ -114,6 +114,7 @@ const editor = new HtmdEditor({
   nodeViews: {
     notice: noticeNodeView,
     codeBlock: codeBlockNodeView,
+    mermaid: mermaidNodeView,
     image: imageNodeView,
     linkPreview: linkPreviewNodeView,
     urlMention: urlMentionNodeView,
@@ -128,7 +129,7 @@ editor.mount(containerElement)
 | --- | --- |
 | Editor keyscope | `editor:htmd` (`editor` priority): `Enter` enters a compound block in normal mode; `Escape` returns to normal mode in insert mode. |
 | Extension keyscope | `extension:<name>` (`extension` priority): declarative `Keymap<HtmdCommandContext>`, overridable via `.configure({ keymap })` and `.extend({ keymap })`. |
-| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, or `createAtomNodeNavigation`. |
+| Node navigation | `HtmdNodeNavigation` (`enterFromAbove`, `enterFromBelow`, `enterCompound`, `stepControl`, `subtext`) inherited from `createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, or `createCustomNodeNavigation`. |
 | Custom block views | `NodeViewRenderer` (`HtmdNodeViewFactory`) receives `NodeViewProps` (`editor`, `node`, `getPos`, `updateAttributes`, `deleteNode`) and returns `{ dom, contentDOM?, update?, destroy? }`. |
 
 #### 3. Markdown Syntax and Recovery
@@ -136,6 +137,7 @@ editor.mount(containerElement)
 | Syntax Kind | Markdown Representation | Schema Node / Mark |
 | --- | --- | --- |
 | Standard blocks & inline marks | CommonMark & GFM | `heading`, `paragraph`, `codeBlock`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `bold`, `italic`, `strike`, `code`, `link` |
+| Mermaid diagrams | ```` ```mermaid ```` fenced block | `mermaid` (`MermaidEditor`; disallowed as a `codeBlock` language) |
 | Callout notices | `> [!NOTE] Title` | `notice` (`NoticeNode`) |
 | Inline HTML marks | `<u>`, `<span style="color:...">`, `<mark>` | `underline`, `textColor`, `highlight` |
 | Mentions & embeds | `[mention ...]`, `[url-mention ...]`, `:::bookmark`, `:::youtube` | `internalMention`, `urlMention`, `linkPreview` |
@@ -153,8 +155,8 @@ editor.mount(containerElement)
 ### Engine Adapters and Extension System
 
 - `src/nodes.ts`, `src/marks.ts`, `src/syntax.ts`, and `src/lib.ts` own the canonical HTMD node and mark schemas, Markdown parsing, serialization, and schema validation.
-- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` and the `HtmdNodeNavigation` presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`).
-- `src/editor/extensions/*` contains the 18 HTMD editor extension modules (9 node extensions, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
+- `src/editor/define-htmd-extension.ts` provides `defineHtmdExtension` and the `HtmdNodeNavigation` presets (`createTextblockNavigation`, `createContainerNodeNavigation`, `createAtomNodeNavigation`, `createCustomNodeNavigation`).
+- `src/editor/extensions/*` contains the 19 HTMD editor extension modules (10 node extensions including `mermaid-editor.ts`, 5 document behavior extensions, and 4 modal editing modules: `modal-editing.ts`, `normal-mode.ts`, `select-mode.ts`, `insert-mode.ts`, plus `modal-presets.ts`).
 - `src/editor/build-extensions.ts` extends the canonical node schemas from `src/nodes.ts` and attaches interactive extension behavior. See [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](editor-extensions.md).
 
 ### Testing
@@ -166,7 +168,7 @@ editor.mount(containerElement)
 
 - [HTMD editor, ProseMirror, Tiptap, and Svelte UI architecture](editor-extensions.md)
 - [core-ts editor plugin architecture](../core-ts.md)
-- [HtmdEditor Svelte component](../ui/htmd-editor.md)
+- [HtmdEditor Svelte component](../ui/htmd-editor/index.md)
 - [Editor source ownership](../ui/editor-source.md)
 - [System architecture](../index.md)
 - [Development commands](../../development.md)

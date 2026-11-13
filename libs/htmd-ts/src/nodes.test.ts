@@ -1366,6 +1366,44 @@ describe('When handling unparsed-inline', () => {
   })
 })
 
+describe('When handling mermaid', () => {
+  describe('When parsing a fenced mermaid block', () => {
+    it('produces the documented ProseMirror JSON and preserves plain ```mermaid fences without additional marks', () => {
+      // Given
+      const source = '```mermaid\nflowchart TD\n  A[Start] --> B[End]\n```'
+      const expected = {
+        type: 'doc',
+        content: [
+          {
+            type: 'mermaid',
+            content: [
+              {
+                type: 'text',
+                text: 'flowchart TD\n  A[Start] --> B[End]',
+              },
+            ],
+          },
+        ],
+      }
+
+      // When
+      const result = parse(source)
+      const saved = serialize(result.content)
+
+      // Then
+      expect(result).toEqual({ content: expected, issues: [] })
+      expect(saved).toBe(source + '\n')
+      expect(saved).not.toContain(':::')
+      expect(saved).not.toContain('data-hypertextual-block')
+      expect(parse(saved)).toEqual({ content: expected, issues: [] })
+      expect(parse('```mermaid   \nflowchart TD\n  A[Start] --> B[End]\n```')).toEqual({
+        content: expected,
+        issues: [],
+      })
+    })
+  })
+})
+
 describe('When handling url-mention', () => {
   describe('When parsing a URL mention', () => {
     it('produces the documented ProseMirror JSON and preserves it when written again', () => {

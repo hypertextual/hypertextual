@@ -1,9 +1,11 @@
+import type { EditorMode } from 'core-ts'
 import type { HtmdEditor, HtmdNodeViewContext, NodeViewRenderer } from 'htmd-ts'
 import { getAllContexts, mount, unmount, type Component } from 'svelte'
 import { createSubscriber, SvelteMap } from 'svelte/reactivity'
 
 export interface SvelteNodeViewProps<TEditor = HtmdEditor> extends HtmdNodeViewContext<TEditor> {
   readonly editable: boolean
+  readonly mode: EditorMode
   readonly subtextRange: { from: number; to: number } | null
 }
 
@@ -55,6 +57,10 @@ export function createSvelteNodeView<
       get editable() {
         subscribe()
         return Boolean(ctx.editor?.isEditable && ctx.editor?.isInsertMode)
+      },
+      get mode(): EditorMode {
+        subscribe()
+        return ctx.editor?.mode ?? (ctx.editor?.isEditable ? 'insert' : 'normal')
       },
       get subtextRange() {
         subscribe()

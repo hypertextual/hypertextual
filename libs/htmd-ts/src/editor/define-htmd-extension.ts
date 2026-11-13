@@ -69,7 +69,7 @@ export interface HtmdControlFocusOptions {
 }
 
 export interface HtmdNodeNavigation {
-  kind: 'textblock' | 'container' | 'atom'
+  kind: 'textblock' | 'container' | 'atom' | 'custom'
   controls?: readonly string[]
   defaultControl?: string
   multilineTextblock?: boolean
@@ -245,7 +245,7 @@ export function createTextblockNavigation(config?: {
       if (!selection) return false
       CursorManager.clearActiveCompoundBlockPos(editor)
       editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
     enterFromBelow(editor, pos, node) {
@@ -255,7 +255,7 @@ export function createTextblockNavigation(config?: {
       if (!selection) return false
       CursorManager.clearActiveCompoundBlockPos(editor)
       editor.commands.setTextSelection(selection.from)
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
   }
@@ -308,7 +308,7 @@ export function createContainerNodeNavigation(config: {
           return true
         }
       }
-      editor.view?.focus()
+      CursorManager.focusEditorView(editor)
       return true
     },
     enterFromBelow(editor, pos, node) {
@@ -317,18 +317,32 @@ export function createContainerNodeNavigation(config: {
       if (enterBelowMode === 'endPos') {
         const endPos = Math.max(pos + 1, pos + node.nodeSize - 1)
         editor.commands.setTextSelection(endPos)
-        editor.view?.focus()
+        CursorManager.focusEditorView(editor)
         return true
       }
       const selection = Selection.findFrom(doc.resolve(pos + node.nodeSize - 1), -1, true)
       if (selection) {
         editor.commands.setTextSelection(selection.from)
-        editor.view?.focus()
+        CursorManager.focusEditorView(editor)
         return true
       }
       return false
     },
     focusControl: config.focusControl,
+  }
+}
+
+/**
+ * Creates a `custom` navigation contract that delegates entry, exit, and
+ * control focus directly to the extension using `CursorManager` and
+ * `SelectionManager` primitives.
+ */
+export function createCustomNodeNavigation(
+  config: Omit<HtmdNodeNavigation, 'kind'>,
+): HtmdNodeNavigation {
+  return {
+    kind: 'custom',
+    ...config,
   }
 }
 

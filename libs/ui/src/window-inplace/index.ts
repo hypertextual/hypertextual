@@ -1,0 +1,8 @@
+export { default as WindowInplace } from './WindowInplace.svelte'
+export { default as WindowInplaceHeader } from './WindowInplaceHeader.svelte'
+export { default as WindowInplaceTitle } from './WindowInplaceTitle.svelte'
+export { default as WindowInplaceToolbar } from './WindowInplaceToolbar.svelte'
+export { default as WindowInplaceBody } from './WindowInplaceBody.svelte'
+export { default as WindowInplaceFooter } from './WindowInplaceFooter.svelte'
+export * from './styles'
+export * from './types'

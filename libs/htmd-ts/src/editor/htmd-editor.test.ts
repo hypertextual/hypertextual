@@ -29,6 +29,7 @@ import {
   InternalMention,
   KakounePreset,
   LinkPreview,
+  MermaidEditor,
   ModalEditing,
   NormalMode,
   NoticeNode,
@@ -827,7 +828,7 @@ describe('Given a filename or error message', () => {
 
 describe('Given an extension defined with defineHtmdExtension', () => {
   describe('When inspecting all built-in HTMD extensions', () => {
-    it('it exposes schema, keymap, commands, and navigation contracts on all 21 extensions', () => {
+    it('it exposes schema, keymap, commands, and navigation contracts on all 22 extensions', () => {
       const extensions = [
         CodeBlock,
         CurrentEmptyBlock,
@@ -839,6 +840,7 @@ describe('Given an extension defined with defineHtmdExtension', () => {
         InternalMention,
         KakounePreset,
         LinkPreview,
+        MermaidEditor,
         ModalEditing,
         NormalMode,
         NoticeNode,
@@ -851,7 +853,7 @@ describe('Given an extension defined with defineHtmdExtension', () => {
         UrlMention,
         VimPreset,
       ]
-      expect(extensions).toHaveLength(21)
+      expect(extensions).toHaveLength(22)
       for (const ext of extensions) {
         expect(typeof ext.spec.name).toBe('string')
         expect(typeof ext.configure).toBe('function')

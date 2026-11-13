@@ -21,7 +21,8 @@
     "class-variance-authority": "0.7.1",
     "core-ts": "workspace:*",
     "htmd-ts": "workspace:*",
-    "lucide-svelte": "0.577.0"
+    "lucide-svelte": "0.577.0",
+    "mermaid": "^11.16.0"
   },
   "peerDependencies": {
     "svelte": "^5.57.0"

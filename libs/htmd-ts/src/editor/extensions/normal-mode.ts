@@ -485,32 +485,29 @@ export function executeNormalModeTextObject(
     return true
   }
 
-  const matchesNodeType = (typeName: string): boolean => {
-    switch (kind) {
-      case 'p':
-        return typeName === 'paragraph' || typeName === 'heading'
-      case 'c':
-        return typeName === 'codeBlock'
-      case 'n':
-        return typeName === 'notice' || typeName === 'blockquote'
-      case 'l':
-        return typeName === 'listItem' || typeName === 'taskItem'
-      default:
-        return false
-    }
+  const defaultTextObjectByType: Record<string, string> = {
+    paragraph: 'p',
+    heading: 'p',
+    notice: 'n',
+    blockquote: 'n',
+    listItem: 'l',
+    taskItem: 'l',
   }
 
   const $head = sel.$head
   let targetNode = null
   let targetPos = -1
 
-  if (sel instanceof NodeSelection && matchesNodeType(sel.node.type.name)) {
+  if (
+    sel instanceof NodeSelection &&
+    (sel.node.type.spec.code ? 'c' : defaultTextObjectByType[sel.node.type.name]) === kind
+  ) {
     targetNode = sel.node
     targetPos = sel.from
   } else {
     for (let d = $head.depth; d >= 1; d -= 1) {
       const ancestor = $head.node(d)
-      if (matchesNodeType(ancestor.type.name)) {
+      if ((ancestor.type.spec.code ? 'c' : defaultTextObjectByType[ancestor.type.name]) === kind) {
         targetNode = ancestor
         targetPos = $head.before(d)
         break

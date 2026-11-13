@@ -16,8 +16,15 @@ export const editorSurface = cva(
   'editor-container relative [&_.ProseMirror]:relative [&_.ProseMirror]:outline-none [&_.ProseMirror_ul]:my-4 [&_.ProseMirror_ul]:pl-5 [&_.ProseMirror_ol]:my-4 [&_.ProseMirror_ol]:pl-5 [&_.ProseMirror_ul>li]:list-disc [&_.ProseMirror_ol>li]:list-decimal [&_.ProseMirror_li]:my-1 [&_.ProseMirror_li]:pl-1 [&_.ProseMirror_li_p]:m-0 [&_.ProseMirror_li_p]:inline [&_.ProseMirror_ul[data-type=taskList]]:list-none [&_.ProseMirror_ul[data-type=taskList]]:pl-0 [&_.ProseMirror_ul[data-type=taskList]_li]:flex [&_.ProseMirror_ul[data-type=taskList]_li]:list-none [&_.ProseMirror_ul[data-type=taskList]_li]:items-start [&_.ProseMirror_ul[data-type=taskList]_li]:gap-2 [&_.ProseMirror_ul[data-type=taskList]_li>label]:mt-1 [&_.ProseMirror_ul[data-type=taskList]_li>label]:shrink-0 [&_.ProseMirror_ul[data-type=taskList]_li>div]:flex-1 [&_.ProseMirror_mark]:text-inherit',
 )
 export type EditorSurfaceVariants = VariantProps<typeof editorSurface>
+// TODO: Group remaining component styles into component-scoped style objects.
 export const codeContent =
   'editor-code-content m-0 rounded-none border-0 bg-transparent p-4 font-mono [&_code]:bg-transparent [&_code]:p-0'
+
+export {
+  mermaidEditorStyles,
+  mermaidRootVariants,
+  type MermaidRootVariants,
+} from './mermaid-editor/styles'
 export const youtubeSurface = 'my-0 [&>button]:block [&>iframe]:block [&>button>img]:my-0'
 export const noticeBody =
   "min-h-6 [&_p]:m-0 data-[empty=true]:before:pointer-events-none data-[empty=true]:before:float-left data-[empty=true]:before:h-0 data-[empty=true]:before:text-muted-foreground data-[empty=true]:before:content-['Add_the_notice_body_here.']"
