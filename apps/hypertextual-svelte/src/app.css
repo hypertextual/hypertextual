@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '@cloudvoyant/helical-ui/theme.css';
+@import '@cloudvoyant/helical-ui/themes.css';
 @import '@cloudvoyant/helical-ui/components.css';
 @import './theme-hypertextual.css';
 @plugin '@tailwindcss/typography';

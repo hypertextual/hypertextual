@@ -12,6 +12,7 @@
   // Methods -------------------------------------------------------------------
   function handleCancel(value: string): void {
     if (value === workspace.pendingEntry?.path) workspace.pendingEntry = null
+    if (value === workspace.renamingPath) workspace.renamingPath = null
   }
 
   function handleSelect(path: string): void {
@@ -26,7 +27,7 @@
 <TreeView
   label="Workspace files"
   nodes={workspace.nodes}
-  renameValue={workspace.pendingEntry?.path}
+  renameValue={workspace.renamingPath ?? workspace.pendingEntry?.path}
   pendingNode={workspace.pendingNode}
   parentValue={workspace.pendingParent}
   refresh={workspace.refreshFolder}

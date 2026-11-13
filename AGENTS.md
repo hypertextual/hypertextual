@@ -69,7 +69,7 @@ let { ... }: ComponentProps = $props()
 
 ### Svelte and Helical
 
-- Compose published Helical components (`Sidebar`, `Select`, `Button`, `WhichKeyProvider`) and wrap missing primitives around Ark UI in `libs/ui`.
+- Compose published Helical components (`Sidebar`, `Select`, `Button`, `WhichKeyProvider`, `LightSwitch`, `ThemeSelector`, `ThemeService`) and wrap missing primitives around Ark UI in `libs/ui`.
 - Delegate behavior, accessibility, keyboard navigation, and interaction state to Ark UI and Helical controllers rather than custom DOM handlers.
 - Define framework-neutral base classes and CVA variants in `styles.ts`, derive variant types with `VariantProps`, and merge caller classes with Helical `cn`.
 - [Proposed] Group component style exports in `styles.ts` into a component-scoped object.
@@ -77,7 +77,7 @@ let { ... }: ComponentProps = $props()
 - [Proposed] Style keyboard focus rings at the theme level rather than adding per-instance focus utility classes on controls.
 - Prefer compound subcomponents over named snippet props for multi-part Svelte components.
 - Keep `Shell.svelte` focused strictly on UI orchestration (`TitleBar`, `Sidebar`, `ContentPane`, `StatusBar`, and lifecycle); place keyboard shortcuts, keymaps, and navigation commands in `HotkeyService`, and register scoped widget, extension, and editor keymaps through `WhichKeyController.registerKeymap` (`useKeymap` in Svelte components).
-- Keep theme state and toggle controls (`ThemeService`, `ThemeToggle`) in `libs/ui`, with `SettingsService` only syncing persisted preferences when needed.
+- Delegate theming to `@cloudvoyant/helical-ui` and `@cloudvoyant/helical-svelte`; implement theme changes upstream rather than in this repository.
 - Bind multi-statement event callbacks to named handler methods in `<script>` rather than inline template lambdas.
 - Implement services in `src/services/` as stateful classes.
 - Delegate format recognition (`formats`, `supportsFile`) and document deserialization/serialization (`EditorFormatAdapter`, `EditorDocument`) to editor plugins (`HtmdEditor` in `libs/htmd-ts`) via `libs/core-ts` contracts; keep all Tiptap/ProseMirror, Markdown parsing, serialization, and AST dependencies internal to `libs/htmd-ts` without leaking `@tiptap/*` types or format regexes into `libs/ui` or `apps/hypertextual-svelte`.
@@ -103,6 +103,9 @@ let { ... }: ComponentProps = $props()
 - Structure BDD `Given` / `When` / `it` clauses as a logical hierarchy that reflects the component or application behavior tree, narrowing down paths so branch coverage is clear.
 - [Proposed] Keep each BDD leaf test focused on a single behavior or transition and hoist shared setup into the enclosing `Given` scope (`beforeEach` / `beforeAll`).
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
+- Prefer Playwright E2E tests with real DOM, persistence checks, and env-gated screenshot outputs (`E2E_SCREENSHOTS=1` into gitignored `test-results/`) over hand-rolled `window`/`document`/`localStorage` mocks in service tests; never check E2E screenshots into git.
+- Do not duplicate upstream `@cloudvoyant/helical-ui` component behavior tests in Hypertextual E2E suites; focus on testing custom additions and fragile integrations (such as custom editor behaviors, persistence, and side effects).
+- [Proposed] Separate E2E assertions for immediate DOM side effects (named explicitly in the test title) from reload persistence tests, and keep screenshot capture as an unnamed verification step rather than part of the test description.
 - Keep all HTMD block and inline node round-trip cases in `libs/htmd-ts/src/nodes.test.ts` and mark cases in `marks.test.ts`, grouped by element and variant. Reserve `lib.test.ts` for whole-document codec contracts and error recovery.
 - Keep public Rust integration suites in `libs/hyped-fs/tests` using real temporary directories (`given_*` / `when_*` modules and `it_*` tests) and private unit tests in colocated `#[cfg(test)] mod tests`.
 - Give each test its own temporary workspace and browser context via fixtures, and interact only through rendered controls and keyboard input:

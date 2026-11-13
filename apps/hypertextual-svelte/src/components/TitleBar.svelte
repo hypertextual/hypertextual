@@ -8,8 +8,10 @@
     SelectContent,
     SelectItem,
     SelectItemText,
+    LightSwitch,
+    themeService,
+    type ThemeMode,
   } from '@cloudvoyant/helical-svelte'
-  import { ThemeToggle } from '@hypertextual/ui'
   import { PanelLeft, ChevronDown } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
 
@@ -18,6 +20,11 @@
     workspace: WorkspaceService
   }
   let { workspace }: TitleBarProps = $props()
+
+  // Methods -------------------------------------------------------------------
+  function handleModeChange(mode: ThemeMode): void {
+    themeService.setThemeMode(mode)
+  }
 </script>
 
 <header class="titlebar" data-tauri-drag-region>
@@ -38,5 +45,5 @@
       >
     </Select>
   </div>
-  <ThemeToggle class="theme-toggle" />
+  <LightSwitch mode={themeService.themeMode} onModeChange={handleModeChange} class="theme-toggle" />
 </header>

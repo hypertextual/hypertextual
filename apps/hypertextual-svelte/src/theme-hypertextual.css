@@ -1,7 +1,6 @@
 /* Custom Hypertextual theme: Vercel-inspired high-contrast neutral surfaces
-   (OLED #101010 in dark mode for both canvas and sidebar/titlebar) with
-   monochrome black/white Vercel primary and focus accents. */
-:root,
+   (#101010 carbon near-black in dark mode for both canvas and sidebar/titlebar)
+   with monochrome black/white Vercel primary and focus accents. */
 .theme-hypertextual {
   --radius: 0.5rem;
   --background: oklch(0.99 0 0);
@@ -44,7 +43,6 @@
   --shadow-offset-y: 1px;
 }
 
-.dark,
 .theme-hypertextual.dark {
   --background: #101010;
   --foreground: #ededed;

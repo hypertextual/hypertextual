@@ -1,4 +1,4 @@
-import { test, expect, png } from './fixtures'
+import { test, expect, png, captureScreenshot } from './fixtures'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -282,7 +282,7 @@ test.describe(
         const itemKeys = await popup
           .locator('[data-testid="which-key-item"]')
           .evaluateAll((els) => els.map((el) => el.getAttribute('data-key')))
-        expect(itemKeys).toEqual(['?', 'e', 'n', 'N', 'f', '/', 'g', 'j', 'w', 'v', 't', 'k'])
+        expect(itemKeys).toEqual([':', '?', 'e', 'n', 'N', 'f', '/', 'g', 'j', 'w', 'v', 't', 'k'])
         await page.keyboard.press('k')
         await page.keyboard.press('v')
         await expect(badge).toHaveText('vim · normal')
@@ -784,6 +784,101 @@ test.describe(
         await expect(fullscreen).toHaveCount(0)
       })
     })
+
+    test.describe('When the user updates command style and appearance settings via commands', () => {
+      test(
+        'it applies theme class, dark mode class, pane outline attribute, and command surface style to the DOM',
+        { tag: '@smoke' },
+        async ({ page }, testInfo) => {
+          // Arrange
+          const html = page.locator('html')
+          const shell = page.locator('.workspace-shell')
+          const palette = page.getByTestId('command-palette')
+          const paletteInput = page.getByTestId('command-palette-input')
+          const menu = page.getByTestId('command-menu')
+          const menuInput = page.getByTestId('command-menu-input')
+
+          await expect(page.getByRole('button', { name: /Open Command/i })).toHaveCount(0)
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+            ),
+          ).toBe(true)
+
+          // Act
+          await page.keyboard.press(':')
+          await expect(palette).toBeVisible()
+          await captureScreenshot(page, testInfo, 'command-palette')
+          await paletteInput.fill('Command Menu')
+          await page.keyboard.press('Enter')
+          await expect(palette).toHaveCount(0)
+
+          await page.keyboard.press(':')
+          await expect(menu).toBeVisible()
+          await captureScreenshot(page, testInfo, 'command-menu')
+          await menuInput.fill('theme catppuccin')
+          await page.keyboard.press('Enter')
+          await expect(menu).toHaveCount(0)
+
+          await page.keyboard.press(':')
+          await menuInput.fill('mode dark')
+          await page.keyboard.press('Enter')
+          await expect(menu).toHaveCount(0)
+
+          await page.keyboard.press(':')
+          await menuInput.fill('pane-outline off')
+          await page.keyboard.press('Enter')
+          await expect(menu).toHaveCount(0)
+
+          // Assert
+          await expect(html).toHaveClass(/\btheme-catppuccin\b/)
+          await expect(html).toHaveClass(/\bdark\b/)
+          await expect(shell).toHaveAttribute('data-pane-outline', 'false')
+          await captureScreenshot(page, testInfo, 'theme-catppuccin-dark')
+        },
+      )
+
+      test(
+        'it persists command style, theme, color mode, and pane outline settings across reloads',
+        { tag: '@smoke' },
+        async ({ page }) => {
+          // Arrange
+          const html = page.locator('html')
+          const shell = page.locator('.workspace-shell')
+          const palette = page.getByTestId('command-palette')
+          const paletteInput = page.getByTestId('command-palette-input')
+          const menu = page.getByTestId('command-menu')
+          const menuInput = page.getByTestId('command-menu-input')
+
+          await page.keyboard.press(':')
+          await paletteInput.fill('Command Menu')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('theme catppuccin')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('mode dark')
+          await page.keyboard.press('Enter')
+
+          await page.keyboard.press(':')
+          await menuInput.fill('pane-outline off')
+          await page.keyboard.press('Enter')
+
+          // Act
+          await page.reload()
+
+          // Assert
+          await expect(html).toHaveClass(/\btheme-catppuccin\b/)
+          await expect(html).toHaveClass(/\bdark\b/)
+          await expect(shell).toHaveAttribute('data-pane-outline', 'false')
+          await page.keyboard.press(':')
+          await expect(menu).toBeVisible()
+          await expect(palette).toHaveCount(0)
+        },
+      )
+    })
   },
 )
 
@@ -896,7 +991,6 @@ test.describe(
         await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
       })
     })
-
     test.describe('Given a Mermaid diagram in edit mode', () => {
       test.beforeEach(async ({ page, workspace }) => {
         await openMermaidArticle(page, workspace)

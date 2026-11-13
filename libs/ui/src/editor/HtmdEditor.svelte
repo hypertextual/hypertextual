@@ -1,7 +1,21 @@
 <script lang="ts">
   import LocalEditor from './components/Editor.svelte'
   import { tick } from 'svelte'
-  import { cn } from '@cloudvoyant/helical-ui'
+  import {
+    ScrollAreaContent,
+    ScrollAreaRoot,
+    ScrollAreaScrollbar,
+    ScrollAreaThumb,
+    ScrollAreaViewport,
+  } from '@ark-ui/svelte/scroll-area'
+  import {
+    cn,
+    scrollContentBase,
+    scrollRootBase,
+    scrollScrollbarBase,
+    scrollThumbBase,
+    scrollViewportBase,
+  } from '@cloudvoyant/helical-ui'
   import { useOptionalWhichKeyController } from '@cloudvoyant/helical-svelte'
   import { editorViewport } from './styles'
   import type { HtmdEditorProps, EditorHandle } from './types'
@@ -23,7 +37,7 @@
   const whichKeyController = useOptionalWhichKeyController()
 
   let view = $state<EditorHandle>()
-  let surface = $state<HTMLDivElement>()
+  let surface = $state<HTMLDivElement | null>(null)
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
@@ -93,27 +107,33 @@
 </script>
 
 <!-- Native scroll-region focus lets arrow and page keys scroll in view state. -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div
-  bind:this={surface}
-  data-pane-focus-target=""
-  class={cn(editorViewport, className)}
-  tabindex="0"
-  role="region"
-  aria-label="Article content"
->
-  <div class={contentClass}>
-    <LocalEditor
-      bind:this={view}
-      content={document}
-      {editable}
-      {clickToEdit}
-      onedit={enterEdit}
-      onexit={exitToNormal}
-      enforceTitle={false}
-      {onUpload}
-      {onchange}
-      {services}
-    />
-  </div>
-</div>
+<ScrollAreaRoot class={cn(scrollRootBase, 'min-h-0 flex-1')}>
+  <ScrollAreaViewport
+    bind:ref={surface}
+    data-pane-focus-target=""
+    tabindex={0}
+    role="region"
+    aria-label="Article content"
+    class={cn(scrollViewportBase, editorViewport, className)}
+  >
+    <ScrollAreaContent class={scrollContentBase}>
+      <div class={contentClass}>
+        <LocalEditor
+          bind:this={view}
+          content={document}
+          {editable}
+          {clickToEdit}
+          onedit={enterEdit}
+          onexit={exitToNormal}
+          enforceTitle={false}
+          {onUpload}
+          {onchange}
+          {services}
+        />
+      </div>
+    </ScrollAreaContent>
+  </ScrollAreaViewport>
+  <ScrollAreaScrollbar orientation="vertical" class={scrollScrollbarBase}>
+    <ScrollAreaThumb class={scrollThumbBase} />
+  </ScrollAreaScrollbar>
+</ScrollAreaRoot>

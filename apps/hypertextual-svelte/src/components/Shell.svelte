@@ -1,8 +1,15 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte'
-  import { getDocumentWhichKeyController, type KeymapMode } from '@cloudvoyant/helical-ui'
+  import {
+    getDocumentWhichKeyController,
+    type CommandStyle,
+    type KeymapMode,
+  } from '@cloudvoyant/helical-ui'
   import {
     Button,
+    CommandMenu,
+    CommandPalette,
+    CommandProvider,
     Row,
     SidebarProvider,
     Sidebar,
@@ -97,7 +104,11 @@
   }
 
   function handleSidebarOpenChange(next: boolean): void {
-    hotkeys.sidebarOpen = next
+    workspace.sidebarOpen = next
+  }
+
+  function handleCommandStyleChange(next: CommandStyle): void {
+    settings.setCommandStyle(next)
   }
 
   function handleRecoveryClose(): void {
@@ -116,74 +127,84 @@
   commands={hotkeys.commands}
   onModeChange={handleModeChange}
 >
-  <SidebarProvider
-    open={hotkeys.sidebarOpen}
-    onOpenChange={handleSidebarOpenChange}
-    class="workspace-shell"
-    style="--sidebar-width: 236px"
-    data-pane-outline={settings.paneOutline ? 'true' : 'false'}
+  <CommandProvider
+    bind:open={workspace.commandOpen}
+    items={hotkeys.commandItems}
+    style={settings.commandStyle}
+    onStyleChange={handleCommandStyleChange}
   >
-    <TitleBar {workspace} />
-    <Row class="workspace-body">
-      <Sidebar
-        id="workspace-sidebar"
-        paneId="workspace"
-        paneTitle="Workspace"
-        collapsible="offcanvas"
-        class="workspace-sidebar"
-        aria-label="Workspace"
-      >
-        <SidebarHeader class="sidebar-heading">
-          <Row class="workspace-heading-row">
-            <span>Workspace</span>
-            <Row class="workspace-actions">
-              <Button
-                variant="text"
-                size="sm"
-                class="new-article"
-                aria-label="New article"
-                title="New article"
-                disabled={workspace.cannotCreate}
-                onclick={() => workspace.startCreate('file')}
-                ><FilePlus2 size={14} strokeWidth={1.5} /></Button
-              >
-              <Button
-                variant="text"
-                size="sm"
-                class="new-article"
-                aria-label="New folder"
-                title="New folder"
-                disabled={workspace.cannotCreate}
-                onclick={() => workspace.startCreate('directory')}
-                ><FolderPlus size={14} strokeWidth={1.5} /></Button
-              >
+    <SidebarProvider
+      open={workspace.sidebarOpen}
+      onOpenChange={handleSidebarOpenChange}
+      class="workspace-shell"
+      style="--sidebar-width: 236px"
+      data-pane-outline={settings.paneOutline ? 'true' : 'false'}
+    >
+      <TitleBar {workspace} />
+      <Row class="workspace-body">
+        <Sidebar
+          id="workspace-sidebar"
+          paneId="workspace"
+          paneTitle="Workspace"
+          collapsible="offcanvas"
+          class="workspace-sidebar"
+          aria-label="Workspace"
+        >
+          <SidebarHeader class="sidebar-heading">
+            <Row class="workspace-heading-row">
+              <span>Workspace</span>
+              <Row class="workspace-actions">
+                <Button
+                  variant="text"
+                  size="sm"
+                  class="new-article"
+                  aria-label="New article"
+                  title="New article"
+                  disabled={workspace.cannotCreate}
+                  onclick={() => workspace.startCreate('file')}
+                  ><FilePlus2 size={14} strokeWidth={1.5} /></Button
+                >
+                <Button
+                  variant="text"
+                  size="sm"
+                  class="new-article"
+                  aria-label="New folder"
+                  title="New folder"
+                  disabled={workspace.cannotCreate}
+                  onclick={() => workspace.startCreate('directory')}
+                  ><FolderPlus size={14} strokeWidth={1.5} /></Button
+                >
+              </Row>
             </Row>
-          </Row>
-        </SidebarHeader>
-        <SidebarContent>
-          {#if workspace.creationError}<p class="sidebar-message error" role="alert">
-              {workspace.creationError}
-            </p>{/if}
-          {#if workspace.loading}
-            <p class="sidebar-message" role="status">Opening workspace…</p>
-          {:else if workspace.error}
-            <p class="sidebar-message error" role="alert">{workspace.error}</p>
-            {#if isTauri()}<Button variant="text" size="sm" onclick={() => workspace.open()}
-                >Retry</Button
-              >{/if}
-          {:else if !workspace.entries.length && !workspace.pendingEntry}
-            <p class="sidebar-message">
-              Your workspace is empty. Create your first article with New article.
-            </p>
-          {:else}
-            {#key workspace.treeVersion}<WorkspaceExplorer {workspace} />{/key}
-          {/if}
-        </SidebarContent>
-      </Sidebar>
-      <ContentPane {workspace} />
-    </Row>
-    <StatusBar {workspace} />
-  </SidebarProvider>
+          </SidebarHeader>
+          <SidebarContent>
+            {#if workspace.creationError}<p class="sidebar-message error" role="alert">
+                {workspace.creationError}
+              </p>{/if}
+            {#if workspace.loading}
+              <p class="sidebar-message" role="status">Opening workspace…</p>
+            {:else if workspace.error}
+              <p class="sidebar-message error" role="alert">{workspace.error}</p>
+              {#if isTauri()}<Button variant="text" size="sm" onclick={() => workspace.open()}
+                  >Retry</Button
+                >{/if}
+            {:else if !workspace.entries.length && !workspace.pendingEntry}
+              <p class="sidebar-message">
+                Your workspace is empty. Create your first article with New article.
+              </p>
+            {:else}
+              {#key workspace.treeVersion}<WorkspaceExplorer {workspace} />{/key}
+            {/if}
+          </SidebarContent>
+        </Sidebar>
+        <ContentPane {workspace} />
+      </Row>
+      <StatusBar {workspace} />
+
+      <CommandPalette />
+      <CommandMenu hotkey="Mod+k" />
+    </SidebarProvider>
+  </CommandProvider>
 
   <WhichKey />
 </WhichKeyProvider>

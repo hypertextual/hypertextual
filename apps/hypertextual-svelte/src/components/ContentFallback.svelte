@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from '@cloudvoyant/helical-svelte'
+  import { Button, Scroll } from '@cloudvoyant/helical-svelte'
   import { FileText, FileWarning } from 'lucide-svelte'
   import type { EditorService } from '../services/editorService.svelte'
 
@@ -33,12 +33,12 @@
 {:else if editor.image && editor.selected}
   <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
 {:else if editor.document && editor.selected}
-  <div class="source-preview min-h-0 flex-1 overflow-auto p-6">
+  <Scroll class="min-h-0 flex-1" contentClass="source-preview p-6">
     <p class="readonly-notice mb-5 text-xs text-muted-foreground">{editor.document.reason}</p>
     <pre
       aria-label="Original article source"
       class="whitespace-pre-wrap break-words text-xs">{editor.document.source}</pre>
-  </div>
+  </Scroll>
 {:else}
   <div class="empty-pane">
     <FileText size={32} strokeWidth={1.5} />

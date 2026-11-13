@@ -1,67 +1,70 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { themeService, type ThemeMode } from '@hypertextual/ui'
+import type { CommandStyle } from '@cloudvoyant/helical-ui'
+import { themeService, useTheme, type ThemeMode, type ThemeName } from '@cloudvoyant/helical-svelte'
 
+// TODO(HYPE-176): Move settings persistence from window.localStorage to filesystem config via hyped-fs
+// (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
 const PANE_OUTLINE_KEY = 'hypertextual.settings.paneOutline'
 const CLICK_TO_INSERT_KEY = 'hypertextual.settings.clickToInsert'
 const THEME_MODE_KEY = 'hypertextual.settings.themeMode'
+const THEME_KEY = 'hypertextual.settings.theme'
+const COMMAND_STYLE_KEY = 'hypertextual.settings.commandStyle'
 
-function readBoolean(key: string, fallback: boolean): boolean {
+/** Normalized application command surface style (`'palette'` or `'menu'`). */
+export type AppCommandStyle = 'palette' | 'menu'
+
+// TODO(HYPE-176): Replace window.localStorage read/write helpers with atomic filesystem config persistence
+// via hyped-fs (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
+function readSetting<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
   try {
     const raw = window.localStorage.getItem(key)
-    if (raw === 'true') return true
-    if (raw === 'false') return false
+    if (raw === null) return fallback
+    try {
+      return JSON.parse(raw) as T
+    } catch {
+      return raw as unknown as T
+    }
   } catch {
-    // Ignore storage access errors
+    return fallback
   }
-  return fallback
 }
 
-function writeBoolean(key: string, value: boolean): void {
+function writeSetting<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(key, value ? 'true' : 'false')
-  } catch {
-    // Ignore storage access errors
-  }
-}
-
-function readThemeMode(): ThemeMode {
-  if (typeof window === 'undefined') return 'system'
-  try {
-    const raw = window.localStorage.getItem(THEME_MODE_KEY)
-    if (raw === 'light' || raw === 'dark' || raw === 'system') return raw
-  } catch {
-    // Ignore storage access errors
-  }
-  return 'system'
-}
-
-function writeThemeMode(mode: ThemeMode): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(THEME_MODE_KEY, mode)
+    window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
     // Ignore storage access errors
   }
 }
 
 export class SettingsService {
-  paneOutline = $state(readBoolean(PANE_OUTLINE_KEY, true))
-  clickToInsert = $state(readBoolean(CLICK_TO_INSERT_KEY, true))
+  paneOutline = $state(readSetting(PANE_OUTLINE_KEY, true))
+  clickToInsert = $state(readSetting(CLICK_TO_INSERT_KEY, true))
+  commandStyle = $state<AppCommandStyle>(readSetting<AppCommandStyle>(COMMAND_STYLE_KEY, 'palette'))
 
   constructor() {
     if (typeof document !== 'undefined') {
       document.documentElement.style.removeProperty('--font-mono')
     }
-    const initialMode = readThemeMode()
-    themeService.setThemeMode(initialMode, false)
-    this.syncTauriTheme(initialMode)
-    themeService.onModeChange((mode) => {
-      writeThemeMode(mode)
-      this.syncTauriTheme(mode)
+    const initialTheme = readSetting<ThemeName>(THEME_KEY, 'hypertextual')
+    const initialMode = readSetting<ThemeMode>(THEME_MODE_KEY, 'system')
+    useTheme({
+      customThemes: [{ name: 'hypertextual', label: 'Hypertextual' }],
+      defaultTheme: 'hypertextual',
+      defaultMode: initialMode,
+      onThemeChange: (theme) => {
+        writeSetting(THEME_KEY, theme)
+      },
+      onModeChange: (mode) => {
+        writeSetting(THEME_MODE_KEY, mode)
+        this.syncTauriTheme(mode)
+      },
     })
+    themeService.setTheme(initialTheme, false)
+    this.syncTauriTheme(initialMode)
     if (isTauri()) {
       void getCurrentWindow()
         .onThemeChanged(({ payload }) => {
@@ -86,15 +89,25 @@ export class SettingsService {
       .catch(() => {})
   }
 
+  setCommandStyle(style: CommandStyle): AppCommandStyle {
+    this.commandStyle = style === 'menu' || style === 'colon' ? 'menu' : 'palette'
+    writeSetting(COMMAND_STYLE_KEY, this.commandStyle)
+    return this.commandStyle
+  }
+
+  toggleCommandStyle(): AppCommandStyle {
+    return this.setCommandStyle(this.commandStyle === 'palette' ? 'menu' : 'palette')
+  }
+
   togglePaneOutline(): boolean {
     this.paneOutline = !this.paneOutline
-    writeBoolean(PANE_OUTLINE_KEY, this.paneOutline)
+    writeSetting(PANE_OUTLINE_KEY, this.paneOutline)
     return this.paneOutline
   }
 
   toggleClickToInsert(): boolean {
     this.clickToInsert = !this.clickToInsert
-    writeBoolean(CLICK_TO_INSERT_KEY, this.clickToInsert)
+    writeSetting(CLICK_TO_INSERT_KEY, this.clickToInsert)
     return this.clickToInsert
   }
 }

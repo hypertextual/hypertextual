@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type Page, type TestInfo } from '@playwright/test'
 import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, rename, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -35,6 +35,7 @@ export const png = Buffer.from(
   'base64',
 )
 const revision = (content: string) => createHash('sha256').update(content).digest('hex')
+/** Resolves after `ms` milliseconds. */
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function emit(page: Page, event: string) {
@@ -286,6 +287,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
   ],
 })
 
+/** Focuses the `.ProseMirror` editor in insert mode, moves to the end of the document, and types `text`. */
 export async function edit(page: Page, text: string) {
   await page.locator('.ProseMirror').click()
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
@@ -301,6 +303,7 @@ export async function edit(page: Page, text: string) {
   await page.keyboard.type(text)
 }
 
+/** Creates a new article via the sidebar toolbar and focuses `.ProseMirror` in insert mode. */
 export async function createArticle(page: Page) {
   const selected = page.locator('[role="treeitem"][aria-selected="true"]')
   const previous = (await selected.count()) ? await selected.getAttribute('data-value') : null
@@ -309,4 +312,21 @@ export async function createArticle(page: Page) {
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
   await page.locator('.ProseMirror').click()
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'true')
+}
+
+/**
+ * Captures a PNG screenshot into the test output directory and attaches it to the Playwright report
+ * when `E2E_SCREENSHOTS=1` or `HYPERTEXTUAL_E2E_SCREENSHOTS=1` is set.
+ */
+export async function captureScreenshot(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+): Promise<void> {
+  if (process.env.E2E_SCREENSHOTS !== '1' && process.env.HYPERTEXTUAL_E2E_SCREENSHOTS !== '1') {
+    return
+  }
+  const path = testInfo.outputPath(`${name}.png`)
+  await page.screenshot({ path })
+  await testInfo.attach(name, { path, contentType: 'image/png' })
 }

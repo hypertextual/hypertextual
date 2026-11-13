@@ -45,12 +45,13 @@ Hypertextual defaults to the **Helix** preset (`storageKey="hypertextual"`) and 
 
 ---
 
-## Leader Menu (`Space`) & Workspace Commands
+## Leader Menu (`Space`), Command Surface (`:` / `⌘K`), & Workspace Commands
 
-`WhichKey` does **not** hardcode numbered pane slots (`Focus Pane 1..9`) into the `<leader>` menu. Instead, `<leader>` (`Space`) exposes semantic workspace, explorer, window, goto, view, and preset actions:
+`WhichKey` does **not** hardcode numbered pane slots (`Focus Pane 1..9`) into the `<leader>` menu. Instead, `<leader>` (`Space`) exposes semantic command, workspace, explorer, window, goto, view, toggle, and preset actions, while `:` (in `normal` or `select` mode), `Space :`, and `Mod+k` (`Cmd+K` / `Ctrl+K` in any mode) open the active **Command Style** surface (`CommandPalette` by default, or `CommandMenu` `:` when switched via `:command-style menu`):
 
 | Key Sequence | Command ID | Label | Description |
 | --- | --- | --- | --- |
+| `:` / `Space :` / `Mod+k` | `command.open` | Open Command | Open the active `CommandPalette` (`⌘K`) or `CommandMenu` (`:`) based on `settings.commandStyle` (`:` is active only in `normal`/`select` mode so typing `:` in `insert` mode inserts a literal `:`) |
 | `Space ?` / `?` | `whichKey.openExplorer` | Explore Keybindings | Open the fuzzy-searchable Keybinding Explorer modal |
 | `Space e` / `Ctrl-e` | `workspace.toggleExplorer` | Toggle Explorer | Toggle the Workspace Explorer sidebar open or closed (focusing the Workspace Explorer tree when opened, and returning focus to the Article editor when closed) |
 | `Space n` | `workspace.newArticle` | New Article | Create a new untitled article and open it in `insert` mode |
@@ -58,12 +59,38 @@ Hypertextual defaults to the **Helix** preset (`storageKey="hypertextual"`) and 
 | `Space t o` | `settings.togglePaneOutline` | Toggle Pane Outline | Toggle the purple focus outline around the active Workspace or Article pane (persisted in `localStorage`, enabled by default) |
 | `Space t c` | `settings.toggleClickToInsert` | Toggle Click to Insert | Toggle whether clicking in the Article editor enters `insert` mode or moves the `normal` mode cursor (persisted in `localStorage`, enabled by default) |
 | `Space t d` | `settings.cycleThemeMode` | Cycle Theme Mode | Cycle between `system`, `light`, and `dark` theme modes (persisted in `localStorage`, defaults to `system`) |
+| `Space t w` | `settings.toggleWhichKeyLeaderOnly` | Toggle WhichKey Leader Only | Toggle whether the `WhichKey` popup opens for all multi-key prefixes (`all`) or only `<leader>` (`Space`) |
 | `Space w` | `+window` | Window / Pane | Open the spatial window/pane menu (proxies `Ctrl-w`) |
 | `Space j` | `jump.start` | Jump to Element | Overlay 2D jump labels across visible workspace and article targets |
 | `Space g` | `+goto` | Goto | Open the Goto menu (proxies `g`) |
 | `Space v` | `+view` | View / Scroll | Open the View / Scroll menu (proxies `z` in Helix/Vim, `v` in Kakoune) |
 | `Space k` | `+preset` | Keybinding Preset | Open the preset switcher (`h` Helix, `v` Vim, `k` Kakoune) |
 | `Space m f` | — | Toggle Mermaid Fullscreen | When a `mermaid` block is highlighted in `normal` mode, open or close the editor-scoped Mermaid Fullscreen Viewer |
+
+### Command Catalog (`CommandPalette` & `CommandMenu`)
+
+Only one command surface (`CommandPalette` or `CommandMenu`) is active at a time, governed by `hypertextual.settings.commandStyle` (`'palette'` by default). Both surfaces share the same command tree (`HotkeyService.commandItems`):
+
+| Group | `:command` Token | Aliases | Palette Label | Subcommands / Behavior |
+| --- | --- | --- | --- | --- |
+| **Workspace** | `new-article` | `new`, `n`, `create` | New Article | Creates a new untitled article and focuses `.ProseMirror` in `insert` mode |
+| **Workspace** | `new-folder` | `mkdir`, `N` | New Folder | Opens the sidebar if collapsed and begins inline folder creation |
+| **Workspace** | `open` | `o`, `edit`, `e`, `article` | Open Article | Branch listing workspace articles; selecting an entry opens and focuses it |
+| **Workspace** | `rename-file` | `rename`, `mv`, `r` | Rename Current Article | Begins inline rename on the selected file (disabled when no article is selected) |
+| **Workspace** | `delete-file` | `delete`, `rm`, `trash` | Move Current Article to Trash | Moves the selected file to Trash (disabled when no article is selected) |
+| **Workspace** | `open-external` | `open-default`, `xdg-open` | Open in Default App | Opens the selected file in the OS default app (disabled when no article is selected) |
+| **Workspace** | `toggle-explorer` | `explorer`, `sidebar`, `tree` | Toggle Workspace Explorer | Toggles the Workspace Explorer sidebar open or closed |
+| **Navigation** | `focus-workspace` | `pane-workspace` | Focus Workspace Pane | Opens the sidebar if needed and focuses the `workspace` pane |
+| **Navigation** | `focus-article` | `pane-article` | Focus Article Pane | Focuses the `article` pane |
+| **Navigation** | `jump` | `gw` | Jump to Element | Starts 2D home-row `jump` mode |
+| **Appearance** | `theme` | `t`, `colorscheme` | Change Theme | Branch with `hypertextual` (`Hypertextual`) + all 54 `@cloudvoyant/helical-ui` `THEMES` (persisted in `hypertextual.settings.theme`) |
+| **Appearance** | `mode` | `m`, `color-mode` | Change Color Mode | Branch with `system`, `light`, and `dark` |
+| **Preferences** | `command-style` | `cmd`, `command` | Change Command Style | Branch with `palette` (`Command Palette (⌘K)`) and `menu` (`Command Menu (:)` with alias `colon`) |
+| **Preferences** | `which-key` | `wk`, `leader-only` | Change WhichKey Popup | Branch with `all` (`All Prefixes`) and `leader` (`Leader Only`) |
+| **Preferences** | `preset` | `keybind`, `keymap`, `k` | Change Keybinding Preset | Branch with `helix` (`hx`), `vim`, and `kakoune` (`kak`) |
+| **Preferences** | `pane-outline` | `outline` | Pane Focus Outline | Branch with `on` and `off` |
+| **Preferences** | `click-to-insert` | `click-insert` | Click to Insert | Branch with `on` and `off` |
+| **Tools** | `keybindings` | `bindings`, `keys`, `help` | Explore Keybindings | Closes the command surface and opens `WhichKeyExplorer` |
 
 ---
 
@@ -233,7 +260,7 @@ Fenced ```` ```mermaid ```` blocks use a dedicated `mermaid` block node (`Mermai
 
 Pressing `Escape` always peels back the innermost temporary layer before changing the modal state:
 
-1. **Keybinding Explorer (`WhichKeyExplorer`)**: Closes the `<leader>?` dialog and restores focus.
+1. **Command Surface (`CommandPalette` / `CommandMenu`) or Keybinding Explorer (`WhichKeyExplorer`)**: Closes the active `⌘K` / `:` command dialog (or steps back a submenu in `CommandPalette`) or closes the `<leader>?` dialog and restores focus without exiting `insert` mode.
 2. **Active Prefix Menu (`Space`, `g`, `z`, `m`, `Ctrl-w`) or `Jump` Mode (`gw`)**: Closes the `WhichKey` popup or cancels Jump badges and returns to `normal` mode.
 3. **Open Floating Surface / Suggestion / Insertion Overlay**:
    - Closes an open `SlashMenu` (`/`), `MentionMenu` (`@`), `BubbleMenu` formatting toolbar, `CursorOverlay` (`ImageInput`, `BookmarkInput`, `YouTubeInput`), or Ark popup (`Select` dropdown, `ContextMenu`, `AlertDialog`) **while keeping the editor in its current mode**.
