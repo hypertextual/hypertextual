@@ -60,7 +60,11 @@
         script.src = scriptUrl
         script.async = true
         script.onload = () => resolve()
-        script.onerror = () => reject(new Error('Could not load Draw.io viewer script.'))
+        script.onerror = () => {
+          win.__drawioViewerLoadPromise = undefined
+          script.remove()
+          reject(new Error('Could not load Draw.io viewer script.'))
+        }
         document.head.appendChild(script)
       })
     }

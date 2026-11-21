@@ -35,6 +35,7 @@
   let captionFocused = $state(false)
   let displaySrcOverride = $state<string | null>(null)
   let xmlSource = $state('')
+  let pendingExternalRefresh = false
 
   // Derived -------------------------------------------------------------------
   const nodeSrc = $derived(String(node.attrs.src ?? ''))
@@ -72,6 +73,17 @@
       return
     }
     void loadXmlFromSource(effectiveSrc)
+  })
+
+  $effect(() => {
+    if (typeof window === 'undefined') return
+    const onFocus = () => {
+      if (!pendingExternalRefresh) return
+      pendingExternalRefresh = false
+      void handleRefresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   })
 
   $effect(() => {
@@ -337,6 +349,7 @@
 
   function handleOpenExternal() {
     if (!portableSource) return
+    pendingExternalRefresh = true
     void editor.services.openExternal?.(portableSource)
   }
 
