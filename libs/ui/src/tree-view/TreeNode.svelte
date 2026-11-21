@@ -39,6 +39,14 @@
   )
 
   // Methods -------------------------------------------------------------------
+  function handleItemMouseDown(event: MouseEvent): void {
+    if ((event.metaKey || event.ctrlKey || event.button === 1) && onnewtab) {
+      event.preventDefault()
+      event.stopPropagation()
+      onnewtab(node.value)
+    }
+  }
+
   function action(value: string) {
     // Let Ark close the menu and restore focus before starting another interaction.
     requestAnimationFrame(() =>
@@ -131,13 +139,7 @@
               data-pane-focus-target={state().selected || isDefaultFocusTarget ? '' : undefined}
               data-tree-node-value={node.value}
               data-tree-node-branch="false"
-              onmousedown={(event: MouseEvent) => {
-                if ((event.metaKey || event.ctrlKey || event.button === 1) && onnewtab) {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  onnewtab(node.value)
-                }
-              }}
+              onmousedown={handleItemMouseDown}
             >
               {@render nodeIcon(false)}
               <ArkTreeView.ItemText class={treeViewLabelBase} hidden={state().renaming}

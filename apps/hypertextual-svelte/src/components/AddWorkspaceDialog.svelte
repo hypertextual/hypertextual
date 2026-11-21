@@ -89,7 +89,7 @@
 
 {#if open}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-xs"
     role="dialog"
     aria-modal="true"
     aria-label={title}
