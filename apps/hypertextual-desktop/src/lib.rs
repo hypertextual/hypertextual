@@ -33,7 +33,7 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
                 None => app.path().home_dir()?,
             };
             app.manage(workspace::WorkspaceState(Arc::new(Mutex::new(
-                hyped_fs::WorkspaceService::from_home(home),
+                workspace::WorkspaceHost::from_home(home),
             ))));
             Ok(())
         })
@@ -44,6 +44,15 @@ pub fn builder(workspace_home: Option<std::path::PathBuf>) -> tauri::Builder<tau
 pub fn commands(invoke: tauri::ipc::Invoke) -> bool {
     let handler: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
         workspace::workspace_open,
+        workspace::workspace_list_all,
+        workspace::workspace_pick_folder,
+        workspace::workspace_open_folder,
+        workspace::workspace_create_workspace,
+        workspace::workspace_switch,
+        workspace::workspace_rename_workspace,
+        workspace::workspace_relocate,
+        workspace::workspace_remove,
+        workspace::workspace_patch_ui_state,
         workspace::workspace_list,
         workspace::workspace_read,
         workspace::workspace_create,

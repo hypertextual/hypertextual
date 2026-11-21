@@ -38,6 +38,30 @@ export class HotkeyService {
       'Toggle the Workspace Explorer sidebar open or closed',
       ['normal', 'select'],
     ),
+    'Meta+w': leaf(
+      'Meta+w',
+      'Close Tab',
+      'Workspace',
+      'workspace.closeTab',
+      'Close the active article tab',
+      ['normal', 'select', 'insert'],
+    ),
+    'Control+Tab': leaf(
+      'Control+Tab',
+      'Next Tab',
+      'Workspace',
+      'workspace.nextTab',
+      'Switch to the next open article tab',
+      ['normal', 'select', 'insert'],
+    ),
+    'Control+Shift+Tab': leaf(
+      'Control+Shift+Tab',
+      'Previous Tab',
+      'Workspace',
+      'workspace.prevTab',
+      'Switch to the previous open article tab',
+      ['normal', 'select', 'insert'],
+    ),
     Space: {
       key: 'Space',
       label: '+leader',
@@ -279,6 +303,29 @@ export class HotkeyService {
     'workspace.openInDefaultApp': () => {
       if (!this.workspace.editor.selected) return false
       void this.workspace.editor.openInDefaultApp()
+      return true
+    },
+    'workspace.closeTab': () => {
+      if (!this.workspace.activeTab) return false
+      void this.workspace.closeTab()
+      return true
+    },
+    'workspace.nextTab': () => {
+      if (this.workspace.openTabs.length <= 1) return false
+      void this.workspace.cycleTab(1)
+      return true
+    },
+    'workspace.prevTab': () => {
+      if (this.workspace.openTabs.length <= 1) return false
+      void this.workspace.cycleTab(-1)
+      return true
+    },
+    'workspace.openFolder': () => {
+      this.workspace.openAddWorkspaceDialog('open')
+      return true
+    },
+    'workspace.newWorkspace': () => {
+      this.workspace.openAddWorkspaceDialog('create')
       return true
     },
   }

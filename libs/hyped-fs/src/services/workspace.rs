@@ -13,6 +13,8 @@ use crate::{
 pub struct WorkspaceService {
     /// The workspace location shared by file operations.
     workspace: Workspace,
+    /// Whether `root()` may automatically create a missing directory (true only for default bootstrap).
+    auto_create: bool,
 }
 
 impl WorkspaceService {
@@ -20,11 +22,27 @@ impl WorkspaceService {
     pub fn from_home(home: PathBuf) -> Self {
         Self {
             workspace: Workspace::from_home(home),
+            auto_create: true,
+        }
+    }
+
+    /// Selects an existing workspace rooted at an arbitrary directory without auto-creating it.
+    pub fn from_root(root: PathBuf) -> Self {
+        Self {
+            workspace: Workspace::from_root(root),
+            auto_create: false,
         }
     }
 
     pub(super) fn root(&self) -> Result<PathBuf> {
-        fs::create_dir_all(&self.workspace.root)?;
+        if self.auto_create {
+            fs::create_dir_all(&self.workspace.root)?;
+        } else if !self.workspace.root.is_dir() {
+            return Err(error(
+                "missingWorkspace",
+                "Workspace folder could not be found on disk.",
+            ));
+        }
         Ok(self.workspace.root.canonicalize()?)
     }
 
@@ -69,8 +87,12 @@ impl WorkspaceService {
                 .file_name()
                 .into_string()
                 .map_err(|_| error("invalidName", "A workspace filename is not valid Unicode."))?;
-            // Atomic-save temporary files are never workspace entries.
-            if name.starts_with(".hypertextual-save-") || name.starts_with(".hyped-fs-save-") {
+            // Atomic-save temporary files and VCS/OS metadata are never workspace entries.
+            if name.starts_with(".hypertextual-save-")
+                || name.starts_with(".hyped-fs-save-")
+                || name == ".git"
+                || name == ".DS_Store"
+            {
                 continue;
             }
             let path = if relative.is_empty() {

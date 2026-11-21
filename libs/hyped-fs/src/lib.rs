@@ -10,6 +10,8 @@ mod services;
 
 pub use error::{Result, WorkspaceError, error};
 pub use models::{
-    ArticleContent, ArticleMetadata, FileAsset, Workspace, WorkspaceListing, WorkspaceNode,
+    ArticleContent, ArticleMetadata, DEFAULT_WORKSPACE_NAME, FileAsset, Workspace,
+    WorkspaceBacking, WorkspaceListing, WorkspaceNode, WorkspaceRecord, WorkspaceRegistrySnapshot,
+    WorkspaceStatePatch, WorkspaceSyncState, WorkspaceUiState,
 };
-pub use services::{ArticleService, MediaService, WorkspaceService};
+pub use services::{ArticleService, MediaService, WorkspaceRegistry, WorkspaceService};

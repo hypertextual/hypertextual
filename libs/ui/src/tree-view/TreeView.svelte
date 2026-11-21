@@ -25,6 +25,8 @@
     parentValue,
     selected = null,
     onselect,
+    expandedValues,
+    onExpandedChange,
     loadChildren,
     label = 'Files',
     icon,
@@ -56,8 +58,14 @@
     id,
     collection,
     selectedValue: selected ? [selected] : [],
+    ...(expandedValues && expandedValues.length > 0
+      ? { defaultExpandedValue: expandedValues }
+      : {}),
     selectionMode: 'single',
     canRename: () => Boolean(onrename),
+    onExpandedChange: ({ expandedValue }) => {
+      onExpandedChange?.(expandedValue)
+    },
 
     onRenameComplete: ({ value, label }) => {
       if (!onrename) return
@@ -466,6 +474,7 @@
           }}
           {contextItems}
           {onaction}
+          onnewtab={(value) => onselect?.(value, { newTab: true })}
         />
       {/each}
     </ArkTreeView.Tree>

@@ -7,6 +7,8 @@ import { createHash } from 'node:crypto'
 export { expect }
 export interface Workspace {
   root: string
+  homeDir: string
+  nextPickedFolder: string | null
   failWrites: boolean
   failImageUploads: boolean
   failLists: boolean
@@ -20,6 +22,14 @@ export interface Workspace {
 
 interface CommandArgs {
   name?: string
+  newName?: string
+  path?: string
+  patch?: {
+    openTabs?: string[]
+    activeTab?: string | null
+    expandedFolders?: string[]
+    sidebarOpen?: boolean
+  }
   parentPath?: string
   relativePath?: string
   articlePath?: string
@@ -29,6 +39,20 @@ interface CommandArgs {
   content?: string
   title?: string
   expectedRevision?: string
+}
+
+interface TestWorkspaceRecord {
+  name: string
+  backing: { kind: 'local'; path: string }
+  lastOpenedAt: number
+  available: boolean
+}
+
+interface TestWorkspaceUiState {
+  openTabs: string[]
+  activeTab: string | null
+  expandedFolders: string[]
+  sidebarOpen: boolean
 }
 
 export const png = Buffer.from(
@@ -54,10 +78,56 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
   initialWorkspace: ['existing', { option: true }],
   workspace: [
     async ({ page, initialWorkspace }, use, testInfo) => {
-      const root = await mkdtemp(join(tmpdir(), 'hypertextual-ui-'))
+      const homeDir = await mkdtemp(join(tmpdir(), 'hypertextual-home-'))
+      const defaultRoot = join(homeDir, '.hypertextual', 'workspace')
+      await mkdir(defaultRoot, { recursive: true })
+      let activeRoot = defaultRoot
+      let activeWorkspaceName = 'Local workspace'
+      const records: TestWorkspaceRecord[] = [
+        {
+          name: 'Local workspace',
+          backing: { kind: 'local', path: defaultRoot },
+          lastOpenedAt: Date.now(),
+          available: true,
+        },
+      ]
+      const uiStates = new Map<string, TestWorkspaceUiState>()
+      function getUiState(wsName: string): TestWorkspaceUiState {
+        return (
+          uiStates.get(wsName.toLowerCase()) ?? {
+            openTabs: [],
+            activeTab: null,
+            expandedFolders: [],
+            sidebarOpen: true,
+          }
+        )
+      }
+      async function persistRegistry() {
+        await mkdir(join(homeDir, '.hypertextual'), { recursive: true })
+        await writeFile(
+          join(homeDir, '.hypertextual', 'workspaces.json'),
+          JSON.stringify(
+            { schemaVersion: 1, activeWorkspace: activeWorkspaceName, workspaces: records },
+            null,
+            2,
+          ),
+        )
+      }
+      async function persistUiState(wsName: string, state: TestWorkspaceUiState) {
+        uiStates.set(wsName.toLowerCase(), state)
+        const dir = join(homeDir, '.hypertextual', 'workspaces', wsName)
+        await mkdir(dir, { recursive: true })
+        await writeFile(join(dir, 'state.json'), JSON.stringify(state, null, 2))
+      }
+      async function isDir(p: string): Promise<boolean> {
+        return stat(p).then(
+          (s) => s.isDirectory(),
+          () => false,
+        )
+      }
       function location(...parts: string[]) {
-        const target = resolve(root, ...parts)
-        if (target !== root && !target.startsWith(root + sep))
+        const target = resolve(activeRoot, ...parts)
+        if (target !== activeRoot && !target.startsWith(activeRoot + sep))
           throw new Error('Test path leaves its workspace')
         return target
       }
@@ -76,8 +146,11 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           )
           await writeFile(location('rich.htmd'), ':::chart\n{"series":[1,2]}\n:::')
         }
+        await persistRegistry()
         const workspace: Workspace = {
-          root,
+          root: defaultRoot,
+          homeDir,
+          nextPickedFolder: null,
           failLists: false,
           failWrites: false,
           failImageUploads: false,
@@ -95,7 +168,9 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
             .filter(
               (entry) =>
                 !entry.name.startsWith('.hypertextual-save-') &&
-                !entry.name.startsWith('.hyped-fs-save-'),
+                !entry.name.startsWith('.hyped-fs-save-') &&
+                entry.name !== '.git' &&
+                entry.name !== '.DS_Store',
             )
             .map((entry) => ({
               name: entry.name,
@@ -145,10 +220,170 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           return { mime: 'image/png', ext: 'png' }
         }
 
+        async function openRecord(record: TestWorkspaceRecord) {
+          if (!(await isDir(record.backing.path))) {
+            record.available = false
+            throw Object.assign(
+              new Error('[missingWorkspace] Workspace folder could not be found on disk.'),
+              { code: 'missingWorkspace' },
+            )
+          }
+          record.available = true
+          record.lastOpenedAt = Date.now()
+          activeRoot = record.backing.path
+          activeWorkspaceName = record.name
+          workspace.root = activeRoot
+          await persistRegistry()
+          return {
+            workspace: { ...record },
+            root: activeRoot,
+            entries: await list(''),
+            uiState: getUiState(record.name),
+          }
+        }
+
         await page.exposeFunction(
           'workspaceTestInvoke',
           async (command: string, args: CommandArgs) => {
-            if (command === 'workspace_open') return { root, entries: await list('') }
+            if (command === 'workspace_list_all') {
+              for (const rec of records) rec.available = await isDir(rec.backing.path)
+              return {
+                activeWorkspace: activeWorkspaceName,
+                workspaces: records.map((r) => ({ ...r })),
+              }
+            }
+            if (command === 'workspace_pick_folder') {
+              return workspace.nextPickedFolder
+            }
+            if (command === 'workspace_open') {
+              const rec =
+                records.find((r) => r.name.toLowerCase() === activeWorkspaceName.toLowerCase()) ??
+                records[0]
+              if (!rec) throw new Error('No workspace registered.')
+              return openRecord(rec)
+            }
+            if (command === 'workspace_open_folder' || command === 'workspace_create_workspace') {
+              const targetPath = resolve(args.path!)
+              if (command === 'workspace_create_workspace') {
+                await mkdir(targetPath, { recursive: true })
+              } else if (!(await isDir(targetPath))) {
+                throw Object.assign(new Error('Selected workspace folder does not exist.'), {
+                  code: 'missingWorkspace',
+                })
+              }
+              const existingByPath = records.find((r) => resolve(r.backing.path) === targetPath)
+              if (existingByPath) return openRecord(existingByPath)
+              const cleanName = (args.name ?? '').trim()
+              if (!cleanName || /[\\/:]/.test(cleanName)) {
+                throw Object.assign(new Error('Enter a valid workspace name.'), {
+                  code: 'invalidName',
+                })
+              }
+              if (records.some((r) => r.name.toLowerCase() === cleanName.toLowerCase())) {
+                throw Object.assign(new Error('A workspace with this name already exists.'), {
+                  code: 'nameUnavailable',
+                })
+              }
+              const created: TestWorkspaceRecord = {
+                name: cleanName,
+                backing: { kind: 'local', path: targetPath },
+                lastOpenedAt: Date.now(),
+                available: true,
+              }
+              records.push(created)
+              return openRecord(created)
+            }
+            if (command === 'workspace_switch') {
+              const rec = records.find(
+                (r) => r.name.toLowerCase() === (args.name ?? '').trim().toLowerCase(),
+              )
+              if (!rec) {
+                throw Object.assign(new Error('Workspace was not found.'), {
+                  code: 'workspaceNotFound',
+                })
+              }
+              return openRecord(rec)
+            }
+            if (command === 'workspace_rename_workspace') {
+              const rec = records.find(
+                (r) => r.name.toLowerCase() === (args.name ?? '').trim().toLowerCase(),
+              )
+              if (!rec) throw new Error('Workspace was not found.')
+              const nextName = (args.newName ?? '').trim()
+              if (
+                !nextName ||
+                records.some((r) => r !== rec && r.name.toLowerCase() === nextName.toLowerCase())
+              ) {
+                throw new Error('A workspace with this name already exists.')
+              }
+              const prevState = uiStates.get(rec.name.toLowerCase())
+              if (prevState) {
+                uiStates.delete(rec.name.toLowerCase())
+                await persistUiState(nextName, prevState)
+              }
+              if (activeWorkspaceName.toLowerCase() === rec.name.toLowerCase()) {
+                activeWorkspaceName = nextName
+              }
+              rec.name = nextName
+              await persistRegistry()
+              return { ...rec }
+            }
+            if (command === 'workspace_relocate') {
+              const rec = records.find(
+                (r) => r.name.toLowerCase() === (args.name ?? '').trim().toLowerCase(),
+              )
+              if (!rec) throw new Error('Workspace was not found.')
+              rec.backing = { kind: 'local', path: resolve(args.path!) }
+              return openRecord(rec)
+            }
+            if (command === 'workspace_remove') {
+              const idx = records.findIndex(
+                (r) => r.name.toLowerCase() === (args.name ?? '').trim().toLowerCase(),
+              )
+              if (idx >= 0) {
+                const [removed] = records.splice(idx, 1)
+                if (removed) {
+                  uiStates.delete(removed.name.toLowerCase())
+                  if (records.length === 0) {
+                    await mkdir(defaultRoot, { recursive: true })
+                    records.push({
+                      name: 'Local workspace',
+                      backing: { kind: 'local', path: defaultRoot },
+                      lastOpenedAt: Date.now(),
+                      available: true,
+                    })
+                    activeWorkspaceName = 'Local workspace'
+                    activeRoot = defaultRoot
+                  } else if (activeWorkspaceName.toLowerCase() === removed.name.toLowerCase()) {
+                    const nextRec = records[0]!
+                    activeWorkspaceName = nextRec.name
+                    activeRoot = nextRec.backing.path
+                  }
+                  await persistRegistry()
+                }
+              }
+              return {
+                activeWorkspace: activeWorkspaceName,
+                workspaces: records.map((r) => ({ ...r })),
+              }
+            }
+            if (command === 'workspace_patch_ui_state') {
+              const targetName = (args.name ?? activeWorkspaceName).trim()
+              const current = getUiState(targetName)
+              const patch = args.patch ?? {}
+              const merged: TestWorkspaceUiState = {
+                openTabs: patch.openTabs !== undefined ? patch.openTabs : current.openTabs,
+                activeTab: patch.activeTab !== undefined ? patch.activeTab : current.activeTab,
+                expandedFolders:
+                  patch.expandedFolders !== undefined
+                    ? patch.expandedFolders
+                    : current.expandedFolders,
+                sidebarOpen:
+                  patch.sidebarOpen !== undefined ? patch.sidebarOpen : current.sidebarOpen,
+              }
+              await persistUiState(targetName, merged)
+              return merged
+            }
             if (command === 'workspace_list') {
               if (workspace.failLists) throw new Error('Folder unavailable')
               return list(args.relativePath!)
@@ -341,7 +576,7 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
           try {
             await page.close()
           } finally {
-            await rm(root, { recursive: true, force: true, maxRetries: 3 })
+            await rm(homeDir, { recursive: true, force: true, maxRetries: 3 })
           }
         }
       }

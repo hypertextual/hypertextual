@@ -26,6 +26,7 @@
     oncancel,
     contextItems,
     onaction,
+    onnewtab,
   }: TreeNodeViewProps = $props()
   // State ---------------------------------------------------------------------
   const tree = useTreeViewContext()
@@ -111,6 +112,7 @@
                 {oncancel}
                 {contextItems}
                 {onaction}
+                {onnewtab}
               />
             {/each}
           </ArkTreeView.BranchContent>
@@ -129,6 +131,13 @@
               data-pane-focus-target={state().selected || isDefaultFocusTarget ? '' : undefined}
               data-tree-node-value={node.value}
               data-tree-node-branch="false"
+              onmousedown={(event: MouseEvent) => {
+                if ((event.metaKey || event.ctrlKey || event.button === 1) && onnewtab) {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onnewtab(node.value)
+                }
+              }}
             >
               {@render nodeIcon(false)}
               <ArkTreeView.ItemText class={treeViewLabelBase} hidden={state().renaming}

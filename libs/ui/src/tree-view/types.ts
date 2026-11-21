@@ -22,7 +22,9 @@ export interface TreeViewProps {
   getLabel?: (node: TreeNode) => string
   nodes: TreeNode[]
   selected?: string | null
-  onselect?: (value: string) => void
+  onselect?: (value: string, options?: { newTab?: boolean }) => void
+  expandedValues?: string[]
+  onExpandedChange?: (values: string[]) => void
   loadChildren?: (node: TreeNode) => Promise<TreeNode[]>
   label?: string
   class?: string
@@ -38,4 +40,5 @@ export interface TreeNodeViewProps {
   contextItems?: (node: TreeNode) => ContextMenuItem[]
   onaction?: (value: string, action: string) => void
   oncancel?: (value: string) => void
+  onnewtab?: (value: string) => void
 }
