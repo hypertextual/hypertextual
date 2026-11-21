@@ -44,3 +44,7 @@ export type {
 } from './pip-window/types'
 export { default as MermaidViewer } from './mermaid-viewer/MermaidViewer.svelte'
 export type { MermaidViewerFit, MermaidViewerProps } from './mermaid-viewer/types'
+export { PanZoomViewport } from './diagram-viewport'
+export type { PanZoomViewportProps, PanZoomViewportState } from './diagram-viewport'
+export { FileViewer, FileViewerToolbar, ImageRenderer, DrawioXmlRenderer } from './file-viewer'
+export type { FileViewerKind, FileViewerProps, FileViewerToolbarProps } from './file-viewer'

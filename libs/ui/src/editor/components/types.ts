@@ -110,5 +110,9 @@ export interface MentionListProps {
 export interface ImageFileUploadProps {
   file: File | null
   disabled?: boolean
+  accept?: string
+  dropLabel?: string
+  buttonLabel?: string
+  removeLabel?: string
   onFileChange: (file: File | null) => void
 }

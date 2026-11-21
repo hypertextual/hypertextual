@@ -7,6 +7,7 @@ import { themeService, useTheme, type ThemeMode, type ThemeName } from '@cloudvo
 // (https://linear.app/cloudvoyant/issue/HYPE-176/persist-user-settings-on-the-filesystem-via-hyped-fs-instead-of).
 const PANE_OUTLINE_KEY = 'hypertextual.settings.paneOutline'
 const CLICK_TO_INSERT_KEY = 'hypertextual.settings.clickToInsert'
+const SHOW_HIDDEN_FILES_KEY = 'hypertextual.settings.showHiddenFiles'
 const THEME_MODE_KEY = 'hypertextual.settings.themeMode'
 const THEME_KEY = 'hypertextual.settings.theme'
 const COMMAND_STYLE_KEY = 'hypertextual.settings.commandStyle'
@@ -43,6 +44,7 @@ function writeSetting<T>(key: string, value: T): void {
 export class SettingsService {
   paneOutline = $state(readSetting(PANE_OUTLINE_KEY, true))
   clickToInsert = $state(readSetting(CLICK_TO_INSERT_KEY, true))
+  showHiddenFiles = $state(readSetting(SHOW_HIDDEN_FILES_KEY, false))
   commandStyle = $state<AppCommandStyle>(readSetting<AppCommandStyle>(COMMAND_STYLE_KEY, 'palette'))
 
   constructor() {
@@ -109,5 +111,11 @@ export class SettingsService {
     this.clickToInsert = !this.clickToInsert
     writeSetting(CLICK_TO_INSERT_KEY, this.clickToInsert)
     return this.clickToInsert
+  }
+
+  toggleShowHiddenFiles(): boolean {
+    this.showHiddenFiles = !this.showHiddenFiles
+    writeSetting(SHOW_HIDDEN_FILES_KEY, this.showHiddenFiles)
+    return this.showHiddenFiles
   }
 }

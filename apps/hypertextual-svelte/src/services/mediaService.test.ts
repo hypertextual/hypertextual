@@ -15,11 +15,11 @@ describe('When resolving workspace media', () => {
     })
     const localRequests: string[] = []
     const media = new MediaService({
-      readImage: async (articlePath, source) => {
+      readFileAsset: async (articlePath, source) => {
         localRequests.push(`${articlePath}:${source}`)
         return { source, url: 'data:image/png;base64,bG9jYWw=' }
       },
-      importImage: async () => {
+      importFileAsset: async () => {
         throw new Error('No upload expected')
       },
     })
@@ -46,10 +46,10 @@ describe('When resolving workspace media', () => {
     // Given
     let bytes: number[] = []
     const media = new MediaService({
-      readImage: async () => {
+      readFileAsset: async () => {
         throw new Error('No read expected')
       },
-      importImage: async (articlePath, uploaded) => {
+      importFileAsset: async (articlePath, uploaded) => {
         expect(articlePath).toBe('Before.md')
         bytes = uploaded
         return { source: '.images/new.png', url: 'data:image/png;base64,bmV3' }
@@ -71,8 +71,11 @@ describe('When resolving workspace media', () => {
   it('keeps identical display URLs scoped to their article origins', async () => {
     // Given
     const media = new MediaService({
-      readImage: async (_article, source) => ({ source, url: 'data:image/png;base64,c2FtZQ==' }),
-      importImage: async () => {
+      readFileAsset: async (_article, source) => ({
+        source,
+        url: 'data:image/png;base64,c2FtZQ==',
+      }),
+      importFileAsset: async () => {
         throw new Error('No upload expected')
       },
     })
@@ -88,8 +91,11 @@ describe('When resolving workspace media', () => {
   it('keeps distinct local references when identical images appear in one article', async () => {
     // Given
     const media = new MediaService({
-      readImage: async (_article, source) => ({ source, url: 'data:image/png;base64,c2FtZQ==' }),
-      importImage: async () => {
+      readFileAsset: async (_article, source) => ({
+        source,
+        url: 'data:image/png;base64,c2FtZQ==',
+      }),
+      importFileAsset: async () => {
         throw new Error('No upload expected')
       },
     })
@@ -113,10 +119,10 @@ describe('When resolving workspace media', () => {
           : new Response('<html>not an image</html>', { headers: { 'content-type': 'text/html' } }),
     })
     const media = new MediaService({
-      readImage: async () => {
+      readFileAsset: async () => {
         throw new Error('No local read expected')
       },
-      importImage: async () => {
+      importFileAsset: async () => {
         throw new Error('No upload expected')
       },
     })
@@ -138,11 +144,11 @@ describe('When resolving workspace media', () => {
     // Given
     const media = new MediaService(
       {
-        readImage: async (_article, source) => {
+        readFileAsset: async (_article, source) => {
           if (source === '.images/missing.png') throw new Error('Missing image')
           return { source, url: 'data:image/png;base64,b2s=' }
         },
-        importImage: async () => {
+        importFileAsset: async () => {
           throw new Error('No upload expected')
         },
       },
@@ -163,5 +169,30 @@ describe('When resolving workspace media', () => {
     expect(media.portableSource('Article.md', 'https://example.test/remote.png')).toBe(
       'https://example.test/remote.png',
     )
+  })
+
+  it('reloads updated .drawio.svg and .drawio assets with a fresh blob URL', async () => {
+    // Given
+    let revision = 0
+    const media = new MediaService({
+      readFileAsset: async (_article, source) => {
+        revision += 1
+        return {
+          source,
+          url: `data:image/svg+xml;base64,${btoa(`<svg data-rev="${revision}"/>`)}`,
+        }
+      },
+      importFileAsset: async () => {
+        throw new Error('No upload expected')
+      },
+    })
+    // When
+    const first = await media.get('Article.md', '.media/arch.drawio.svg')
+    const second = await media.reload('Article.md', '.media/arch.drawio.svg')
+    // Then
+    expect(first.url).not.toBe(second.url)
+    expect(await (await fetch(second.url)).text()).toBe('<svg data-rev="2"/>')
+    expect(media.portableSource('Article.md', second.url)).toBe('.media/arch.drawio.svg')
+    media.dispose()
   })
 })

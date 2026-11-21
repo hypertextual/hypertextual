@@ -69,10 +69,8 @@ impl WorkspaceService {
                 .file_name()
                 .into_string()
                 .map_err(|_| error("invalidName", "A workspace filename is not valid Unicode."))?;
-            // Atomic-save temporary files are not articles.
-            if (name.starts_with(".hypertextual-save-") || name.starts_with(".hyped-fs-save-"))
-                || name == ".images"
-            {
+            // Atomic-save temporary files are never workspace entries.
+            if name.starts_with(".hypertextual-save-") || name.starts_with(".hyped-fs-save-") {
                 continue;
             }
             let path = if relative.is_empty() {
@@ -220,6 +218,11 @@ impl WorkspaceService {
             &head[..bytes_read],
             is_executable_mode,
         )?;
+        if let Some(preferred_app) = Self::preferred_app_for_path(relative)
+            && Self::try_open_with_app(preferred_app, &path)
+        {
+            return Ok(());
+        }
         #[cfg(target_os = "macos")]
         let status = std::process::Command::new("open").arg(&path).status();
         #[cfg(target_os = "linux")]
@@ -242,5 +245,57 @@ impl WorkspaceService {
             }
             Ok(())
         }
+    }
+
+    /// Resolves a built-in preferred application for compound or specialized file extensions.
+    pub fn preferred_app_for_path(relative: &str) -> Option<&'static str> {
+        /// Data-driven mapping from compound-extension patterns to preferred desktop apps.
+        const OPEN_WITH_OVERRIDES: &[(&str, &str)] =
+            &[(".drawio.", "draw.io"), (".drawio", "draw.io")];
+
+        let filename = Path::new(relative)
+            .file_name()?
+            .to_string_lossy()
+            .to_lowercase();
+        for &(pattern, app) in OPEN_WITH_OVERRIDES {
+            if pattern.ends_with('.') {
+                if let Some(idx) = filename.find(pattern)
+                    && idx > 0
+                    && idx + pattern.len() < filename.len()
+                {
+                    return Some(app);
+                }
+            } else if filename.ends_with(pattern) && filename.len() > pattern.len() {
+                return Some(app);
+            }
+        }
+        None
+    }
+
+    /// Attempts to open a file with a preferred application, returning true on launch success.
+    fn try_open_with_app(app: &str, path: &Path) -> bool {
+        #[cfg(target_os = "macos")]
+        let status = std::process::Command::new("open")
+            .arg("-a")
+            .arg(app)
+            .arg(path)
+            .status();
+        #[cfg(target_os = "linux")]
+        let status = {
+            let binary = if app == "draw.io" { "drawio" } else { app };
+            std::process::Command::new(binary).arg(path).status()
+        };
+        #[cfg(windows)]
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "start", "", app])
+            .arg(path)
+            .status();
+        #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+        let status: std::io::Result<std::process::ExitStatus> = Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "unsupported platform",
+        ));
+
+        matches!(status, Ok(s) if s.success())
     }
 }

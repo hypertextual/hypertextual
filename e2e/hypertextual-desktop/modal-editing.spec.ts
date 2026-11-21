@@ -1317,3 +1317,112 @@ test.describe(
     })
   },
 )
+
+test.describe(
+  'Given an article containing an embedded Draw.io diagram block',
+  { tag: ['@desktop', '@editor', '@modal-editing', '@drawio'] },
+  () => {
+    const drawioArticlePath = 'Drafts/Drawio.md'
+    const drawioSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80" content="&lt;mxfile&gt;&lt;diagram id=&quot;1&quot;&gt;&lt;mxGraphModel/&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><rect width="160" height="80" fill="#e2e8f0"/><text x="16" y="46" font-size="14">Service Map</text></svg>'
+    const drawioSvgUpdated =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80" content="&lt;mxfile&gt;&lt;diagram id=&quot;1&quot;&gt;&lt;mxGraphModel/&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><rect width="160" height="80" fill="#cbd5e1"/><text x="16" y="46" font-size="14">Replaced Map</text></svg>'
+
+    test.beforeEach(async ({ page, workspace }) => {
+      await mkdir(join(workspace.root, 'Drafts/.media'), { recursive: true })
+      await writeFile(join(workspace.root, 'Drafts/.media/arch.drawio.svg'), drawioSvg)
+      await writeFile(
+        join(workspace.root, drawioArticlePath),
+        '# Drawio\n\nIntro paragraph.\n\n![Arch](.media/arch.drawio.svg "System overview")\n\nOutro paragraph.\n',
+      )
+      await page.reload()
+      await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
+      await page.locator(`[role="treeitem"][data-value="${drawioArticlePath}"]`).click()
+      await expect(page.locator('.ProseMirror [data-drawio-node]')).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
+    })
+
+    test('supports normal-mode pan/zoom, fullscreen, insert-mode centered CTA, caption editing, Replace, and Remove', async ({
+      page,
+      workspace,
+    }) => {
+      const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+      const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+
+      // Navigate onto the drawio block in normal mode (j from title -> intro -> drawio)
+      await page.keyboard.press('j')
+      await page.keyboard.press('j')
+      await expect(drawioNode.locator('[data-drawio-caption-text]')).toHaveText('System overview')
+      await captureScreenshot(page, test.info(), 'drawio-block-normal')
+
+      // Pan/zoom and fullscreen in normal mode
+      await page.keyboard.press('+')
+      await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1.25')
+      await page.keyboard.press('0')
+      await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1')
+      await page.keyboard.press('f')
+      await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'true')
+      await page.keyboard.press('Escape')
+      await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'false')
+
+      // Enter insert mode -> centered prominent Open in Draw.io CTA + Replace + Remove + caption
+      await page.keyboard.press('i')
+      await expect(badge).toHaveText('helix · insert')
+      const cta = drawioNode.locator('[data-drawio-cta]')
+      await expect(cta).toBeVisible()
+      await expect(cta).toBeFocused()
+      await captureScreenshot(page, test.info(), 'drawio-block-insert-cta')
+
+      // Pressing Enter on focused CTA invokes openExternal
+      await page.keyboard.press('Enter')
+      expect(workspace.openedExternal).toContain('Drafts/.media/arch.drawio.svg')
+
+      // Tab cycles CTA -> Replace -> Remove -> caption input
+      await page.keyboard.press('Tab')
+      await expect(
+        drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }),
+      ).toBeFocused()
+      await page.keyboard.press('Tab')
+      await expect(
+        drawioNode.getByRole('button', { name: 'Remove diagram', exact: true }),
+      ).toBeFocused()
+      await page.keyboard.press('Tab')
+      const captionInput = drawioNode.getByRole('textbox', {
+        name: 'Diagram caption',
+        exact: true,
+      })
+      await expect(captionInput).toBeFocused()
+      await captionInput.fill('Updated architecture')
+      await expect
+        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+        .toContain('"Updated architecture"')
+
+      // Replace re-uploads a new .drawio.svg asset in place
+      await drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }).click()
+      const replaceDialog = page.getByRole('dialog', { name: 'Replace Draw.io diagram' })
+      await expect(replaceDialog).toBeVisible()
+      await replaceDialog.locator('input[type="file"]').setInputFiles({
+        name: 'replaced.drawio.svg',
+        mimeType: 'image/svg+xml',
+        buffer: Buffer.from(drawioSvgUpdated),
+      })
+      await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click()
+      await expect(replaceDialog).toHaveCount(0)
+      await expect
+        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+        .not.toContain('.media/arch.drawio.svg')
+
+      // Escape exits to normal mode and hides centered CTA
+      await page.keyboard.press('Escape')
+      await expect(badge).toHaveText('helix · normal')
+      await expect(drawioNode.locator('[data-drawio-cta]')).toHaveCount(0)
+
+      // Deleting the selected block in normal mode with d persists across reload
+      await page.keyboard.press('d')
+      await expect(page.locator('.ProseMirror [data-drawio-node]')).toHaveCount(0)
+      await expect
+        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+        .not.toContain('![Arch]')
+    })
+  },
+)

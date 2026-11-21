@@ -184,6 +184,13 @@ export class HotkeyService {
                 'settings.toggleClickToInsert',
                 'Toggle whether clicking the article enters insert mode',
               ),
+              h: leaf(
+                'h',
+                'Toggle Hidden Files',
+                'Workspace',
+                'settings.toggleShowHiddenFiles',
+                'Toggle visibility of dot-prefixed folders and files (such as .media) in the sidebar',
+              ),
               d: leaf(
                 'd',
                 'Cycle Theme Mode',
@@ -244,6 +251,10 @@ export class HotkeyService {
     },
     'settings.toggleClickToInsert': () => {
       this.workspace.settings.toggleClickToInsert()
+      return true
+    },
+    'settings.toggleShowHiddenFiles': () => {
+      this.workspace.toggleShowHiddenFiles()
       return true
     },
     'settings.cycleThemeMode': () => {
@@ -730,6 +741,38 @@ export class HotkeyService {
             active: !settings.clickToInsert,
             onSelect: () => {
               if (settings.clickToInsert) settings.toggleClickToInsert()
+            },
+          },
+        ],
+      },
+      {
+        value: 'show-hidden-files',
+        label: 'Show Hidden Files',
+        description: 'Show or hide dot-prefixed folders and files (such as .media) in the sidebar',
+        group: 'Preferences',
+        command: 'show-hidden-files',
+        aliases: ['hidden-files', 'dotfiles'],
+        shortcut: 'Space t h',
+        keywords: ['hidden', 'dotfiles', 'media', 'sidebar', 'explorer'],
+        children: [
+          {
+            value: 'show-hidden-files:on',
+            label: 'Enabled',
+            command: 'on',
+            aliases: ['true', 'enable', 'show'],
+            active: settings.showHiddenFiles,
+            onSelect: () => {
+              if (!settings.showHiddenFiles) this.workspace.toggleShowHiddenFiles()
+            },
+          },
+          {
+            value: 'show-hidden-files:off',
+            label: 'Disabled',
+            command: 'off',
+            aliases: ['false', 'disable', 'hide'],
+            active: !settings.showHiddenFiles,
+            onSelect: () => {
+              if (settings.showHiddenFiles) this.workspace.toggleShowHiddenFiles()
             },
           },
         ],

@@ -1,6 +1,6 @@
 import type { EditorDocument, EditorMediaService } from 'core-ts'
 import { HtmdEditor, type JSONContent } from 'htmd-ts'
-import type { EditorImageUploadResult } from '@hypertextual/ui'
+import type { EditorImageUploadResult, FileViewerKind } from '@hypertextual/ui'
 import { MediaService } from './mediaService'
 import {
   errorMessage,
@@ -15,12 +15,20 @@ export interface EditorObserver {
   saved: (oldPath: string, saved: ArticleMetadata, title: string) => void
 }
 
+export interface StandaloneFilePreview {
+  kind: FileViewerKind
+  title: string
+  path: string
+  src: string
+  xml: string
+}
+
 /** One selection and autosave lifecycle per workspace window. */
 export class EditorService {
   selected = $state<WorkspaceNode | null>(null)
   document = $state.raw<EditorDocument<JSONContent> | null>(null)
   editable = $state(false)
-  image = $state<string | null>(null)
+  filePreview = $state<StandaloneFilePreview | null>(null)
   unsupported = $state(false)
   loading = $state(false)
   openingError = $state<string | null>(null)
@@ -35,6 +43,7 @@ export class EditorService {
   private readonly media: MediaService
   private requestId = 0
   private active = true
+  private externalLaunchPendingRefresh = false
 
   constructor(
     private client: WorkspaceClient,
@@ -68,7 +77,10 @@ export class EditorService {
           : 'Changes pending…'
     }
     if (this.unsupported) return 'Unsupported'
-    return this.image ? 'Image' : this.document ? 'Read-only' : 'Local files'
+    if (this.filePreview) {
+      return this.filePreview.kind === 'image' ? 'Image' : 'Draw.io'
+    }
+    return this.document ? 'Read-only' : 'Local files'
   }
 
   setEditable(editable: boolean): boolean {
@@ -113,7 +125,7 @@ export class EditorService {
     this.selected = entry
     this.editable = false
     this.document = null
-    this.image = null
+    this.filePreview = null
     this.unsupported = false
     this.codecError = null
     this.openingError = null
@@ -123,9 +135,19 @@ export class EditorService {
     try {
       if (entry.kind === 'unavailable')
         throw new Error('This file is unavailable or links outside the workspace.')
-      if (/\.(png|jpe?g|gif|webp)$/i.test(entry.name)) {
+      const previewKind = EditorService.detectPreviewKind(entry.name)
+      if (previewKind) {
         const asset = await this.media.get('', entry.path)
-        if (this.isCurrent(id)) this.image = asset.url
+        const xml = previewKind === 'drawio-xml' ? await EditorService.readTextUrl(asset.url) : ''
+        if (this.isCurrent(id)) {
+          this.filePreview = {
+            kind: previewKind,
+            title: entry.name,
+            path: entry.path,
+            src: asset.url,
+            xml,
+          }
+        }
         return
       }
       if (!HtmdEditor.supportsFile(entry.name)) {
@@ -194,9 +216,33 @@ export class EditorService {
   async openInDefaultApp() {
     if (!this.selected) return
     try {
+      this.externalLaunchPendingRefresh = true
       await this.client.openDefaultApp(this.selected.path)
     } catch (error) {
+      this.externalLaunchPendingRefresh = false
       this.openingError = errorMessage(error)
+    }
+  }
+
+  async refreshPreview() {
+    const preview = this.filePreview
+    if (!preview) return
+    try {
+      const asset = await this.media.reload('', preview.path)
+      const xml = preview.kind === 'drawio-xml' ? await EditorService.readTextUrl(asset.url) : ''
+      if (this.filePreview?.path === preview.path) {
+        this.filePreview = { ...preview, src: asset.url, xml }
+      }
+    } catch (error) {
+      this.openingError = errorMessage(error)
+    }
+  }
+
+  handleWindowFocus() {
+    if (!this.externalLaunchPendingRefresh) return
+    this.externalLaunchPendingRefresh = false
+    if (this.filePreview) {
+      void this.refreshPreview()
     }
   }
 
@@ -268,7 +314,7 @@ export class EditorService {
     this.selected = null
     this.editable = false
     this.document = null
-    this.image = null
+    this.filePreview = null
     this.unsupported = false
     this.codecError = null
     this.save = { status: 'saved', error: null }
@@ -295,5 +341,19 @@ export class EditorService {
 
   private isCurrent(id: number) {
     return this.active && id === this.requestId
+  }
+
+  private static detectPreviewKind(filename: string): FileViewerKind | null {
+    const lower = filename.toLowerCase()
+    if (lower.endsWith('.drawio')) return 'drawio-xml'
+    if (lower.endsWith('.drawio.svg') || lower.endsWith('.drawio.png')) return 'drawio-image'
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(lower)) return 'image'
+    return null
+  }
+
+  private static async readTextUrl(url: string): Promise<string> {
+    if (!url) return ''
+    const response = await fetch(url)
+    return response.ok ? response.text() : ''
   }
 }

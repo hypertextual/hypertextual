@@ -91,7 +91,11 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
         async function list(path: string) {
           const entries = await readdir(location(path), { withFileTypes: true })
           return entries
-            .filter((entry) => entry.name !== '.images')
+            .filter(
+              (entry) =>
+                !entry.name.startsWith('.hypertextual-save-') &&
+                !entry.name.startsWith('.hyped-fs-save-'),
+            )
             .map((entry) => ({
               name: entry.name,
               path: path ? `${path}/${entry.name}` : entry.name,
@@ -102,6 +106,42 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
                 Number(a.kind !== 'directory') - Number(b.kind !== 'directory') ||
                 a.name.localeCompare(b.name),
             )
+        }
+
+        function detectAssetType(bytes: Buffer): { mime: string; ext: string } {
+          if (
+            bytes
+              .subarray(0, 8)
+              .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+          ) {
+            const text = bytes.toString('latin1')
+            if (text.includes('mxfile') || text.includes('mxGraphModel')) {
+              return { mime: 'image/png', ext: 'drawio.png' }
+            }
+            return { mime: 'image/png', ext: 'png' }
+          }
+          const utf8 = bytes
+            .toString('utf8')
+            .replace(/^\uFEFF/, '')
+            .trimStart()
+          if (utf8.startsWith('<svg') || (utf8.startsWith('<?xml') && utf8.includes('<svg'))) {
+            if (
+              utf8.includes('content=') &&
+              (utf8.includes('mxfile') ||
+                utf8.includes('mxGraphModel') ||
+                utf8.includes('%3Cmxfile'))
+            ) {
+              return { mime: 'image/svg+xml', ext: 'drawio.svg' }
+            }
+            return { mime: 'image/svg+xml', ext: 'svg' }
+          }
+          if (
+            utf8.startsWith('<mxfile') ||
+            (utf8.startsWith('<?xml') && utf8.includes('<mxfile'))
+          ) {
+            return { mime: 'application/vnd.jgraph.mxfile', ext: 'drawio' }
+          }
+          return { mime: 'image/png', ext: 'png' }
         }
 
         await page.exposeFunction(
@@ -181,26 +221,28 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
               }
               throw new Error('No available name')
             }
-            if (command === 'workspace_import_image') {
+            if (command === 'workspace_import_file_asset' || command === 'workspace_import_image') {
               if (workspace.failImageUploads)
                 throw new Error('Image storage unavailable. Retry the upload.')
               const bytes = Buffer.from(args.bytes!)
+              const { mime, ext } = detectAssetType(bytes)
               const parent = args.articlePath!.includes('/')
                 ? args.articlePath!.slice(0, args.articlePath!.lastIndexOf('/'))
                 : ''
-              const source = `.images/${revision(bytes.toString('base64'))}.png`
-              await mkdir(location(parent, '.images'), { recursive: true })
+              const source = `.media/${revision(bytes.toString('base64'))}.${ext}`
+              await mkdir(location(parent, '.media'), { recursive: true })
               await writeFile(location(parent, source), bytes)
-              return { source, url: `data:image/png;base64,${bytes.toString('base64')}` }
+              return { source, url: `data:${mime};base64,${bytes.toString('base64')}` }
             }
-            if (command === 'workspace_read_image') {
+            if (command === 'workspace_read_file_asset' || command === 'workspace_read_image') {
               const parent = args.articlePath?.includes('/')
                 ? args.articlePath.slice(0, args.articlePath.lastIndexOf('/'))
                 : ''
               const bytes = await readFile(location(parent, args.source!))
+              const { mime } = detectAssetType(bytes)
               return {
                 source: args.source!,
-                url: `data:image/png;base64,${bytes.toString('base64')}`,
+                url: `data:${mime};base64,${bytes.toString('base64')}`,
               }
             }
             if (command === 'workspace_read') {

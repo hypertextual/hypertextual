@@ -30,6 +30,7 @@ import {
 import { common, createLowlight } from 'lowlight'
 
 import {
+  Drawio as SchemaDrawioNode,
   HeadingNodeWithId,
   Image as SchemaImageNode,
   InternalMention as SchemaInternalMentionNode,
@@ -49,6 +50,7 @@ import {
 } from './define-htmd-extension.js'
 import { CodeBlock } from './extensions/code-block.js'
 import { CurrentEmptyBlock } from './extensions/current-empty-block.js'
+import { DrawioViewer } from './extensions/drawio-viewer.js'
 import { EditorOverlays } from './extensions/editor-overlays.js'
 import { HeadingWithId } from './extensions/heading-with-id.js'
 import { ImageNode } from './extensions/image-node.js'
@@ -123,6 +125,7 @@ const SCHEMA_NODE_BY_NAME: Readonly<Record<string, AnyExtension>> = {
   heading: HeadingNodeWithId,
   codeBlock: CodeBlockLowlight.extend({ selectable: true }),
   mermaid: SchemaMermaidNode,
+  drawio: SchemaDrawioNode,
   internalMention: SchemaInternalMentionNode,
   urlMention: SchemaUrlMentionNode,
   notice: SchemaNoticeNode,
@@ -506,6 +509,7 @@ export function buildExtensions<TEditor = unknown>(
       }),
     ),
     compile(ImageNode.configure({ nodeView: untypedNodeViews.image })),
+    compile(DrawioViewer.configure({ nodeView: untypedNodeViews.drawio })),
     compile(UrlMention.configure({ nodeView: untypedNodeViews.urlMention })),
     compile(
       SlashCommands.configure({

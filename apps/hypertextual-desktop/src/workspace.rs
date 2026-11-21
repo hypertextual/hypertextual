@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tauri::State;
 
 use hyped_fs::{
-    ArticleContent, ArticleMetadata, ArticleService, ImageAsset, MediaService, Result,
+    ArticleContent, ArticleMetadata, ArticleService, FileAsset, MediaService, Result,
     WorkspaceListing, WorkspaceNode, WorkspaceService, error,
 };
 
@@ -109,22 +109,22 @@ pub async fn workspace_save_article(
     .await
 }
 #[tauri::command]
-pub async fn workspace_import_image(
+pub async fn workspace_import_file_asset(
     state: State<'_, WorkspaceState>,
     article_path: String,
     bytes: Vec<u8>,
-) -> Result<ImageAsset> {
+) -> Result<FileAsset> {
     run(state, move |w| {
         MediaService::new(w).import(&article_path, &bytes)
     })
     .await
 }
 #[tauri::command]
-pub async fn workspace_read_image(
+pub async fn workspace_read_file_asset(
     state: State<'_, WorkspaceState>,
     article_path: String,
     source: String,
-) -> Result<ImageAsset> {
+) -> Result<FileAsset> {
     run(state, move |w| {
         MediaService::new(w).read(&article_path, &source)
     })

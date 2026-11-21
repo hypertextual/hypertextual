@@ -54,8 +54,8 @@ pub fn commands(invoke: tauri::ipc::Invoke) -> bool {
         workspace::workspace_open_default_app,
         workspace::workspace_write,
         workspace::workspace_save_article,
-        workspace::workspace_import_image,
-        workspace::workspace_read_image,
+        workspace::workspace_import_file_asset,
+        workspace::workspace_read_file_asset,
         workspace_frontend_ready,
         workspace_finish_quit,
     ];

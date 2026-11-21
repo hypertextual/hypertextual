@@ -197,6 +197,12 @@ export const YouTubeSyntax = Extension.create({
   },
 })
 
+/** Returns true when a Markdown asset path targets a Draw.io diagram (`.drawio`, `.drawio.svg`, `.drawio.png`). */
+export function isDrawioSource(src: string): boolean {
+  const clean = src.split(/[?#]/)[0]?.toLowerCase() ?? ''
+  return clean.endsWith('.drawio') || clean.endsWith('.drawio.svg') || clean.endsWith('.drawio.png')
+}
+
 export const Image = Node.create({
   name: 'imageNode',
   group: 'block',
@@ -225,12 +231,49 @@ export const Image = Node.create({
     ]
   },
   markdownTokenName: 'image',
-  parseMarkdown: (token, h) =>
-    h.createNode('imageNode', {
-      src: decodeHtmlEntities(token.href ?? ''),
-      alt: decodeHtmlEntities(token.text ?? ''),
-      caption: decodeHtmlEntities(token.title ?? ''),
-    }),
+  parseMarkdown: (token, h) => {
+    const src = decodeHtmlEntities(token.href ?? '')
+    const alt = decodeHtmlEntities(token.text ?? '')
+    const caption = decodeHtmlEntities(token.title ?? '')
+    if (isDrawioSource(src)) {
+      return h.createNode('drawio', { src, alt, caption })
+    }
+    return h.createNode('imageNode', { src, alt, caption })
+  },
+  renderMarkdown(node) {
+    const quote = node.attrs?.caption ? ` "${escape(node.attrs.caption)}"` : ''
+    const src = escape(node.attrs?.src ?? '')
+    const destination = /[\s()]/.test(src) ? `<${src}>` : src
+    return `![${escape(node.attrs?.alt ?? '').replace(/[[\\\]]/g, '\\$&')}](${destination}${quote})`
+  },
+})
+
+export const Drawio = Node.create({
+  name: 'drawio',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  addAttributes: () => attributeDefaults({ src: null, alt: '', caption: '' }),
+  parseHTML() {
+    return [{ tag: 'figure[data-type="drawio"]' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    const { src, alt, caption } = HTMLAttributes
+    const imgAttrs = {
+      src,
+      alt: alt || '',
+      class: 'w-full object-contain',
+    }
+    if (!caption) {
+      return ['figure', { 'data-type': 'drawio', class: 'my-6 m-0' }, ['img', imgAttrs]]
+    }
+    return [
+      'figure',
+      { 'data-type': 'drawio', class: 'my-6 m-0' },
+      ['img', imgAttrs],
+      ['figcaption', { class: 'mt-4 text-sm text-muted-foreground text-center italic' }, caption],
+    ]
+  },
   renderMarkdown(node) {
     const quote = node.attrs?.caption ? ` "${escape(node.attrs.caption)}"` : ''
     const src = escape(node.attrs?.src ?? '')
@@ -554,7 +597,9 @@ export function adaptNodes(extensions: AnyExtension[]): AnyExtension[] {
           const blocks: JSONContent[] = []
           let inline: JSONContent[] = []
           for (const child of content) {
-            if (['imageNode', 'linkPreview', 'unparsedBlock'].includes(String(child.type))) {
+            if (
+              ['imageNode', 'drawio', 'linkPreview', 'unparsedBlock'].includes(String(child.type))
+            ) {
               if (inline.length) blocks.push({ type: 'paragraph', content: inline })
               blocks.push(child)
               inline = []
@@ -691,6 +736,7 @@ export const customNodes = [
   TaskItem.configure({ nested: true }),
   Notice,
   Image,
+  Drawio,
   InternalMention,
   UrlMention,
   LinkPreview,

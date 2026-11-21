@@ -18,12 +18,14 @@
   import BubbleMenuContent from './BubbleMenu.svelte'
   import SlashMenu from './SlashMenu.svelte'
   import BookmarkInput from './BookmarkInput.svelte'
+  import DrawioInput from './DrawioInput.svelte'
   import ImageInput from './ImageInput.svelte'
   import YouTubeInput from './YouTubeInput.svelte'
   import ImageNodeView from './ImageNodeView.svelte'
   import UrlMentionPill from './UrlMentionPill.svelte'
   import LinkPreviewCard from './LinkPreviewCard.svelte'
   import CodeBlockComponent from './CodeBlockComponent.svelte'
+  import { DrawioNodeView } from './drawio-block'
   import { MermaidEditor } from './mermaid-editor'
   import NoticeNodeView from './NoticeNodeView.svelte'
   import MentionList from './MentionList.svelte'
@@ -66,12 +68,14 @@
 
   const overlayViews: Record<string, Component<EditorOverlayViewProps>> = {
     image: ImageInput,
+    drawio: DrawioInput,
     bookmark: BookmarkInput,
     youtube: YouTubeInput,
   }
 
   const overlays: Record<string, HtmdOverlayDefinition> = {
     image: { width: 320, height: 480, gap: 4 },
+    drawio: { width: 320, height: 340, gap: 4 },
     bookmark: { width: 320, height: 240, gap: 4 },
     youtube: { width: 320, height: 220, gap: 4 },
   }
@@ -80,6 +84,7 @@
 
   const nodeViews = {
     image: createSvelteNodeView(ImageNodeView),
+    drawio: createSvelteNodeView(DrawioNodeView),
     urlMention: createSvelteNodeView(UrlMentionPill, { as: 'span' }),
     linkPreview: createSvelteNodeView(LinkPreviewCard),
     codeBlock: createSvelteNodeView(CodeBlockComponent),

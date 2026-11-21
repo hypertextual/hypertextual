@@ -7,29 +7,29 @@ use std::{
 use super::{MAX_BYTES, WorkspaceService};
 use crate::{
     error::{Result, error},
-    models::{ArticleContent, ImageAsset},
+    models::{ArticleContent, FileAsset},
 };
 
-/// Stores and reads images within one workspace.
+/// Stores and reads file assets (images, diagrams, media) within one workspace.
 pub struct MediaService<'a> {
-    /// The workspace boundary used by image operations.
+    /// The workspace boundary used by file asset operations.
     workspace: &'a WorkspaceService,
 }
 
 impl<'a> MediaService<'a> {
-    /// Uses the supplied workspace for every image operation.
+    /// Uses the supplied workspace for every file asset operation.
     pub fn new(workspace: &'a WorkspaceService) -> Self {
         Self { workspace }
     }
 
-    pub fn import(&self, article_path: &str, bytes: &[u8]) -> Result<ImageAsset> {
+    pub fn import(&self, article_path: &str, bytes: &[u8]) -> Result<FileAsset> {
         ArticleContent::validate_path(article_path)?;
         if bytes.len() as u64 > MAX_BYTES {
-            return Err(error("tooLarge", "Images must be smaller than 16 MB."));
+            return Err(error("tooLarge", "Files must be smaller than 16 MB."));
         }
-        let name = ImageAsset::filename(bytes)?;
+        let name = FileAsset::filename(bytes)?;
         let article = self.workspace.resolve(article_path)?;
-        let directory = article.parent().unwrap().join(".images");
+        let directory = article.parent().unwrap().join(".media");
         fs::create_dir_all(&directory)?;
         if !directory
             .canonicalize()?
@@ -37,7 +37,7 @@ impl<'a> MediaService<'a> {
         {
             return Err(error(
                 "outsideWorkspace",
-                "The image folder is outside this workspace.",
+                "The media folder is outside this workspace.",
             ));
         }
         let path = directory.join(&name);
@@ -54,15 +54,15 @@ impl<'a> MediaService<'a> {
                 if fs::symlink_metadata(&path)?.file_type().is_symlink()
                     || fs::read(&path)? != bytes
                 {
-                    return Err(error("io", "The image asset name is already in use."));
+                    return Err(error("io", "The media asset name is already in use."));
                 }
             }
             Err(e) => return Err(e.into()),
         }
-        self.read(article_path, &format!(".images/{name}"))
+        self.read(article_path, &format!(".media/{name}"))
     }
 
-    pub fn read(&self, article_path: &str, source: &str) -> Result<ImageAsset> {
+    pub fn read(&self, article_path: &str, source: &str) -> Result<FileAsset> {
         let source_path = Path::new(source);
         if source.is_empty()
             || source.contains(['\\', ':'])
@@ -72,7 +72,7 @@ impl<'a> MediaService<'a> {
         {
             return Err(error(
                 "outsideWorkspace",
-                "Choose an image inside the workspace.",
+                "Choose a file inside the workspace.",
             ));
         }
         let parent = if article_path.is_empty() {
@@ -89,14 +89,14 @@ impl<'a> MediaService<'a> {
         let root = self.workspace.root()?;
         let relative = joined
             .strip_prefix(root)
-            .map_err(|_| error("outsideWorkspace", "Image is outside the workspace."))?
+            .map_err(|_| error("outsideWorkspace", "File is outside the workspace."))?
             .to_string_lossy()
             .replace(std::path::MAIN_SEPARATOR, "/");
         let path = self.workspace.resolve(&relative)?;
         if fs::metadata(&path)?.len() > MAX_BYTES {
-            return Err(error("tooLarge", "Image is too large."));
+            return Err(error("tooLarge", "File is too large."));
         }
         let bytes = fs::read(path)?;
-        ImageAsset::from_bytes(source, &bytes)
+        FileAsset::from_bytes(source, &bytes)
     }
 }

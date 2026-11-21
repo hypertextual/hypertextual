@@ -20,11 +20,19 @@
   import { ImagePlus, Trash2, Upload } from 'lucide-svelte'
 
   // Props ---------------------------------------------------------------------
-  let { file, onFileChange, disabled = false }: ImageFileUploadProps = $props()
+  let {
+    file,
+    onFileChange,
+    disabled = false,
+    accept = 'image/*',
+    dropLabel = 'Drop an image here',
+    buttonLabel = 'Choose image',
+    removeLabel = 'Remove image',
+  }: ImageFileUploadProps = $props()
 </script>
 
 <FileUploadRoot
-  accept="image/*"
+  {accept}
   maxFiles={1}
   acceptedFiles={file ? [file] : []}
   {disabled}
@@ -35,13 +43,13 @@
     class="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors data-[dragging]:border-primary data-[dragging]:bg-primary/5"
   >
     <ImagePlus size={24} class="text-muted-foreground" aria-hidden="true" />
-    <div class="text-sm font-medium">Drop an image here</div>
+    <div class="text-sm font-medium">{dropLabel}</div>
     <div class="text-xs text-muted-foreground">or</div>
     <FileUploadTrigger
       class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent"
     >
       <Upload size={16} aria-hidden="true" />
-      Choose image
+      {buttonLabel}
     </FileUploadTrigger>
   </FileUploadDropzone>
   <FileUploadItemGroup class="mt-2">
@@ -59,7 +67,7 @@
         </div>
         <FileUploadItemDeleteTrigger
           class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Remove image"
+          aria-label={removeLabel}
         >
           <Trash2 size={16} />
         </FileUploadItemDeleteTrigger>

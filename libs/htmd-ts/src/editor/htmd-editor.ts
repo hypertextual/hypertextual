@@ -19,6 +19,7 @@ import {
   type EditorPreset,
 } from 'core-ts'
 import { parse, serialize, validateDocument } from '../lib.js'
+import { isDrawioSource } from '../nodes.js'
 import type { JSONContent } from '../types.js'
 import { buildExtensions, createDefaultHtmdDocument } from './build-extensions.js'
 import type { EditorOverlaysStorage } from './extensions/editor-overlays.js'
@@ -66,6 +67,7 @@ const htmdEditorSchema = getSchema(
     enforceTitle: false,
     nodeViews: {
       image: dummyNodeView,
+      drawio: dummyNodeView,
       urlMention: dummyNodeView,
       linkPreview: dummyNodeView,
       codeBlock: dummyNodeView,
@@ -278,6 +280,7 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
       notifications: options.services?.notifications,
       media: options.services?.media,
       embedRegistry: options.services?.embedRegistry ?? new DefaultEmbeddedEditorRegistry(),
+      openExternal: options.services?.openExternal,
     }
 
     this.initTiptap(this.mountElement ?? undefined)
@@ -601,6 +604,9 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
     attrs: { src: string; srcset?: string; alt?: string; caption?: string },
     replace = false,
   ): boolean {
+    if (!replace && isDrawioSource(attrs.src)) {
+      return this.insertOrReplaceDrawio(position, attrs, false)
+    }
     if (replace) {
       const existing = this.tiptap.state.doc.nodeAt(position)
       if (existing && (existing.type.name === 'image' || existing.type.name === 'imageNode')) {
@@ -620,6 +626,35 @@ export class HtmdEditor implements Editor<JSONContent, HtmdCommandMap> {
         attrs: {
           src: attrs.src,
           srcset: attrs.srcset,
+          alt: attrs.alt ?? '',
+          caption: attrs.caption ?? '',
+        },
+      })
+      .run()
+  }
+
+  insertOrReplaceDrawio(
+    position: number,
+    attrs: { src: string; alt?: string; caption?: string },
+    replace = false,
+  ): boolean {
+    if (replace) {
+      const existing = this.tiptap.state.doc.nodeAt(position)
+      if (existing && existing.type.name === 'drawio') {
+        const tr = this.tiptap.state.tr.setNodeMarkup(position, undefined, {
+          ...existing.attrs,
+          src: attrs.src,
+        })
+        dispatchModalTransaction(this.tiptap, tr)
+        return true
+      }
+    }
+    return this.chain()
+      .setTextSelection(position)
+      .insertContent({
+        type: 'drawio',
+        attrs: {
+          src: attrs.src,
           alt: attrs.alt ?? '',
           caption: attrs.caption ?? '',
         },

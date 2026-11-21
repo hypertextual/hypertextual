@@ -192,6 +192,20 @@ function filterSlashCommands(query: string): SlashCommandItem[] {
       },
     },
     {
+      title: 'Draw.io Diagram',
+      description: 'Upload a Draw.io diagram (.drawio, .drawio.svg, .drawio.png)',
+      icon: 'Workflow',
+      category: 'media',
+      command: ({ editor, range }) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .openOverlay('drawio', { position: range.from })
+          .run()
+      },
+    },
+    {
       title: 'YouTube',
       description: 'Embed a YouTube video',
       icon: 'YouTube',

@@ -1,4 +1,5 @@
 export { parse, serialize, validateDocument } from './lib.js'
+export { isDrawioSource } from './nodes.js'
 export { InvalidDocumentError, MarkdownParseError, MarkdownSerializationError } from './errors.js'
 export type { JSONContent, ParseIssue, ParseResult } from './types.js'
 
@@ -10,6 +11,7 @@ export {
   CursorManager,
   DEFAULT_MERMAID_SOURCE,
   defineHtmdExtension,
+  DrawioViewer,
   getNodeNavigation,
   getNodeNavigationForType,
   HtmdDocument,
@@ -17,6 +19,11 @@ export {
   MermaidEditor,
   registerNodeNavigation,
   SelectionManager,
+  type DrawioViewerCommands,
+  type DrawioViewerOptions,
+  type DrawioViewerStorage,
+  type DrawioViewportAction,
+  type DrawioViewportState,
   type EditorCounts,
   type HtmdCommandContext,
   type HtmdCommandMap,

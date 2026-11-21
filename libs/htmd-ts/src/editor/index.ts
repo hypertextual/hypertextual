@@ -37,6 +37,14 @@ export { HtmdEditor } from './htmd-editor.js'
 
 export { CodeBlock, type CodeBlockOptions } from './extensions/code-block.js'
 export { CurrentEmptyBlock } from './extensions/current-empty-block.js'
+export {
+  DrawioViewer,
+  type DrawioViewerCommands,
+  type DrawioViewerOptions,
+  type DrawioViewerStorage,
+  type DrawioViewportAction,
+  type DrawioViewportState,
+} from './extensions/drawio-viewer.js'
 export { EditorOverlays, editorOverlaysKey } from './extensions/editor-overlays.js'
 export { HeadingWithId } from './extensions/heading-with-id.js'
 export { ImageNode } from './extensions/image-node.js'
