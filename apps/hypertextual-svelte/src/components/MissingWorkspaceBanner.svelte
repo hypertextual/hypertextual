@@ -12,9 +12,7 @@
   let { workspace, record }: MissingWorkspaceBannerProps = $props()
 
   // Derived -------------------------------------------------------------------
-  const missingPath = $derived(
-    record.backing.kind === 'remote' ? '' : record.backing.path,
-  )
+  const missingPath = $derived(record.backing.kind === 'remote' ? '' : record.backing.path)
 
   // Methods -------------------------------------------------------------------
   async function handleRelocate(): Promise<void> {
