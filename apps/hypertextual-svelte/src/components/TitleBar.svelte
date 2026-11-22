@@ -8,12 +8,11 @@
     SelectContent,
     SelectItem,
     SelectItemText,
-    Button,
     LightSwitch,
     themeService,
     type ThemeMode,
   } from '@cloudvoyant/helical-svelte'
-  import { PanelLeft, ChevronDown, Trash2 } from 'lucide-svelte'
+  import { PanelLeft, ChevronDown } from 'lucide-svelte'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
 
   // Props ---------------------------------------------------------------------
@@ -21,9 +20,6 @@
     workspace: WorkspaceService
   }
   let { workspace }: TitleBarProps = $props()
-
-  // Derived -------------------------------------------------------------------
-  const canRemoveWorkspace = $derived(workspace.workspaces.length > 1 && !workspace.blocked)
 
   // Methods -------------------------------------------------------------------
   function handleModeChange(mode: ThemeMode): void {
@@ -33,11 +29,6 @@
   function handleWorkspaceChange(details: { value: string[] }): void {
     const next = details.value[0]
     if (next) void workspace.switchWorkspace(next)
-  }
-
-  function handleRemoveWorkspace(): void {
-    if (!canRemoveWorkspace) return
-    void workspace.removeWorkspace(workspace.activeWorkspaceName)
   }
 </script>
 
@@ -63,17 +54,6 @@
           >{/each}</SelectContent
       >
     </Select>
-    {#if canRemoveWorkspace}
-      <Button
-        variant="text"
-        size="sm"
-        aria-label="Remove workspace"
-        title="Remove workspace from list"
-        onclick={handleRemoveWorkspace}
-      >
-        <Trash2 size={13} strokeWidth={1.5} />
-      </Button>
-    {/if}
   </div>
   <LightSwitch mode={themeService.themeMode} onModeChange={handleModeChange} class="theme-toggle" />
 </header>

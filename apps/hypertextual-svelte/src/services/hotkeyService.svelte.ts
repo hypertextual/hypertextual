@@ -324,6 +324,11 @@ export class HotkeyService {
       void this.workspace.beginOpenWorkspace()
       return true
     },
+    'workspace.removeWorkspace': () => {
+      if (this.workspace.workspaces.length <= 1 || this.workspace.blocked) return false
+      void this.workspace.removeWorkspace(this.workspace.activeWorkspaceName)
+      return true
+    },
   }
 
   constructor(private readonly workspace: WorkspaceService) {}
@@ -517,6 +522,30 @@ export class HotkeyService {
         disabled: !hasSelected,
         onSelect: () => {
           this.commands['workspace.openInDefaultApp']?.()
+        },
+      },
+      {
+        value: 'open-workspace',
+        label: 'Open Workspace…',
+        description: 'Open an existing folder as a workspace',
+        group: 'Workspace',
+        command: 'open-workspace',
+        keywords: ['workspace', 'folder', 'add', 'switch'],
+        disabled: this.workspace.blocked,
+        onSelect: () => {
+          this.commands['workspace.openWorkspace']?.()
+        },
+      },
+      {
+        value: 'remove-workspace',
+        label: 'Remove Workspace from List',
+        description: 'Remove the active workspace from Hypertextual without deleting files on disk',
+        group: 'Workspace',
+        command: 'remove-workspace',
+        keywords: ['workspace', 'remove', 'forget', 'unregister'],
+        disabled: this.workspace.workspaces.length <= 1 || this.workspace.blocked,
+        onSelect: () => {
+          this.commands['workspace.removeWorkspace']?.()
         },
       },
       {

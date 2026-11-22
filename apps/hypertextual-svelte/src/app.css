@@ -237,6 +237,8 @@ button:focus-visible {
 }
 
 .workspace-chooser {
+  display: flex;
+  align-items: center;
   width: 180px;
   min-width: 0;
 }

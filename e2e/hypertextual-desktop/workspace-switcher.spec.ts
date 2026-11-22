@@ -147,8 +147,10 @@ test.describe('Given markerless workspaces and multi-tabs', () => {
       await page.getByRole('button', { name: 'Relocate folder…' }).click()
       await expect(page.getByRole('treeitem', { name: 'Moved Note' })).toBeVisible()
 
-      // Act: remove workspace from list; disk files stay intact
-      await page.getByRole('button', { name: 'Remove workspace' }).click()
+      // Act: remove workspace from list via command palette; disk files stay intact
+      await page.keyboard.press(`${modKey}+k`)
+      await page.getByTestId('command-palette-input').fill('Remove Workspace from List')
+      await page.keyboard.press('Enter')
       await expect(page.getByRole('treeitem', { name: 'Markdown' })).toBeVisible()
       const keptOnDisk = await stat(join(relocated, 'moved.md')).then(
         () => true,
