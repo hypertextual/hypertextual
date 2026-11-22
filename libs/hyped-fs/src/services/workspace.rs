@@ -82,7 +82,9 @@ impl WorkspaceService {
         let root = self.root()?;
         let mut entries = Vec::new();
         for entry in fs::read_dir(directory)? {
-            let entry = entry?;
+            let Ok(entry) = entry else {
+                continue;
+            };
             let name = entry
                 .file_name()
                 .into_string()
@@ -100,10 +102,16 @@ impl WorkspaceService {
             } else {
                 format!("{relative}/{name}")
             };
-            let canonical = entry.path().canonicalize();
-            let kind = match canonical {
-                Ok(p) if p.starts_with(&root) && p.is_dir() => "directory",
-                Ok(p) if p.starts_with(&root) && p.is_file() => "file",
+            // Avoid unnecessary canonicalize() calls on non-symlinks (prevents FileProvider
+            // hydration/deadlocks on macOS cloud-synced directories).
+            let kind = match entry.file_type() {
+                Ok(ft) if ft.is_symlink() => match entry.path().canonicalize() {
+                    Ok(p) if p.starts_with(&root) && p.is_dir() => "directory",
+                    Ok(p) if p.starts_with(&root) && p.is_file() => "file",
+                    _ => "unavailable",
+                },
+                Ok(ft) if ft.is_dir() => "directory",
+                Ok(ft) if ft.is_file() => "file",
                 _ => "unavailable",
             };
             entries.push(WorkspaceNode { path, name, kind });

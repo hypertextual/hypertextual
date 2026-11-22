@@ -320,12 +320,8 @@ export class HotkeyService {
       void this.workspace.cycleTab(-1)
       return true
     },
-    'workspace.openFolder': () => {
-      this.workspace.openAddWorkspaceDialog('open')
-      return true
-    },
-    'workspace.newWorkspace': () => {
-      this.workspace.openAddWorkspaceDialog('create')
+    'workspace.openWorkspace': () => {
+      void this.workspace.beginOpenWorkspace()
       return true
     },
   }

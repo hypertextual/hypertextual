@@ -22,15 +22,14 @@ test.describe('Given markerless workspaces and multi-tabs', () => {
       await mkdir(docsB, { recursive: true })
       await writeFile(join(docsB, 'guide-b.md'), '# Guide B\n\nFrom repo B.\n')
 
-      // Act: Open first "docs" folder
+      // Act: Open first "docs" folder (picker opens immediately, then create dialog)
       workspace.nextPickedFolder = docsA
       await page.getByRole('combobox', { name: 'Workspace selector' }).click()
-      await page.getByRole('option', { name: 'Open folder as workspace…' }).click()
-      await page.getByRole('button', { name: 'Choose…' }).click()
+      await page.getByRole('option', { name: 'Open workspace…' }).click()
 
       // Assert default basename prefill and clean load
       await expect(page.getByLabel('Workspace name')).toHaveValue('docs')
-      await page.getByRole('button', { name: 'Open workspace' }).click()
+      await page.getByRole('button', { name: 'Create workspace' }).click()
       await expect(page.getByRole('treeitem', { name: 'Guide A' })).toBeVisible()
       await expect(page.getByRole('treeitem', { name: '.git' })).toHaveCount(0)
       await expect(page.getByRole('treeitem', { name: '.DS_Store' })).toHaveCount(0)
@@ -43,14 +42,13 @@ test.describe('Given markerless workspaces and multi-tabs', () => {
       // Act: Open second folder with duplicate basename "docs"
       workspace.nextPickedFolder = docsB
       await page.getByRole('combobox', { name: 'Workspace selector' }).click()
-      await page.getByRole('option', { name: 'Open folder as workspace…' }).click()
-      await page.getByRole('button', { name: 'Choose…' }).click()
+      await page.getByRole('option', { name: 'Open workspace…' }).click()
 
       // Assert name field starts empty and requires unique entry
       await expect(page.getByLabel('Workspace name')).toHaveValue('')
-      await expect(page.getByRole('button', { name: 'Open workspace' })).toBeDisabled()
+      await expect(page.getByRole('button', { name: 'Create workspace' })).toBeDisabled()
       await page.getByLabel('Workspace name').fill('docs-b')
-      await page.getByRole('button', { name: 'Open workspace' }).click()
+      await page.getByRole('button', { name: 'Create workspace' }).click()
       await expect(page.getByRole('treeitem', { name: 'Guide B' })).toBeVisible()
 
       await captureScreenshot(page, testInfo, 'workspaces-switcher')
@@ -86,10 +84,9 @@ test.describe('Given markerless workspaces and multi-tabs', () => {
       // Act: switch to second workspace, open Alpha, then switch back to Local workspace
       workspace.nextPickedFolder = secondDir
       await page.getByRole('combobox', { name: 'Workspace selector' }).click()
-      await page.getByRole('option', { name: 'Open folder as workspace…' }).click()
-      await page.getByRole('button', { name: 'Choose…' }).click()
+      await page.getByRole('option', { name: 'Open workspace…' }).click()
       await page.getByLabel('Workspace name').fill('second')
-      await page.getByRole('button', { name: 'Open workspace' }).click()
+      await page.getByRole('button', { name: 'Create workspace' }).click()
       await page.getByRole('treeitem', { name: 'Alpha' }).click()
       await expect(page.getByRole('tab', { name: 'Alpha' })).toBeVisible()
 
@@ -123,10 +120,9 @@ test.describe('Given markerless workspaces and multi-tabs', () => {
 
       workspace.nextPickedFolder = vanished
       await page.getByRole('combobox', { name: 'Workspace selector' }).click()
-      await page.getByRole('option', { name: 'Open folder as workspace…' }).click()
-      await page.getByRole('button', { name: 'Choose…' }).click()
+      await page.getByRole('option', { name: 'Open workspace…' }).click()
       await page.getByLabel('Workspace name').fill('ephemeral')
-      await page.getByRole('button', { name: 'Open workspace' }).click()
+      await page.getByRole('button', { name: 'Create workspace' }).click()
       await expect(page.getByRole('treeitem', { name: 'Original' })).toBeVisible()
 
       // Switch back to Local workspace and delete ephemeral folder on disk

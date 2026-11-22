@@ -116,17 +116,14 @@ pub async fn workspace_list_all(
 
 #[tauri::command]
 pub async fn workspace_pick_folder(title: Option<String>) -> Result<Option<String>> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut dialog = rfd::FileDialog::new();
-        if let Some(title) = title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
-            dialog = dialog.set_title(title);
-        }
-        Ok(dialog
-            .pick_folder()
-            .map(|p| p.to_string_lossy().into_owned()))
-    })
-    .await
-    .map_err(|e| error("io", e.to_string()))?
+    let mut dialog = rfd::AsyncFileDialog::new();
+    if let Some(title) = title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        dialog = dialog.set_title(title);
+    }
+    Ok(dialog
+        .pick_folder()
+        .await
+        .map(|folder| folder.path().to_string_lossy().into_owned()))
 }
 
 #[tauri::command]
@@ -136,8 +133,19 @@ pub async fn workspace_open_folder(
     name: String,
 ) -> Result<WorkspaceOpenResult> {
     run(state, move |host| {
-        let record = host.registry.open_folder(PathBuf::from(path), &name)?;
-        host.open_record(record)
+        let path_buf = PathBuf::from(path);
+        // Validate that the folder is readable before mutating the workspace registry.
+        let service = WorkspaceService::from_root(path_buf.clone());
+        let WorkspaceListing { root, entries } = service.open()?;
+        let record = host.registry.open_folder(path_buf, &name)?;
+        let ui_state = host.registry.read_ui_state(&record.name)?;
+        host.active = service;
+        Ok(WorkspaceOpenResult {
+            workspace: record,
+            root,
+            entries,
+            ui_state,
+        })
     })
     .await
 }
@@ -185,8 +193,19 @@ pub async fn workspace_relocate(
     path: String,
 ) -> Result<WorkspaceOpenResult> {
     run(state, move |host| {
-        let record = host.registry.relocate(&name, PathBuf::from(path))?;
-        host.open_record(record)
+        let path_buf = PathBuf::from(path);
+        // Validate that the relocated folder is readable before updating the registry.
+        let service = WorkspaceService::from_root(path_buf.clone());
+        let WorkspaceListing { root, entries } = service.open()?;
+        let record = host.registry.relocate(&name, path_buf)?;
+        let ui_state = host.registry.read_ui_state(&record.name)?;
+        host.active = service;
+        Ok(WorkspaceOpenResult {
+            workspace: record,
+            root,
+            entries,
+            ui_state,
+        })
     })
     .await
 }

@@ -32,7 +32,6 @@ interface CachedWorkspaceSnapshot {
 }
 
 export const WORKSPACE_ACTION_OPEN = '__open_workspace__'
-export const WORKSPACE_ACTION_CREATE = '__create_workspace__'
 
 /** Workspace view model. Rust retains filesystem ownership and path validation. */
 export class WorkspaceService {
@@ -40,7 +39,7 @@ export class WorkspaceService {
   workspaces = $state<WorkspaceRecord[]>([])
   activeWorkspaceName = $state('Local workspace')
   missingWorkspace = $state<WorkspaceRecord | null>(null)
-  addDialogMode = $state<'open' | 'create' | null>(null)
+  pendingWorkspacePath = $state<string | null>(null)
   entries = $state<WorkspaceNode[]>([])
   openTabs = $state<string[]>([])
   activeTab = $state<string | null>(null)
@@ -114,11 +113,7 @@ export class WorkspaceService {
             disabled: record.backing.kind === 'remote',
           }))
         : [{ label: this.activeWorkspaceName, value: this.activeWorkspaceName }]
-    return [
-      ...records,
-      { label: 'Open folder as workspace…', value: WORKSPACE_ACTION_OPEN },
-      { label: 'New workspace…', value: WORKSPACE_ACTION_CREATE },
-    ]
+    return [...records, { label: 'Open workspace…', value: WORKSPACE_ACTION_OPEN }]
   }
   get tabItems(): TabItem[] {
     return this.openTabs.map((path) => {
@@ -240,13 +235,29 @@ export class WorkspaceService {
     return base
   }
 
-  openAddWorkspaceDialog(mode: 'open' | 'create') {
+  async beginOpenWorkspace(): Promise<void> {
     if (this.blocked) return
-    this.addDialogMode = mode
+    try {
+      const picked = await this.pickFolder('Open workspace folder')
+      if (!picked || !this.active) return
+      const normalized = picked.replace(/[\\/]+$/, '')
+      const existing = this.workspaces.find(
+        (record) =>
+          (record.backing.kind === 'local' || record.backing.kind === 'synced') &&
+          record.backing.path.replace(/[\\/]+$/, '') === normalized,
+      )
+      if (existing) {
+        await this.switchWorkspace(existing.name)
+        return
+      }
+      this.pendingWorkspacePath = picked
+    } catch (error) {
+      this.error = errorMessage(error)
+    }
   }
 
   closeAddWorkspaceDialog() {
-    this.addDialogMode = null
+    this.pendingWorkspacePath = null
   }
 
   async pickFolder(title?: string): Promise<string | null> {
@@ -264,24 +275,7 @@ export class WorkspaceService {
       if (!this.active || seq !== this.openRequestSeq) return
       await this.refreshRegistry()
       await this.applyOpenResult(result, seq)
-      this.addDialogMode = null
-    } finally {
-      if (this.active && seq === this.openRequestSeq) this.loading = false
-    }
-  }
-
-  async createWorkspace(path: string, name: string): Promise<void> {
-    if (!(await this.prepareForWorkspaceSwitch())) return
-    const seq = ++this.openRequestSeq
-    this.loading = true
-    this.error = null
-    this.missingWorkspace = null
-    try {
-      const result = await this.client.createWorkspace(path, name)
-      if (!this.active || seq !== this.openRequestSeq) return
-      await this.refreshRegistry()
-      await this.applyOpenResult(result, seq)
-      this.addDialogMode = null
+      this.pendingWorkspacePath = null
     } finally {
       if (this.active && seq === this.openRequestSeq) this.loading = false
     }
@@ -289,11 +283,7 @@ export class WorkspaceService {
 
   async switchWorkspace(name: string): Promise<void> {
     if (name === WORKSPACE_ACTION_OPEN) {
-      this.openAddWorkspaceDialog('open')
-      return
-    }
-    if (name === WORKSPACE_ACTION_CREATE) {
-      this.openAddWorkspaceDialog('create')
+      void this.beginOpenWorkspace()
       return
     }
     if (name.toLowerCase() === this.activeWorkspaceName.toLowerCase() && !this.missingWorkspace) {
@@ -735,8 +725,8 @@ export class WorkspaceService {
     this.editor.clear()
     this.treeVersion++
 
-    await this.loadTitles(result.entries)
-    if (!this.active || seq !== this.openRequestSeq) return
+    // Load article titles in the background so opening large vaults is non-blocking.
+    void this.loadTitles(result.entries, seq)
 
     const uiState: WorkspaceUiState = result.uiState ?? {
       openTabs: [],
@@ -754,7 +744,7 @@ export class WorkspaceService {
         if (!this.active || seq !== this.openRequestSeq) return
         this.dirChildren[folder] = children
         for (const child of children) this.listed[child.path] = child
-        await this.loadTitles(children)
+        void this.loadTitles(children, seq)
         validFolders.push(folder)
       } catch {
         /* Folder removed externally; prune from restored state. */
@@ -872,19 +862,28 @@ export class WorkspaceService {
       if (parent) this.refresh(parent)
     }
   }
-  private async loadTitles(items: WorkspaceNode[]) {
-    await Promise.all(
-      items
-        .filter((entry) => entry.kind === 'file' && this.editor.supportsFile(entry.name))
-        .map(async (entry) => {
+  private async loadTitles(items: WorkspaceNode[], seq = this.openRequestSeq) {
+    const readable = items.filter(
+      (entry) => entry.kind === 'file' && this.editor.supportsFile(entry.name),
+    )
+    const batchSize = 4
+    for (let i = 0; i < readable.length; i += batchSize) {
+      if (!this.active || seq !== this.openRequestSeq) return
+      await Promise.all(
+        readable.slice(i, i + batchSize).map(async (entry) => {
           try {
             const read = await this.client.read(entry.path)
-            if (this.active && this.editor.selected?.path !== entry.path)
+            if (
+              this.active &&
+              seq === this.openRequestSeq &&
+              this.editor.selected?.path !== entry.path
+            )
               this.updateTitle(entry.path, this.editor.extractTitle(read.content))
           } catch {
             /* Keep unreadable entries visible under their filenames. */
           }
         }),
-    )
+      )
+    }
   }
 }

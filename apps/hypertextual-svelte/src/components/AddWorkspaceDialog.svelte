@@ -11,25 +11,34 @@
   let { workspace }: AddWorkspaceDialogProps = $props()
 
   // State ---------------------------------------------------------------------
-  let folderPath = $state('')
   let workspaceName = $state('')
   let duplicateHint = $state(false)
   let submitting = $state(false)
   let submitError = $state<string | null>(null)
+  let nameInput = $state<HTMLInputElement | null>(null)
 
   // Derived -------------------------------------------------------------------
-  const open = $derived(workspace.addDialogMode !== null)
-  const isCreate = $derived(workspace.addDialogMode === 'create')
-  const title = $derived(isCreate ? 'New workspace' : 'Open folder as workspace')
+  const folderPath = $derived(workspace.pendingWorkspacePath ?? '')
+  const open = $derived(workspace.pendingWorkspacePath !== null)
   const nameTaken = $derived(workspace.hasWorkspaceName(workspaceName))
   const canSubmit = $derived(
-    !submitting && Boolean(folderPath.trim()) && Boolean(workspaceName.trim()) && !nameTaken,
+    !submitting && Boolean(folderPath) && Boolean(workspaceName.trim()) && !nameTaken,
   )
 
   // Lifecycle -----------------------------------------------------------------
   $effect(() => {
-    if (!open) {
-      folderPath = ''
+    const picked = workspace.pendingWorkspacePath
+    if (picked) {
+      const suggested = workspace.defaultNameForPath(picked)
+      workspaceName = suggested
+      duplicateHint = suggested === ''
+      submitting = false
+      submitError = null
+      queueMicrotask(() => {
+        nameInput?.focus()
+        nameInput?.select()
+      })
+    } else {
       workspaceName = ''
       duplicateHint = false
       submitting = false
@@ -38,33 +47,13 @@
   })
 
   // Methods -------------------------------------------------------------------
-  async function handlePickFolder(): Promise<void> {
-    submitError = null
-    try {
-      const picked = await workspace.pickFolder(
-        isCreate ? 'Choose folder for new workspace' : 'Choose existing folder',
-      )
-      if (!picked) return
-      folderPath = picked
-      const suggested = workspace.defaultNameForPath(picked)
-      workspaceName = suggested
-      duplicateHint = suggested === ''
-    } catch (error) {
-      submitError = errorMessage(error)
-    }
-  }
-
   async function handleSubmit(event: SubmitEvent): Promise<void> {
     event.preventDefault()
     if (!canSubmit) return
     submitting = true
     submitError = null
     try {
-      if (isCreate) {
-        await workspace.createWorkspace(folderPath.trim(), workspaceName.trim())
-      } else {
-        await workspace.openWorkspaceFolder(folderPath.trim(), workspaceName.trim())
-      }
+      await workspace.openWorkspaceFolder(folderPath, workspaceName.trim())
     } catch (error) {
       submitError = errorMessage(error)
     } finally {
@@ -92,36 +81,21 @@
     class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-xs"
     role="dialog"
     aria-modal="true"
-    aria-label={title}
+    aria-label="Create workspace"
   >
     <form
       class="flex w-full max-w-md flex-col gap-4 rounded-lg border border-border bg-background p-5 shadow-lg"
       onsubmit={handleSubmit}
     >
       <div class="flex flex-col gap-1">
-        <h2 class="text-sm font-semibold text-foreground">{title}</h2>
-        <p class="text-xs text-muted-foreground">
-          {isCreate
-            ? 'Choose a folder location and name. No hidden marker files are added to the folder.'
-            : 'Open any folder on disk as a workspace without modifying or tainting its contents.'}
+        <h2 class="text-sm font-semibold text-foreground">Create workspace</h2>
+        <p
+          class="flex items-center gap-1.5 truncate text-xs text-muted-foreground"
+          title={folderPath}
+        >
+          <FolderOpen size={12} strokeWidth={1.5} class="shrink-0" />
+          <span class="truncate">{folderPath}</span>
         </p>
-      </div>
-
-      <div class="flex flex-col gap-1.5">
-        <span class="text-xs font-medium text-foreground">Folder</span>
-        <div class="flex items-center gap-2">
-          <input
-            type="text"
-            aria-label="Workspace folder path"
-            class="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-            placeholder="/path/to/folder"
-            bind:value={folderPath}
-          />
-          <Button type="button" variant="outline" size="sm" onclick={() => void handlePickFolder()}>
-            <FolderOpen size={13} strokeWidth={1.5} />
-            <span>Choose…</span>
-          </Button>
-        </div>
       </div>
 
       <div class="flex flex-col gap-1.5">
@@ -129,6 +103,7 @@
           >Workspace name</label
         >
         <input
+          bind:this={nameInput}
           id="workspace-name-input"
           type="text"
           aria-label="Workspace name"
@@ -155,9 +130,7 @@
         <Button type="button" variant="text" size="sm" disabled={submitting} onclick={handleClose}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={!canSubmit}>
-          {isCreate ? 'Create workspace' : 'Open workspace'}
-        </Button>
+        <Button type="submit" size="sm" disabled={!canSubmit}>Create workspace</Button>
       </div>
     </form>
   </div>
