@@ -73,17 +73,14 @@ const MAX_ZOOM = 4.0
  * ```text
  * Normal mode:
  * +------------------------------------------------------------+
- * | Draw.io                       [Open in Draw.io]  [↻]  [⛶] |
- * +------------------------------------------------------------+
  * |                  [Client] ---> [Server]                    |
  * +------------------------------------------------------------+
  *   System architecture
  *
  * Insert mode:
  * +------------------------------------------------------------+
- * | Draw.io                       [Open in Draw.io]  [↻]  [⛶] |
- * +------------------------------------------------------------+
- * |              [ ↗ Open in Draw.io ] [Replace] [×]           | <-- Tab
+ * |                                                        [×] |
+ * |              [ ↗ Open in Draw.io ] [Replace]               | <-- Tab
  * +------------------------------------------------------------+
  *   [ System architecture|                                    ] <-- Tab
  * ```
@@ -107,17 +104,17 @@ export const DrawioViewer = defineHtmdExtension<
   navigation: () =>
     createAtomNodeNavigation({
       controls: [
-        DRAWIO_CTA_SELECTOR,
         DRAWIO_REPLACE_SELECTOR,
+        DRAWIO_CTA_SELECTOR,
         DRAWIO_REMOVE_SELECTOR,
         DRAWIO_CAPTION_SELECTOR,
       ],
-      defaultControl: 'cta',
+      defaultControl: 'replace',
       subtext: {
         kind: 'imageCaption',
         attr: 'caption',
         control: 'caption',
-        enterControl: 'cta',
+        enterControl: 'caption',
         decorationAttr: 'data-pm-modal-drawio-caption',
         textSelector: '[data-drawio-caption-text]',
         inputSelector: DRAWIO_CAPTION_SELECTOR,
@@ -432,8 +429,8 @@ function whenDrawioCaptionEnter({ state }: HtmdCommandContext, event: KeyboardEv
 
 function getFocusableDrawioControls(wrapper: HTMLElement): HTMLElement[] {
   const selectors = [
-    DRAWIO_CTA_SELECTOR,
     DRAWIO_REPLACE_SELECTOR,
+    DRAWIO_CTA_SELECTOR,
     DRAWIO_REMOVE_SELECTOR,
     DRAWIO_CAPTION_SELECTOR,
   ]
@@ -503,6 +500,12 @@ function handleArrowDown(
 function handleArrowUp({ editor, state, view }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'drawio')
   if (ctrl) {
+    const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(DRAWIO_CAPTION_SELECTOR)
+    const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(DRAWIO_REPLACE_SELECTOR)
+    if (ctrl.target === captionInput && replaceBtn) {
+      replaceBtn.focus()
+      return true
+    }
     ctrl.target.blur()
     return focusBeforeBlock(editor, ctrl.pos)
   }

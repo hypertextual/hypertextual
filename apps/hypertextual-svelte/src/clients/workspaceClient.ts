@@ -25,7 +25,7 @@ export interface WorkspaceClient {
     revision: string,
     title: string,
   ): Promise<ArticleMetadata>
-  importFileAsset(path: string, bytes: number[]): Promise<FileAsset>
+  importFileAsset(path: string, bytes: number[], filename?: string): Promise<FileAsset>
   readFileAsset(path: string, source: string): Promise<FileAsset>
   open(): Promise<{ root: string; entries: WorkspaceNode[] }>
   list(path: string): Promise<WorkspaceNode[]>
@@ -41,8 +41,8 @@ export interface WorkspaceClient {
 export const workspaceClient: WorkspaceClient = {
   saveArticle: (relativePath, content, expectedRevision, title) =>
     invoke('workspace_save_article', { relativePath, content, expectedRevision, title }),
-  importFileAsset: (articlePath, bytes) =>
-    invoke('workspace_import_file_asset', { articlePath, bytes }),
+  importFileAsset: (articlePath, bytes, filename) =>
+    invoke('workspace_import_file_asset', { articlePath, bytes, filename }),
   readFileAsset: (articlePath, source) =>
     invoke('workspace_read_file_asset', { articlePath, source }),
   open: () => {

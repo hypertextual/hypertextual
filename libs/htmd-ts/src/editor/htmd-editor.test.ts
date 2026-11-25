@@ -622,6 +622,10 @@ describe('Given an HtmdEditor in normal mode', () => {
 
       expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
+      expect(editor.getSubtextCursor()).toBeNull()
+      expect(editor.getSelectionState().isNodeSelection).toBe(true)
+
+      expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(editor.getSubtextCursor()?.kind).toBe('imageCaption')
       expect(editor.getSelectionState().isNodeSelection).toBe(true)
 
@@ -630,6 +634,9 @@ describe('Given an HtmdEditor in normal mode', () => {
 
       expect(target.move('up', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(editor.getSubtextCursor()?.kind).toBe('imageCaption')
+      expect(target.move('up', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
+      expect(editor.getSubtextCursor()).toBeNull()
+      expect(editor.getSelectionState().isNodeSelection).toBe(true)
       expect(target.move('docEnd', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(target.move('docStart', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       editor.destroy()

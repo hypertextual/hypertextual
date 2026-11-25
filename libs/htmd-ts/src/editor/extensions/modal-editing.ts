@@ -1098,6 +1098,29 @@ export function collectLeafBlocks(doc: PMNode, mode: KeymapMode = 'normal'): Blo
         })
         return true
       }
+      if (nav.subtext.kind === 'imageCaption') {
+        blocks.push({
+          node,
+          pos,
+          start: pos,
+          end: pos + node.nodeSize,
+          isTextblock: false,
+          isAtom: true,
+        })
+        if (subtextText.length > 0) {
+          blocks.push({
+            node,
+            pos,
+            start: pos,
+            end: pos + node.nodeSize,
+            isTextblock: true,
+            isAtom: true,
+            subtextKind: nav.subtext.kind,
+            subtextText,
+          })
+        }
+        return false
+      }
       blocks.push({
         node,
         pos,
@@ -1534,8 +1557,10 @@ export function findCurrentBlockIndex(
     if (subIdx !== -1) return subIdx
   }
   if (!extendedRange && sel instanceof NodeSelection) {
-    const nodeIdx = blocks.findIndex((b) => b.pos === sel.from)
+    const nodeIdx = blocks.findIndex((b) => !b.subtextKind && b.pos === sel.from)
     if (nodeIdx !== -1) return nodeIdx
+    const fallbackIdx = blocks.findIndex((b) => b.pos === sel.from)
+    if (fallbackIdx !== -1) return fallbackIdx
   }
 
   const cursorPos = getCursorCharPos(doc, sel, extendedRange)

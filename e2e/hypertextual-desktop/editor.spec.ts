@@ -2040,7 +2040,6 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         .toBeGreaterThan(0)
       await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
       // Act
-      await page.locator('.ProseMirror img').hover()
       await page.getByRole('button', { name: 'Remove image', exact: true }).click()
       // Assert
       await expect(page.locator('.ProseMirror img')).toHaveCount(0)
@@ -2138,7 +2137,7 @@ test.describe(
       '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" content="&lt;mxfile&gt;&lt;diagram id=&quot;1&quot;&gt;&lt;mxGraphModel/&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><rect width="120" height="60" fill="#e2e8f0"/></svg>'
     const drawioPng = Buffer.concat([png, Buffer.from('tEXtmxfile\0<mxfile/>')])
     const drawioXml =
-      '<mxfile host="Electron"><diagram id="d1" name="Page-1"><mxGraphModel/></diagram></mxfile>'
+      '<mxfile host="Electron"><diagram id="d1" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="Client" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="20" y="20" width="120" height="50" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>'
 
     for (const spec of [
       {
@@ -2208,12 +2207,21 @@ test.describe(
 
         // Assert
         await expect(page.locator(spec.expectedSelector)).toBeVisible()
+        if (spec.expectedExt === '.drawio') {
+          await expect
+            .poll(async () => {
+              const box = await page
+                .locator('.ProseMirror [data-drawio-node] [data-drawio-xml-host] svg')
+                .first()
+                .boundingBox()
+              return box ? box.width > 20 && box.height > 20 : false
+            })
+            .toBe(true)
+        }
         await expect
           .poll(() => readFile(join(workspace.root, 'Drafts/one.md'), 'utf8'))
-          .toContain('.media/')
-        const saved = await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')
-        expect(saved).toContain(spec.expectedExt)
-        expect(await readdir(join(workspace.root, 'Drafts/.media'))).toHaveLength(1)
+          .toContain(`.media/${spec.file.name}`)
+        expect(await readdir(join(workspace.root, 'Drafts/.media'))).toEqual([spec.file.name])
       })
     }
   },

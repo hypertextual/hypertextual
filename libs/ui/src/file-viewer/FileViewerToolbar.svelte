@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ExternalLink, Maximize2, Minimize2, RefreshCw, Workflow } from 'lucide-svelte'
+  import { ExternalLink, Maximize2, Minimize2, Workflow } from 'lucide-svelte'
   import { WindowInplaceToolbar } from '../window-inplace'
   import { fileViewerStyles } from './styles'
   import type { FileViewerToolbarProps } from './types'
@@ -10,9 +10,8 @@
     externalAppLabel,
     isFullscreen,
     canOpenExternal,
-    canRefresh,
+    canFullscreen = true,
     onopenexternal,
-    onrefresh,
     ontogglefullscreen,
   }: FileViewerToolbarProps = $props()
 
@@ -39,31 +38,20 @@
     </button>
   {/if}
 
-  {#if canRefresh}
+  {#if canFullscreen}
     <button
       type="button"
-      data-file-viewer-refresh=""
-      onclick={onrefresh}
+      data-file-viewer-fullscreen=""
+      onclick={ontogglefullscreen}
       class={fileViewerStyles.toolbarIconButton}
-      aria-label="Refresh preview"
-      title="Refresh preview"
+      aria-label={isFullscreen ? 'Minimize preview' : 'Maximize preview'}
+      title={isFullscreen ? 'Minimize preview' : 'Maximize preview'}
     >
-      <RefreshCw class="size-3.5" aria-hidden="true" />
+      {#if isFullscreen}
+        <Minimize2 class="size-3.5" aria-hidden="true" />
+      {:else}
+        <Maximize2 class="size-3.5" aria-hidden="true" />
+      {/if}
     </button>
   {/if}
-
-  <button
-    type="button"
-    data-file-viewer-fullscreen=""
-    onclick={ontogglefullscreen}
-    class={fileViewerStyles.toolbarIconButton}
-    aria-label={isFullscreen ? 'Minimize preview' : 'Maximize preview'}
-    title={isFullscreen ? 'Minimize preview' : 'Maximize preview'}
-  >
-    {#if isFullscreen}
-      <Minimize2 class="size-3.5" aria-hidden="true" />
-    {:else}
-      <Maximize2 class="size-3.5" aria-hidden="true" />
-    {/if}
-  </button>
 </WindowInplaceToolbar>

@@ -13,6 +13,7 @@ import { Autosave, type SaveState } from './autosave'
 export interface EditorObserver {
   titleChanged: (path: string, title: string) => void
   saved: (oldPath: string, saved: ArticleMetadata, title: string) => void
+  mediaImported?: (articlePath: string) => void
 }
 
 export interface StandaloneFilePreview {
@@ -274,6 +275,7 @@ export class EditorService {
     const asset = await this.media.upload(articlePath, file)
     if (this.document === document && this.selected && this.selected.path !== articlePath)
       this.media.relocateArticle(articlePath, this.selected.path)
+    this.observer.mediaImported?.(this.selected?.path ?? articlePath)
     return { src: asset.url }
   }
 

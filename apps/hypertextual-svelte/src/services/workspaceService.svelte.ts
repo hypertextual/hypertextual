@@ -43,6 +43,7 @@ export class WorkspaceService {
     this.editor = new EditorService(client, {
       titleChanged: (path, title) => this.updateTitle(path, title),
       saved: (path, saved, title) => this.saved(path, saved, title),
+      mediaImported: (articlePath) => this.handleMediaImported(articlePath),
     })
     this.hotkeys = new HotkeyService(this)
     this.editorServices = {
@@ -93,7 +94,27 @@ export class WorkspaceService {
   toggleShowHiddenFiles(): boolean {
     const next = this.settings.toggleShowHiddenFiles()
     this.treeVersion++
+    void this.refreshRoot()
     return next
+  }
+
+  private async refreshRoot() {
+    try {
+      const items = await this.client.list('')
+      if (!this.active) return
+      this.entries = items
+      this.treeVersion++
+    } catch {
+      // Keep current sidebar entries if background refresh fails.
+    }
+  }
+
+  private handleMediaImported(articlePath: string) {
+    const parent = articlePath.includes('/')
+      ? articlePath.slice(0, articlePath.lastIndexOf('/'))
+      : ''
+    if (!parent) void this.refreshRoot()
+    else this.refresh(parent)
   }
 
   async openExternalAsset(source: string) {

@@ -22,12 +22,17 @@ impl<'a> MediaService<'a> {
         Self { workspace }
     }
 
-    pub fn import(&self, article_path: &str, bytes: &[u8]) -> Result<FileAsset> {
+    pub fn import(
+        &self,
+        article_path: &str,
+        bytes: &[u8],
+        filename: Option<&str>,
+    ) -> Result<FileAsset> {
         ArticleContent::validate_path(article_path)?;
         if bytes.len() as u64 > MAX_BYTES {
             return Err(error("tooLarge", "Files must be smaller than 16 MB."));
         }
-        let name = FileAsset::filename(bytes)?;
+        let (stem, extension) = FileAsset::filename_parts(filename, bytes)?;
         let article = self.workspace.resolve(article_path)?;
         let directory = article.parent().unwrap().join(".media");
         fs::create_dir_all(&directory)?;
@@ -40,25 +45,39 @@ impl<'a> MediaService<'a> {
                 "The media folder is outside this workspace.",
             ));
         }
-        let path = directory.join(&name);
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-        {
-            Ok(mut file) => {
-                file.write_all(bytes)?;
-                file.sync_all()?;
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                if fs::symlink_metadata(&path)?.file_type().is_symlink()
-                    || fs::read(&path)? != bytes
-                {
-                    return Err(error("io", "The media asset name is already in use."));
+
+        let mut saved_name = None;
+        for counter in 1usize..=10_000 {
+            let candidate = if counter == 1 {
+                format!("{stem}.{extension}")
+            } else {
+                format!("{stem}-{counter}.{extension}")
+            };
+            let path = directory.join(&candidate);
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(mut file) => {
+                    file.write_all(bytes)?;
+                    file.sync_all()?;
+                    saved_name = Some(candidate);
+                    break;
                 }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if !fs::symlink_metadata(&path)?.file_type().is_symlink()
+                        && fs::read(&path)? == bytes
+                    {
+                        saved_name = Some(candidate);
+                        break;
+                    }
+                }
+                Err(e) => return Err(e.into()),
             }
-            Err(e) => return Err(e.into()),
         }
+        let name = saved_name
+            .ok_or_else(|| error("io", "Could not allocate a unique media asset name."))?;
         self.read(article_path, &format!(".media/{name}"))
     }
 

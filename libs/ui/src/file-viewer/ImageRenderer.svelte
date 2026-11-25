@@ -6,6 +6,8 @@
   // Props ---------------------------------------------------------------------
   interface ImageRendererProps {
     src: string
+    srcset?: string
+    sizes?: string
     alt?: string
     isFullscreen?: boolean
     scale?: number
@@ -21,6 +23,8 @@
 
   let {
     src,
+    srcset,
+    sizes,
     alt = '',
     isFullscreen = false,
     scale = $bindable(1),
@@ -62,6 +66,7 @@
   bind:panY
   {tabindex}
   {ariaLabel}
+  canvasClass={isFullscreen ? 'flex h-full w-full items-center justify-center' : 'w-full'}
   {onviewportchange}
   {onfocus}
   {onkeydown}
@@ -70,6 +75,8 @@
 >
   <img
     {src}
+    {srcset}
+    {sizes}
     {alt}
     draggable="false"
     data-file-viewer-image=""

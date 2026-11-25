@@ -35,28 +35,39 @@
     }
     const region =
       rootEl.closest<HTMLElement>('[role="region"]') ??
-      rootEl.closest<HTMLElement>('.editor-container')
-    if (!region) return
-    const previousOverflow = region.style.overflow
-    region.style.overflow = 'hidden'
+      rootEl.closest<HTMLElement>('.editor-container') ??
+      rootEl.closest<HTMLElement>('main')
+    const previousOverflow = region ? region.style.overflow : ''
+    if (region) {
+      region.style.overflow = 'hidden'
+    }
     const updateRect = () => {
-      const rect = region.getBoundingClientRect()
-      fullscreenRect = {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
+      if (region) {
+        const rect = region.getBoundingClientRect()
+        fullscreenRect = {
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        }
+      } else {
+        fullscreenRect = {
+          top: 0,
+          left: 0,
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }
       }
     }
     updateRect()
     const resizeObserver =
-      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateRect) : null
-    resizeObserver?.observe(region)
+      region && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateRect) : null
+    if (region) resizeObserver?.observe(region)
     window.addEventListener('resize', updateRect)
     return () => {
       resizeObserver?.disconnect()
       window.removeEventListener('resize', updateRect)
-      region.style.overflow = previousOverflow
+      if (region) region.style.overflow = previousOverflow
     }
   })
 

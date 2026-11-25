@@ -113,9 +113,10 @@ pub async fn workspace_import_file_asset(
     state: State<'_, WorkspaceState>,
     article_path: String,
     bytes: Vec<u8>,
+    filename: Option<String>,
 ) -> Result<FileAsset> {
     run(state, move |w| {
-        MediaService::new(w).import(&article_path, &bytes)
+        MediaService::new(w).import(&article_path, &bytes, filename.as_deref())
     })
     .await
 }

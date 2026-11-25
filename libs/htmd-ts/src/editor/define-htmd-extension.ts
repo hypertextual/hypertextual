@@ -363,16 +363,19 @@ export function createAtomNodeNavigation(config: {
   serializeModalText?: (node: PMNode) => string
 }): HtmdNodeNavigation {
   const primarySelector = config.controls[0] ?? ''
+  const lastSelector = config.controls[config.controls.length - 1] ?? primarySelector
 
-  const focusPrimaryControl = (
+  const focusDirectionalControl = (
     editor: TiptapEditor,
     pos: number,
     node: PMNode,
     direction: 'down' | 'up',
   ): boolean => {
     const dom = editor.view?.nodeDOM(pos)
-    if (!(dom instanceof HTMLElement) || !primarySelector) return false
-    const input = dom.querySelector<HTMLElement>(primarySelector)
+    const selector = direction === 'up' ? lastSelector : primarySelector
+    if (!(dom instanceof HTMLElement) || !selector) return false
+    const input =
+      dom.querySelector<HTMLElement>(selector) ?? dom.querySelector<HTMLElement>(primarySelector)
     if (!input) return false
     const { doc } = editor.state
     CursorManager.setActiveCompoundBlockPos(editor, pos)
@@ -393,17 +396,23 @@ export function createAtomNodeNavigation(config: {
     subtext: config.subtext,
     serializeModalText: config.serializeModalText,
     enterFromAbove(editor, pos, node) {
-      return focusPrimaryControl(editor, pos, node, 'down')
+      return focusDirectionalControl(editor, pos, node, 'down')
     },
     enterFromBelow(editor, pos, node) {
-      return focusPrimaryControl(editor, pos, node, 'up')
+      return focusDirectionalControl(editor, pos, node, 'up')
     },
     focusControl:
       config.focusControl ??
       ((editor, pos, _node, options) => {
         const dom = editor.view?.nodeDOM(pos)
-        if (!(dom instanceof HTMLElement) || !primarySelector) return false
-        const input = dom.querySelector<HTMLElement>(primarySelector)
+        const selector =
+          options?.control && options.control === config.subtext?.control
+            ? config.subtext.inputSelector
+            : primarySelector
+        if (!(dom instanceof HTMLElement) || !selector) return false
+        const input =
+          dom.querySelector<HTMLElement>(selector) ??
+          dom.querySelector<HTMLElement>(primarySelector)
         if (!input) return false
         input.focus()
         if (input instanceof HTMLInputElement) {

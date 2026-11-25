@@ -1,14 +1,7 @@
 <script lang="ts">
-  import { tick } from 'svelte'
-  import { ExternalLink, Image as ImageIcon, ImagePlus, Workflow, X } from 'lucide-svelte'
-  import {
-    WindowInplace,
-    WindowInplaceBody,
-    WindowInplaceHeader,
-    WindowInplaceTitle,
-  } from '../window-inplace'
+  import { ExternalLink, ImagePlus, Maximize2, Minimize2, X } from 'lucide-svelte'
+  import { WindowInplace, WindowInplaceBody } from '../window-inplace'
   import DrawioXmlRenderer from './DrawioXmlRenderer.svelte'
-  import FileViewerToolbar from './FileViewerToolbar.svelte'
   import ImageRenderer from './ImageRenderer.svelte'
   import { fileViewerStyles } from './styles'
   import type { FileViewerProps } from './types'
@@ -18,9 +11,13 @@
     kind,
     title,
     src = '',
+    srcset,
+    sizes,
     xml = '',
     alt = '',
-    externalAppLabel,
+    externalAppLabel = 'Open',
+    replaceLabel,
+    removeLabel,
     standalone = false,
     mode = 'normal',
     fullscreen = $bindable(false),
@@ -29,7 +26,6 @@
     panY = $bindable(0),
     viewerScriptUrl = '/vendor/drawio/viewer-static.min.js',
     onopenexternal,
-    onrefresh,
     onreplace,
     onremove,
     onviewportchange,
@@ -45,23 +41,12 @@
   let windowInplace = $state<ReturnType<typeof WindowInplace> | null>(null)
   let imageRenderer = $state<ReturnType<typeof ImageRenderer> | null>(null)
   let xmlRenderer = $state<ReturnType<typeof DrawioXmlRenderer> | null>(null)
-  let ctaButtonEl = $state<HTMLButtonElement | null>(null)
 
   // Derived -------------------------------------------------------------------
   const isDrawio = $derived(kind === 'drawio-image' || kind === 'drawio-xml')
-  const resolvedExternalLabel = $derived(
-    externalAppLabel ?? (isDrawio ? 'Open in Draw.io' : 'Open in Default App'),
-  )
+  const resolvedReplaceLabel = $derived(replaceLabel ?? (isDrawio ? 'Replace diagram' : 'Replace image'))
+  const resolvedRemoveLabel = $derived(removeLabel ?? (isDrawio ? 'Remove diagram' : 'Remove image'))
   const showInsertOverlay = $derived(!standalone && mode === 'insert')
-
-  // Lifecycle -----------------------------------------------------------------
-  $effect(() => {
-    if (showInsertOverlay && ctaButtonEl) {
-      void tick().then(() => {
-        ctaButtonEl?.focus({ preventScroll: true })
-      })
-    }
-  })
 
   // Methods -------------------------------------------------------------------
   export function getElement(): HTMLElement | null {
@@ -97,11 +82,6 @@
   function handleOpenExternalClick(event: MouseEvent) {
     event.stopPropagation()
     onopenexternal?.()
-  }
-
-  function handleRefreshClick(event: MouseEvent) {
-    event.stopPropagation()
-    onrefresh?.()
   }
 
   function handleReplaceClick(event: MouseEvent) {
@@ -168,28 +148,6 @@
   data-drawio-fullscreen={fullscreen ? 'true' : 'false'}
   class={fileViewerStyles.rootVariants({ standalone, class: className })}
 >
-  <WindowInplaceHeader>
-    <WindowInplaceTitle>
-      {#if isDrawio}
-        <Workflow class="size-3.5" aria-hidden="true" />
-      {:else}
-        <ImageIcon class="size-3.5" aria-hidden="true" />
-      {/if}
-      <span>{title}</span>
-    </WindowInplaceTitle>
-
-    <FileViewerToolbar
-      {kind}
-      externalAppLabel={resolvedExternalLabel}
-      isFullscreen={fullscreen}
-      canOpenExternal={Boolean(onopenexternal)}
-      canRefresh={Boolean(onrefresh)}
-      onopenexternal={handleOpenExternalClick}
-      onrefresh={handleRefreshClick}
-      ontogglefullscreen={handleToggleFullscreenClick}
-    />
-  </WindowInplaceHeader>
-
   <WindowInplaceBody class="relative flex-1">
     {#if kind === 'drawio-xml'}
       <DrawioXmlRenderer
@@ -210,6 +168,8 @@
       <ImageRenderer
         bind:this={imageRenderer}
         {src}
+        {srcset}
+        {sizes}
         alt={alt || title}
         isFullscreen={fullscreen || standalone}
         bind:scale
@@ -224,36 +184,49 @@
       />
     {/if}
 
+    {#if !standalone}
+      <button
+        type="button"
+        data-file-viewer-fullscreen=""
+        onclick={handleToggleFullscreenClick}
+        class={`${fileViewerStyles.floatingFullscreenButton} ${fullscreen || showInsertOverlay ? 'opacity-100' : 'opacity-0 group-hover/file-viewer:opacity-100 focus:opacity-100'}`}
+        aria-label={fullscreen ? 'Minimize preview' : 'Maximize preview'}
+        title={fullscreen ? 'Minimize preview' : 'Maximize preview'}
+      >
+        {#if fullscreen}
+          <Minimize2 class="size-3.5" aria-hidden="true" />
+        {:else}
+          <Maximize2 class="size-3.5" aria-hidden="true" />
+        {/if}
+      </button>
+    {/if}
+
     {#if showInsertOverlay}
       <div class={fileViewerStyles.insertOverlay} data-file-viewer-insert-overlay="">
         <div class={fileViewerStyles.insertActions} data-editor-controls="">
-          {#if onopenexternal}
-            <button
-              bind:this={ctaButtonEl}
-              type="button"
-              data-drawio-cta=""
-              onclick={handleOpenExternalClick}
-              class={fileViewerStyles.prominentCta}
-              aria-label={resolvedExternalLabel}
-            >
-              {#if isDrawio}
-                <Workflow class="size-4" aria-hidden="true" />
-              {:else}
-                <ExternalLink class="size-4" aria-hidden="true" />
-              {/if}
-              <span>{resolvedExternalLabel}</span>
-            </button>
-          {/if}
-
           {#if onreplace}
             <button
               type="button"
               onclick={handleReplaceClick}
-              class={fileViewerStyles.secondaryCta}
-              aria-label="Replace diagram"
+              class={fileViewerStyles.actionButton}
+              aria-label={resolvedReplaceLabel}
             >
               <ImagePlus class="size-3.5" aria-hidden="true" />
               <span>Replace</span>
+            </button>
+          {/if}
+
+          {#if onopenexternal}
+            <button
+              type="button"
+              data-drawio-cta=""
+              data-file-viewer-open=""
+              onclick={handleOpenExternalClick}
+              class={fileViewerStyles.actionButton}
+              aria-label={externalAppLabel}
+            >
+              <ExternalLink class="size-3.5" aria-hidden="true" />
+              <span>{externalAppLabel}</span>
             </button>
           {/if}
 
@@ -261,11 +234,12 @@
             <button
               type="button"
               onclick={handleRemoveClick}
-              class={fileViewerStyles.removeCta}
-              aria-label="Remove diagram"
-              title="Remove diagram"
+              class={fileViewerStyles.removeActionButton}
+              aria-label={resolvedRemoveLabel}
+              title={resolvedRemoveLabel}
             >
               <X class="size-3.5" aria-hidden="true" />
+              <span>Remove</span>
             </button>
           {/if}
         </div>

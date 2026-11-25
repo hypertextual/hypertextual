@@ -77,16 +77,17 @@
     try {
       await ensureViewerScript(viewerScriptUrl)
       container.innerHTML = ''
+      const hasMultiplePages = (sourceXml.match(/<diagram\b/gi)?.length ?? 0) > 1
       const graphEl = document.createElement('div')
       graphEl.className = 'mxgraph'
       graphEl.style.maxWidth = '100%'
       graphEl.setAttribute(
         'data-mxgraph',
         JSON.stringify({
-          highlight: '#0000ff',
           nav: true,
           resize: true,
-          toolbar: 'pages layers',
+          center: true,
+          ...(hasMultiplePages ? { toolbar: 'pages' } : {}),
           'dark-mode': 'auto',
           xml: sourceXml,
         }),
@@ -134,6 +135,7 @@
   bind:panY
   {tabindex}
   {ariaLabel}
+  canvasClass="w-full"
   {onviewportchange}
   {onfocus}
   {onkeydown}
@@ -142,7 +144,11 @@
   class={className}
 >
   <div class={fileViewerStyles.xmlContainer}>
-    <div bind:this={hostEl} data-drawio-xml-host=""></div>
+    <div
+      bind:this={hostEl}
+      data-drawio-xml-host=""
+      class="inline-block min-h-[1px] min-w-[1px] max-w-full select-none"
+    ></div>
     {#if loading}
       <span class="text-xs text-muted-foreground">Rendering Draw.io diagram…</span>
     {:else if error}

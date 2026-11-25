@@ -409,19 +409,21 @@
       xml={xmlSource}
       {alt}
       {mode}
+      externalAppLabel="Open"
+      replaceLabel="Replace diagram"
+      removeLabel="Remove diagram"
       bind:fullscreen={isFullscreen}
       bind:scale
       bind:panX
       bind:panY
       onopenexternal={editor.services.openExternal ? handleOpenExternal : undefined}
-      onrefresh={editor.services.media ? handleRefresh : undefined}
       onreplace={handleReplace}
       onremove={deleteNode}
       onviewportchange={syncDatasetState}
       class="my-0"
     />
 
-    {#if editable || caption || subtextRange}
+    {#if editable || caption.length > 0}
       <figcaption class="mt-2">
         {#if editable}
           <input

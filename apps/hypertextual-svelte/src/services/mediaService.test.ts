@@ -45,14 +45,16 @@ describe('When resolving workspace media', () => {
   it('retains origins for uploaded media before its first save and after an article rename', async () => {
     // Given
     let bytes: number[] = []
+    let uploadedName: string | undefined
     const media = new MediaService({
       readFileAsset: async () => {
         throw new Error('No read expected')
       },
-      importFileAsset: async (articlePath, uploaded) => {
+      importFileAsset: async (articlePath, uploaded, filename) => {
         expect(articlePath).toBe('Before.md')
         bytes = uploaded
-        return { source: '.images/new.png', url: 'data:image/png;base64,bmV3' }
+        uploadedName = filename
+        return { source: '.media/new.png', url: 'data:image/png;base64,bmV3' }
       },
     })
     // When
@@ -61,7 +63,8 @@ describe('When resolving workspace media', () => {
     media.relocateArticle('After.md', 'After.md')
     // Then
     expect(bytes).toEqual([110, 101, 119])
-    expect(media.portableSource('After.md', uploaded.url)).toBe('.images/new.png')
+    expect(uploadedName).toBe('new.png')
+    expect(media.portableSource('After.md', uploaded.url)).toBe('.media/new.png')
     expect(media.portableSource('Before.md', uploaded.url)).toBe(uploaded.url)
     media.dispose()
     expect(media.portableSource('After.md', uploaded.url)).toBe(uploaded.url)

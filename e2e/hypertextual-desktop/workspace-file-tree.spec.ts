@@ -558,19 +558,26 @@ test.describe(
       await expect(page.getByRole('treeitem', { name: 'diagrams', exact: true })).toBeVisible()
     })
 
-    test('hides .media/ by default and toggles visibility via Show Hidden Files across reloads', async ({
+    test('hides .media/ by default and toggles visibility via Show Hidden Files across reloads and runtime creations', async ({
       page,
+      workspace,
     }) => {
       // Assert default hidden state
       await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
 
-      // Act: toggle Show Hidden Files on via Space t h
+      // Arrange: create a new hidden folder after initial workspace load (simulating upload creating .media/)
+      await mkdir(join(workspace.root, '.media-runtime'), { recursive: true })
+
+      // Act: toggle Show Hidden Files on via Space t h (without reload)
       await page.keyboard.press('Space')
       await page.keyboard.press('t')
       await page.keyboard.press('h')
 
-      // Assert .media appears and persists across reload
+      // Assert both existing and newly created hidden folders appear and persist across reload
       await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toBeVisible()
+      await expect(
+        page.getByRole('treeitem', { name: '.media-runtime', exact: true }),
+      ).toBeVisible()
       await page.reload()
       await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toBeVisible()
 
@@ -588,27 +595,28 @@ test.describe(
       // Arrange: expand diagrams/
       await page.getByRole('treeitem', { name: 'diagrams', exact: true }).click()
 
-      // Act & Assert: .drawio.svg
+      // Act & Assert: .drawio.svg (pure full-pane canvas with no top bar)
       await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
       const viewer = page.locator('[data-file-viewer]')
       await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
       await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
-      await expect(
-        viewer.getByRole('button', { name: 'Open in Draw.io', exact: true }),
-      ).toBeVisible()
+      await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+      await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
       await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-svg')
 
-      // Act: click Open in Draw.io
-      await viewer.getByRole('button', { name: 'Open in Draw.io', exact: true }).click()
-      expect(workspace.openedExternal).toContain('diagrams/arch.drawio.svg')
+      // Act: open externally via WhichKey Space f o
+      await page.keyboard.press('Space')
+      await page.keyboard.press('f')
+      await page.keyboard.press('o')
+      await expect.poll(() => workspace.openedExternal).toContain('diagrams/arch.drawio.svg')
 
-      // Act: modify file on disk and click Refresh
+      // Act: modify file on disk and refocus window -> auto-refreshes preview
       const prevSrc = await viewer.locator('[data-file-viewer-image]').getAttribute('src')
       await writeFile(
         join(workspace.root, 'diagrams/arch.drawio.svg'),
         drawioSvg.replace('Architecture', 'Updated Architecture'),
       )
-      await viewer.getByRole('button', { name: 'Refresh preview', exact: true }).click()
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')))
       await expect
         .poll(() => viewer.locator('[data-file-viewer-image]').getAttribute('src'))
         .not.toBe(prevSrc)
@@ -618,18 +626,23 @@ test.describe(
       await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
       await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
 
-      // Act & Assert: plain .drawio XML
+      // Act & Assert: plain .drawio XML actually renders non-zero SVG via viewer-static.min.js
       await page.locator('[role="treeitem"][data-value="diagrams/flow.drawio"]').click()
       await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-xml')
       await expect(viewer.locator('[data-drawio-xml-viewport]')).toBeVisible()
+      await expect
+        .poll(async () => {
+          const box = await viewer.locator('[data-drawio-xml-host] svg').first().boundingBox()
+          return box ? box.width > 20 && box.height > 20 : false
+        })
+        .toBe(true)
       await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-xml')
 
-      // Act & Assert: standalone .png image
+      // Act & Assert: standalone .png image (pure full-pane canvas with no top bar)
       await page.locator('[role="treeitem"][data-value="diagrams/photo.png"]').click()
       await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'image')
-      await expect(
-        viewer.getByRole('button', { name: 'Open in Default App', exact: true }),
-      ).toBeVisible()
+      await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+      await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
       await captureScreenshot(page, test.info(), 'file-viewer-standalone-image')
     })
   },

@@ -8,9 +8,8 @@ export interface FileViewerToolbarProps {
   externalAppLabel: string
   isFullscreen: boolean
   canOpenExternal: boolean
-  canRefresh: boolean
+  canFullscreen?: boolean
   onopenexternal?: (event: MouseEvent) => void
-  onrefresh?: (event: MouseEvent) => void
   ontogglefullscreen?: (event: MouseEvent) => void
 }
 
@@ -18,9 +17,13 @@ export interface FileViewerProps {
   kind: FileViewerKind
   title: string
   src?: string
+  srcset?: string
+  sizes?: string
   xml?: string
   alt?: string
   externalAppLabel?: string
+  replaceLabel?: string
+  removeLabel?: string
   standalone?: boolean
   mode?: EditorMode
   fullscreen?: boolean
@@ -29,7 +32,6 @@ export interface FileViewerProps {
   panY?: number
   viewerScriptUrl?: string
   onopenexternal?: () => void
-  onrefresh?: () => void
   onreplace?: () => void
   onremove?: () => void
   onviewportchange?: (state: PanZoomViewportState) => void

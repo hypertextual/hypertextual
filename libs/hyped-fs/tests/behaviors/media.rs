@@ -19,12 +19,13 @@ mod tests {
             fixture.write_file("Drafts/Article.md", "# Article");
 
             // When
-            let asset = fixture.media().import("Drafts/Article.md", PNG).unwrap();
+            let asset = fixture
+                .media()
+                .import("Drafts/Article.md", PNG, Some("photo.png"))
+                .unwrap();
 
             // Then
-            assert!(asset.source.starts_with(".media/"));
-            assert!(asset.source.ends_with(".png"));
-            assert!(!asset.source.ends_with(".drawio.png"));
+            assert_eq!(asset.source, ".media/photo.png");
             assert!(asset.url.starts_with("data:image/png;base64,"));
             assert_eq!(
                 fs::read(fixture.root().join("Drafts").join(asset.source)).unwrap(),
@@ -39,16 +40,17 @@ mod tests {
             fixture.write_file("Drafts/Article.md", "# Article");
 
             // When
-            let asset = fixture.media().import("Drafts/Article.md", SVG).unwrap();
+            let asset = fixture
+                .media()
+                .import("Drafts/Article.md", SVG, Some("icon.svg"))
+                .unwrap();
             let reopened = fixture
                 .media()
                 .read("Drafts/Article.md", &asset.source)
                 .unwrap();
 
             // Then
-            assert!(asset.source.starts_with(".media/"));
-            assert!(asset.source.ends_with(".svg"));
-            assert!(!asset.source.ends_with(".drawio.svg"));
+            assert_eq!(asset.source, ".media/icon.svg");
             assert!(asset.url.starts_with("data:image/svg+xml;base64,"));
             assert_eq!(reopened.url, asset.url);
         }
@@ -62,7 +64,7 @@ mod tests {
             // When
             let asset = fixture
                 .media()
-                .import("Drafts/Article.md", DRAWIO_SVG)
+                .import("Drafts/Article.md", DRAWIO_SVG, Some("workflow.drawio.svg"))
                 .unwrap();
             let reopened = fixture
                 .media()
@@ -70,8 +72,7 @@ mod tests {
                 .unwrap();
 
             // Then
-            assert!(asset.source.starts_with(".media/"));
-            assert!(asset.source.ends_with(".drawio.svg"));
+            assert_eq!(asset.source, ".media/workflow.drawio.svg");
             assert!(asset.url.starts_with("data:image/svg+xml;base64,"));
             assert_eq!(reopened.url, asset.url);
         }
@@ -85,7 +86,7 @@ mod tests {
             // When
             let asset = fixture
                 .media()
-                .import("Drafts/Article.md", DRAWIO_PNG)
+                .import("Drafts/Article.md", DRAWIO_PNG, Some("system.drawio.png"))
                 .unwrap();
             let reopened = fixture
                 .media()
@@ -93,8 +94,7 @@ mod tests {
                 .unwrap();
 
             // Then
-            assert!(asset.source.starts_with(".media/"));
-            assert!(asset.source.ends_with(".drawio.png"));
+            assert_eq!(asset.source, ".media/system.drawio.png");
             assert!(asset.url.starts_with("data:image/png;base64,"));
             assert_eq!(reopened.url, asset.url);
         }
@@ -108,7 +108,7 @@ mod tests {
             // When
             let asset = fixture
                 .media()
-                .import("Drafts/Article.md", DRAWIO_XML)
+                .import("Drafts/Article.md", DRAWIO_XML, Some("architecture.drawio"))
                 .unwrap();
             let reopened = fixture
                 .media()
@@ -116,8 +116,7 @@ mod tests {
                 .unwrap();
 
             // Then
-            assert!(asset.source.starts_with(".media/"));
-            assert!(asset.source.ends_with(".drawio"));
+            assert_eq!(asset.source, ".media/architecture.drawio");
             assert!(
                 asset
                     .url
@@ -131,10 +130,16 @@ mod tests {
             // Given
             let fixture = WorkspaceFixture::new();
             fixture.write_file("Article.md", "# Article");
-            let first = fixture.media().import("Article.md", PNG).unwrap();
+            let first = fixture
+                .media()
+                .import("Article.md", PNG, Some("photo.png"))
+                .unwrap();
 
             // When
-            let second = fixture.media().import("Article.md", PNG).unwrap();
+            let second = fixture
+                .media()
+                .import("Article.md", PNG, Some("photo.png"))
+                .unwrap();
 
             // Then
             assert_eq!(first.source, second.source);
@@ -145,13 +150,60 @@ mod tests {
         }
 
         #[test]
+        fn it_numbers_different_assets_with_the_same_filename() {
+            // Given
+            let fixture = WorkspaceFixture::new();
+            fixture.write_file("Article.md", "# Article");
+            let first = fixture
+                .media()
+                .import("Article.md", PNG, Some("photo.png"))
+                .unwrap();
+
+            // When
+            let second = fixture
+                .media()
+                .import(
+                    "Article.md",
+                    b"\x89PNG\r\n\x1a\ndifferent bytes",
+                    Some("photo.png"),
+                )
+                .unwrap();
+
+            // Then
+            assert_eq!(first.source, ".media/photo.png");
+            assert_eq!(second.source, ".media/photo-2.png");
+        }
+
+        #[test]
+        fn it_sanitizes_unsafe_filenames_and_falls_back_when_missing() {
+            // Given
+            let fixture = WorkspaceFixture::new();
+            fixture.write_file("Article.md", "# Article");
+
+            // When
+            let sanitized = fixture
+                .media()
+                .import("Article.md", PNG, Some("../../evil:name?.png"))
+                .unwrap();
+            let unnamed = fixture.media().import("Article.md", PNG, None).unwrap();
+
+            // Then
+            assert_eq!(sanitized.source, ".media/evil-name.png");
+            assert!(unnamed.source.starts_with(".media/asset-"));
+            assert!(unnamed.source.ends_with(".png"));
+            assert!(unnamed.source.len() < 30);
+        }
+
+        #[test]
         fn it_rejects_bytes_that_are_not_a_supported_file_asset() {
             // Given
             let fixture = WorkspaceFixture::new();
             fixture.write_file("Article.md", "# Article");
 
             // When
-            let result = fixture.media().import("Article.md", b"not an image");
+            let result = fixture
+                .media()
+                .import("Article.md", b"not an image", Some("bad.bin"));
 
             // Then
             assert_eq!(result.err().unwrap().code, "unsupported");
@@ -166,7 +218,10 @@ mod tests {
                 // Given
                 let fixture = WorkspaceFixture::new();
                 fixture.write_file("Drafts/Article.md", "# Article");
-                let asset = fixture.media().import("Drafts/Article.md", PNG).unwrap();
+                let asset = fixture
+                    .media()
+                    .import("Drafts/Article.md", PNG, Some("photo.png"))
+                    .unwrap();
 
                 // When
                 fixture

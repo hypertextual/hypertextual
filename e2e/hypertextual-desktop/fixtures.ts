@@ -24,6 +24,7 @@ interface CommandArgs {
   relativePath?: string
   articlePath?: string
   bytes?: number[]
+  filename?: string
   source?: string
   content?: string
   title?: string
@@ -229,9 +230,29 @@ export const test = base.extend<{ workspace: Workspace; initialWorkspace: 'empty
               const parent = args.articlePath!.includes('/')
                 ? args.articlePath!.slice(0, args.articlePath!.lastIndexOf('/'))
                 : ''
-              const source = `.media/${revision(bytes.toString('base64'))}.${ext}`
+              const rawBase = (args.filename ?? '').split(/[/\\]/).pop()?.trim() ?? ''
+              const stripped = rawBase
+                .replace(/\.(drawio\.(svg|png)|drawio|png|jpe?g|gif|webp|svg)$/i, '')
+                .replace(/[<>:"/\\|?*]+/g, '-')
+                .replace(/^[.\-\s]+|[.\-\s]+$/g, '')
+              const stem = stripped || `asset-${revision(bytes.toString('base64')).slice(0, 8)}`
               await mkdir(location(parent, '.media'), { recursive: true })
-              await writeFile(location(parent, source), bytes)
+              let source = `.media/${stem}.${ext}`
+              for (let counter = 1; counter <= 1000; counter++) {
+                const candidate =
+                  counter === 1 ? `.media/${stem}.${ext}` : `.media/${stem}-${counter}.${ext}`
+                const target = location(parent, candidate)
+                const existing = await readFile(target).catch(() => null)
+                if (!existing) {
+                  await writeFile(target, bytes)
+                  source = candidate
+                  break
+                }
+                if (existing.equals(bytes)) {
+                  source = candidate
+                  break
+                }
+              }
               return { source, url: `data:${mime};base64,${bytes.toString('base64')}` }
             }
             if (command === 'workspace_read_file_asset' || command === 'workspace_read_image') {

@@ -16,7 +16,7 @@ export const windowInplaceVariants = cva(
   {
     variants: {
       fullscreen: {
-        true: 'fixed z-40 m-0 rounded-none border-0 shadow-lg outline-none',
+        true: 'fixed inset-0 z-40 m-0 rounded-none border-0 shadow-lg outline-none',
         false: '',
       },
     },

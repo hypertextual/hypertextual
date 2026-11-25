@@ -1349,11 +1349,18 @@ test.describe(
       const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
       const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
 
-      // Navigate onto the drawio block in normal mode (j from title -> intro -> drawio)
+      // Navigate onto the drawio preview in normal mode (j from title -> intro -> drawio preview)
       await page.keyboard.press('j')
       await page.keyboard.press('j')
       await expect(drawioNode.locator('[data-drawio-caption-text]')).toHaveText('System overview')
+      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
       await captureScreenshot(page, test.info(), 'drawio-block-normal')
+
+      // Second j moves modal cursor onto the caption; k returns to the preview
+      await page.keyboard.press('j')
+      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(1)
+      await page.keyboard.press('k')
+      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
 
       // Pan/zoom and fullscreen in normal mode
       await page.keyboard.press('+')
@@ -1365,23 +1372,24 @@ test.describe(
       await page.keyboard.press('Escape')
       await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'false')
 
-      // Enter insert mode -> centered prominent Open in Draw.io CTA + Replace + Remove + caption
+      // Enter insert mode -> centered uniform Replace / Open / Remove controls + caption
       await page.keyboard.press('i')
       await expect(badge).toHaveText('helix · insert')
-      const cta = drawioNode.locator('[data-drawio-cta]')
-      await expect(cta).toBeVisible()
-      await expect(cta).toBeFocused()
+      const replaceBtn = drawioNode.getByRole('button', { name: 'Replace diagram', exact: true })
+      const openBtn = drawioNode.locator('[data-drawio-cta]')
+      await expect(replaceBtn).toBeFocused()
+      await expect(openBtn).toBeVisible()
+      await expect(drawioNode.locator('[data-file-viewer-fullscreen]')).toBeVisible()
       await captureScreenshot(page, test.info(), 'drawio-block-insert-cta')
 
-      // Pressing Enter on focused CTA invokes openExternal
+      // Tab cycles Replace -> Open -> Remove -> caption input
+      await page.keyboard.press('Tab')
+      await expect(openBtn).toBeFocused()
+
+      // Pressing Enter on focused Open button invokes openExternal
       await page.keyboard.press('Enter')
       expect(workspace.openedExternal).toContain('Drafts/.media/arch.drawio.svg')
 
-      // Tab cycles CTA -> Replace -> Remove -> caption input
-      await page.keyboard.press('Tab')
-      await expect(
-        drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }),
-      ).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(
         drawioNode.getByRole('button', { name: 'Remove diagram', exact: true }),

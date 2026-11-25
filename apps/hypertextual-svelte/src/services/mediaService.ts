@@ -67,6 +67,7 @@ export class MediaService {
     const asset = await this.client.importFileAsset(
       articlePath,
       Array.from(new Uint8Array(await file.arrayBuffer())),
+      file.name || undefined,
     )
     const display = asset.url.startsWith('data:')
       ? { ...asset, url: URL.createObjectURL(await (await fetch(asset.url)).blob()) }

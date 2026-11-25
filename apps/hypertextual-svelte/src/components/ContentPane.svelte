@@ -50,7 +50,6 @@
         src={editor.filePreview.src}
         xml={editor.filePreview.xml}
         onopenexternal={() => void editor.openInDefaultApp()}
-        onrefresh={() => void editor.refreshPreview()}
       />
     {/key}
   {:else if !editor.loading && !editor.openingError && !editor.unsupported && editor.document?.content && editor.selected}

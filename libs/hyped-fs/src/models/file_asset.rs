@@ -22,10 +22,79 @@ impl FileAsset {
         })
     }
 
-    /// Derives a content-addressed filename from its bytes and detected format.
-    pub fn filename(bytes: &[u8]) -> Result<String> {
+    /// Derives a sanitized filename from an optional original name and detected format.
+    pub fn filename_for(original_name: Option<&str>, bytes: &[u8]) -> Result<String> {
+        let (stem, extension) = Self::filename_parts(original_name, bytes)?;
+        Ok(format!("{stem}.{extension}"))
+    }
+
+    /// Derives a sanitized `(stem, canonical_extension)` pair from an optional original name and bytes.
+    pub fn filename_parts(
+        original_name: Option<&str>,
+        bytes: &[u8],
+    ) -> Result<(String, &'static str)> {
         let (_, extension) = Self::media_type(bytes)?;
-        Ok(format!("{:x}.{extension}", Sha256::digest(bytes)))
+        let stem = original_name
+            .and_then(Self::sanitize_stem)
+            .unwrap_or_else(|| {
+                let hash = format!("{:x}", Sha256::digest(bytes));
+                format!("asset-{}", &hash[..8])
+            });
+        Ok((stem, extension))
+    }
+
+    /// Derives a fallback filename from its bytes and detected format.
+    pub fn filename(bytes: &[u8]) -> Result<String> {
+        Self::filename_for(None, bytes)
+    }
+
+    /// Extracts and sanitizes a human-readable filename stem without known media extensions.
+    fn sanitize_stem(raw: &str) -> Option<String> {
+        let basename = raw.rsplit(['/', '\\']).next().unwrap_or("").trim();
+        if basename.is_empty() {
+            return None;
+        }
+        let lower = basename.to_ascii_lowercase();
+        let stripped = [
+            ".drawio.svg",
+            ".drawio.png",
+            ".drawio",
+            ".jpeg",
+            ".webp",
+            ".png",
+            ".jpg",
+            ".gif",
+            ".svg",
+        ]
+        .iter()
+        .find_map(|ext| {
+            lower
+                .ends_with(ext)
+                .then(|| &basename[..basename.len() - ext.len()])
+        })
+        .unwrap_or(basename);
+
+        let mut cleaned = String::with_capacity(stripped.len());
+        let mut last_sep = false;
+        for ch in stripped.chars() {
+            let forbidden = matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+                || ch.is_control();
+            let mapped = if forbidden { '-' } else { ch };
+            if mapped == '-' || mapped.is_whitespace() {
+                if !last_sep {
+                    cleaned.push(if mapped == '-' { '-' } else { ' ' });
+                    last_sep = true;
+                }
+            } else {
+                cleaned.push(mapped);
+                last_sep = false;
+            }
+        }
+        let trimmed = cleaned.trim_matches(|c: char| c == '.' || c == '-' || c.is_whitespace());
+        if trimmed.is_empty() {
+            return None;
+        }
+        Some(trimmed.chars().take(120).collect())
     }
 
     /// Identifies a supported file asset format from its header or XML markup.
