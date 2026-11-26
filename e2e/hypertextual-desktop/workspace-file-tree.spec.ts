@@ -1,7 +1,13 @@
 import type { Page } from '@playwright/test'
-import { test, expect, edit, createArticle } from './fixtures'
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { test, expect, edit, createArticle, png, captureScreenshot } from './fixtures'
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
+const drawioSvg =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80" content="&lt;mxfile&gt;&lt;diagram id=&quot;1&quot;&gt;&lt;mxGraphModel/&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><rect width="160" height="80" fill="#e2e8f0"/><text x="16" y="46" font-size="14">Architecture</text></svg>'
+const drawioPng = Buffer.concat([png, Buffer.from('tEXtmxfile\0<mxfile/>')])
+const drawioXml =
+  '<mxfile host="Electron"><diagram id="d1" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="Client" style="rounded=1;" vertex="1" parent="1"><mxGeometry x="20" y="20" width="100" height="40" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>'
 
 // Tests -----------------------------------------------------------------------
 test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-tree'] }, () => {
@@ -535,3 +541,137 @@ async function exists(path: string) {
     },
   )
 }
+
+test.describe(
+  'Given a workspace with hidden .media/ and visible diagrams/ files',
+  { tag: ['@desktop', '@file-tree', '@drawio'] },
+  () => {
+    test.beforeEach(async ({ page, workspace }) => {
+      await mkdir(join(workspace.root, '.media'), { recursive: true })
+      await writeFile(join(workspace.root, '.media/hidden.drawio.svg'), drawioSvg)
+      await mkdir(join(workspace.root, 'diagrams'), { recursive: true })
+      await writeFile(join(workspace.root, 'diagrams/arch.drawio.svg'), drawioSvg)
+      await writeFile(join(workspace.root, 'diagrams/system.drawio.png'), drawioPng)
+      await writeFile(join(workspace.root, 'diagrams/flow.drawio'), drawioXml)
+      await writeFile(join(workspace.root, 'diagrams/photo.png'), png)
+      await page.reload()
+      await expect(page.getByRole('treeitem', { name: 'diagrams', exact: true })).toBeVisible()
+    })
+
+    test('hides .media/ by default and toggles visibility via Show Hidden Files across reloads and runtime creations', async ({
+      page,
+      workspace,
+    }) => {
+      // Assert default hidden state
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
+
+      // Arrange: create a new hidden folder after initial workspace load (simulating upload creating .media/)
+      await mkdir(join(workspace.root, '.media-runtime'), { recursive: true })
+
+      // Act: toggle Show Hidden Files on via Space t h (without reload)
+      await page.keyboard.press('Space')
+      await page.keyboard.press('t')
+      await page.keyboard.press('h')
+
+      // Assert both existing and newly created hidden folders appear and persist across reload
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toBeVisible()
+      await expect(
+        page.getByRole('treeitem', { name: '.media-runtime', exact: true }),
+      ).toBeVisible()
+      await page.reload()
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toBeVisible()
+
+      // Act: toggle off again
+      await page.keyboard.press('Space')
+      await page.keyboard.press('t')
+      await page.keyboard.press('h')
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
+    })
+
+    test.describe('When opening standalone files from diagrams/', () => {
+      test.beforeEach(async ({ page }) => {
+        await page.getByRole('treeitem', { name: 'diagrams', exact: true }).click()
+      })
+
+      test('it renders .drawio.svg full-pane without a top bar', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
+        await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
+        await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-svg')
+      })
+
+      test('it opens externally via Space f o and auto-refreshes on window focus', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
+        const viewer = page.locator('[data-file-viewer]')
+        const prevSrc = await viewer.locator('[data-file-viewer-image]').getAttribute('src')
+
+        // Act: open externally via WhichKey Space f o
+        await page.keyboard.press('Space')
+        await page.keyboard.press('f')
+        await page.keyboard.press('o')
+        await expect.poll(() => workspace.openedExternal).toContain('diagrams/arch.drawio.svg')
+
+        // Act: modify file on disk and refocus window
+        await writeFile(
+          join(workspace.root, 'diagrams/arch.drawio.svg'),
+          drawioSvg.replace('Architecture', 'Updated Architecture'),
+        )
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+
+        // Assert
+        await expect
+          .poll(() => viewer.locator('[data-file-viewer-image]').getAttribute('src'))
+          .not.toBe(prevSrc)
+      })
+
+      test('it renders .drawio.png full-pane', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/system.drawio.png"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
+        await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
+      })
+
+      test('it renders plain .drawio XML offline as a non-zero SVG', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/flow.drawio"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-xml')
+        await expect(viewer.locator('[data-drawio-xml-viewport]')).toBeVisible()
+        await expect
+          .poll(async () => {
+            const box = await viewer.locator('[data-drawio-xml-host] svg').first().boundingBox()
+            return box ? box.width > 20 && box.height > 20 : false
+          })
+          .toBe(true)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-xml')
+      })
+
+      test('it renders standalone .png images full-pane without a top bar', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/photo.png"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'image')
+        await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-image')
+      })
+    })
+  },
+)

@@ -1,14 +1,14 @@
 import type { EditorMediaService } from 'core-ts'
-import type { ImageAsset, WorkspaceClient } from '../clients/workspaceClient'
+import type { FileAsset, WorkspaceClient } from '../clients/workspaceClient'
 
-/** Resolve media within one workspace window and retain portable asset origins. */
+/** Resolve file assets within one workspace window and retain portable asset origins. */
 export class MediaService {
   // Origin records let newly uploaded display URLs be restored before their first save.
   // The workspace window owns this service and clears the records when it closes.
-  private assets = new Map<string, { articlePath: string; asset: ImageAsset }>()
+  private assets = new Map<string, { articlePath: string; asset: FileAsset }>()
 
   constructor(
-    private client: Pick<WorkspaceClient, 'readImage' | 'importImage'>,
+    private client: Pick<WorkspaceClient, 'readFileAsset' | 'importFileAsset'>,
     private fetchImage: (url: string) => Promise<Response> = fetch,
   ) {}
 
@@ -24,18 +24,18 @@ export class MediaService {
     }
   }
 
-  async get(articlePath: string, source: string): Promise<ImageAsset> {
-    let asset: ImageAsset
+  async get(articlePath: string, source: string): Promise<FileAsset> {
+    let asset: FileAsset
     if (/^https?:/i.test(source)) {
       const response = await this.fetchImage(source)
       if (!response.ok) throw new Error(`Could not load image: HTTP ${response.status}.`)
       const mime = response.headers.get('content-type')?.split(';')[0] ?? ''
       if (!mime.startsWith('image/')) throw new Error('The remote URL did not return an image.')
       asset = { source, url: URL.createObjectURL(await response.blob()) }
-    } else if (/^(data:image\/|blob:)/i.test(source)) {
+    } else if (/^(data:(?:image\/|application\/vnd\.jgraph\.mxfile)|blob:)/i.test(source)) {
       asset = { source, url: source }
     } else {
-      asset = await this.client.readImage(articlePath, source)
+      asset = await this.client.readFileAsset(articlePath, source)
       if (asset.url.startsWith('data:'))
         asset = { ...asset, url: URL.createObjectURL(await (await fetch(asset.url)).blob()) }
     }
@@ -43,7 +43,19 @@ export class MediaService {
     return asset
   }
 
-  async batchGet(articlePath: string, sources: readonly string[]): Promise<ImageAsset[]> {
+  async reload(articlePath: string, source: string): Promise<FileAsset> {
+    for (const [key, entry] of this.assets) {
+      if (entry.articlePath === articlePath && entry.asset.source === source) {
+        if (entry.asset.url.startsWith('blob:') && entry.asset.url !== entry.asset.source) {
+          URL.revokeObjectURL(entry.asset.url)
+        }
+        this.assets.delete(key)
+      }
+    }
+    return this.get(articlePath, source)
+  }
+
+  async batchGet(articlePath: string, sources: readonly string[]): Promise<FileAsset[]> {
     const results = await Promise.allSettled(
       [...new Set(sources)].map((source) => this.get(articlePath, source)),
     )
@@ -51,10 +63,11 @@ export class MediaService {
     return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
   }
 
-  async upload(articlePath: string, file: File): Promise<ImageAsset> {
-    const asset = await this.client.importImage(
+  async upload(articlePath: string, file: File): Promise<FileAsset> {
+    const asset = await this.client.importFileAsset(
       articlePath,
       Array.from(new Uint8Array(await file.arrayBuffer())),
+      file.name || undefined,
     )
     const display = asset.url.startsWith('data:')
       ? { ...asset, url: URL.createObjectURL(await (await fetch(asset.url)).blob()) }
@@ -89,7 +102,7 @@ export class MediaService {
     this.assets.clear()
   }
 
-  private remember(articlePath: string, asset: ImageAsset) {
+  private remember(articlePath: string, asset: FileAsset) {
     this.assets.set(`${articlePath}\0${asset.url}`, { articlePath, asset })
   }
 }

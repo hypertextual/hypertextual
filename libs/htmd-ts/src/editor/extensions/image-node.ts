@@ -1,6 +1,5 @@
 import type { Keymap } from 'core-ts'
-import type { Editor as TiptapEditor } from '@tiptap/core'
-import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
   createAtomNodeNavigation,
@@ -16,7 +15,6 @@ import {
   type HtmdCommandContext,
 } from '../define-htmd-extension.js'
 import type { HtmdNodeViewFactory } from '../types.js'
-import { isEditorInInsertMode } from './modal-editing.js'
 
 // types ---------------------------------------------------------------------
 
@@ -60,11 +58,12 @@ export const ImageNode = defineHtmdExtension<
   navigation: () =>
     createAtomNodeNavigation({
       controls: [
-        'input.caption-input, input[aria-label="Image caption"]',
         'button[aria-label="Replace image"]',
+        'button[data-file-viewer-open]',
         'button[aria-label="Remove image"]',
+        'input.caption-input, input[aria-label="Image caption"]',
       ],
-      defaultControl: 'caption',
+      defaultControl: 'replace',
       subtext: {
         kind: 'imageCaption',
         attr: 'caption',
@@ -87,6 +86,22 @@ export const ImageNode = defineHtmdExtension<
         }),
   }),
   keymap: () => ({
+    'Mod-Enter': {
+      id: 'image.toggleFullscreenModEnter',
+      key: 'Mod+Enter',
+      label: 'Toggle Image Fullscreen',
+      mode: ['normal', 'select', 'insert'],
+      when: whenImageActiveOrSelected,
+      run: handleToggleFullscreen,
+    },
+    f: {
+      id: 'image.toggleFullscreenNormal',
+      key: 'f',
+      label: 'Toggle Image Fullscreen',
+      mode: 'normal',
+      when: whenImageSelectedInNormal,
+      run: handleToggleFullscreen,
+    },
     Tab: {
       id: 'image.tabNext',
       key: 'Tab',
@@ -128,79 +143,12 @@ export const ImageNode = defineHtmdExtension<
       run: handleEnter,
     },
   }),
-  pmPlugins({ editor }) {
-    return [createImageCaptionFocusPlugin(editor), createImageBackspacePlugin()]
+  pmPlugins() {
+    return [createImageBackspacePlugin()]
   },
 })
 
 // pm ------------------------------------------------------------------------
-
-function createImageCaptionFocusPlugin(editor: TiptapEditor): Plugin {
-  let arrowKeyPressed = false
-
-  return new Plugin({
-    key: new PluginKey('imageNodeCaptionFocus'),
-    props: {
-      handleKeyDown(_view, event) {
-        if (!isEditorInInsertMode(editor)) {
-          arrowKeyPressed = false
-          return false
-        }
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-          arrowKeyPressed = true
-        }
-        return false
-      },
-    },
-    view() {
-      return {
-        update(view, prevState) {
-          if (!isEditorInInsertMode(editor)) {
-            arrowKeyPressed = false
-            return
-          }
-          const { selection } = view.state
-          const { selection: prevSelection } = prevState
-
-          const movedOntoImage =
-            arrowKeyPressed &&
-            selection instanceof NodeSelection &&
-            selection.node.type.name === 'imageNode' &&
-            !(prevSelection instanceof NodeSelection && prevSelection.from === selection.from)
-
-          arrowKeyPressed = false
-
-          if (movedOntoImage) {
-            const pos = selection.from
-            const nodeSize = selection.node.nodeSize
-            const dom = view.nodeDOM(pos)
-            const input = dom
-              ? ((dom as HTMLElement).querySelector('.caption-input') as HTMLInputElement | null)
-              : null
-
-            if (input) {
-              const modalStorage = (
-                editor.storage as
-                  { modalKeymap?: { activeCompoundBlockPos: number | null } } | undefined
-              )?.modalKeymap
-              if (modalStorage) modalStorage.activeCompoundBlockPos = pos
-              const { tr, doc } = view.state
-              const $after = doc.resolve(Math.min(pos + nodeSize, doc.content.size))
-              view.dispatch(tr.setSelection(TextSelection.near($after)))
-              input.focus({ preventScroll: true })
-              setTimeout(() => {
-                const rect = input.getBoundingClientRect()
-                if (rect.bottom > window.innerHeight || rect.top < 0) {
-                  input.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-                }
-              }, 0)
-            }
-          }
-        },
-      }
-    },
-  })
-}
 
 function createImageBackspacePlugin(): Plugin {
   return new Plugin({
@@ -266,6 +214,38 @@ function createImageBackspacePlugin(): Plugin {
 
 // helpers -------------------------------------------------------------------
 
+function findActiveImagePos(ctx: HtmdCommandContext, event?: KeyboardEvent): number | null {
+  const { state } = ctx
+  if (event) {
+    const ctrl = findNodeViewControl(state, event, 'imageNode')
+    if (ctrl) return ctrl.pos
+  }
+  const { selection } = state
+  if (selection instanceof NodeSelection && selection.node.type.name === 'imageNode') {
+    return selection.from
+  }
+  return null
+}
+
+function whenImageActiveOrSelected(ctx: HtmdCommandContext, event: KeyboardEvent): boolean {
+  return findActiveImagePos(ctx, event) !== null
+}
+
+function whenImageSelectedInNormal(ctx: HtmdCommandContext, event: KeyboardEvent): boolean {
+  if (ctx.editor.isEditable) return false
+  return findActiveImagePos(ctx, event) !== null
+}
+
+function handleToggleFullscreen(ctx: HtmdCommandContext, event: KeyboardEvent): boolean {
+  const pos = findActiveImagePos(ctx, event)
+  if (pos === null) return false
+  const dom = ctx.view.nodeDOM(pos)
+  if (dom instanceof HTMLElement && typeof CustomEvent !== 'undefined') {
+    dom.dispatchEvent(new CustomEvent('htmd:image-fullscreen', { bubbles: true }))
+  }
+  return true
+}
+
 function whenImageControlFocused({ state }: HtmdCommandContext, event: KeyboardEvent): boolean {
   return Boolean(findNodeViewControl(state, event, 'imageNode'))
 }
@@ -285,28 +265,31 @@ function whenImageCaptionEnter({ state }: HtmdCommandContext, event: KeyboardEve
   )
 }
 
+function getFocusableImageControls(wrapper: HTMLElement): HTMLElement[] {
+  const selectors = [
+    'button[aria-label="Replace image"]',
+    'button[data-file-viewer-open]',
+    'button[aria-label="Remove image"]',
+    'input[aria-label="Image caption"]',
+  ]
+  const controls: HTMLElement[] = []
+  for (const selector of selectors) {
+    const el = wrapper.querySelector<HTMLElement>(selector)
+    if (el) controls.push(el)
+  }
+  return controls
+}
+
 function handleTab({ state }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'imageNode')
   if (!ctrl) return false
-  const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
-    'input[aria-label="Image caption"]',
-  )
-  const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
-    'button[aria-label="Replace image"]',
-  )
-  const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
-    'button[aria-label="Remove image"]',
-  )
-  if (ctrl.target === captionInput && replaceBtn) {
-    replaceBtn.focus()
-    return true
-  }
-  if (ctrl.target.closest('button[aria-label="Replace image"]') && removeBtn) {
-    removeBtn.focus()
-    return true
-  }
-  if (ctrl.target.closest('button[aria-label="Remove image"]') && captionInput) {
-    captionInput.focus()
+  const controls = getFocusableImageControls(ctrl.wrapper)
+  if (controls.length === 0) return false
+  const current = controls.find((el) => el === ctrl.target || el.contains(ctrl.target))
+  const idx = current ? controls.indexOf(current) : -1
+  const next = controls[(idx + 1) % controls.length]
+  if (next) {
+    next.focus()
     return true
   }
   return false
@@ -315,25 +298,13 @@ function handleTab({ state }: HtmdCommandContext, event: KeyboardEvent): boolean
 function handleShiftTab({ state }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'imageNode')
   if (!ctrl) return false
-  const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
-    'input[aria-label="Image caption"]',
-  )
-  const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
-    'button[aria-label="Replace image"]',
-  )
-  const removeBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
-    'button[aria-label="Remove image"]',
-  )
-  if (ctrl.target === captionInput && removeBtn) {
-    removeBtn.focus()
-    return true
-  }
-  if (ctrl.target.closest('button[aria-label="Replace image"]') && captionInput) {
-    captionInput.focus()
-    return true
-  }
-  if (ctrl.target.closest('button[aria-label="Remove image"]') && replaceBtn) {
-    replaceBtn.focus()
+  const controls = getFocusableImageControls(ctrl.wrapper)
+  if (controls.length === 0) return false
+  const current = controls.find((el) => el === ctrl.target || el.contains(ctrl.target))
+  const idx = current ? controls.indexOf(current) : 0
+  const prev = controls[(idx - 1 + controls.length) % controls.length]
+  if (prev) {
+    prev.focus()
     return true
   }
   return false
@@ -352,16 +323,11 @@ function handleArrowDown(
       captionInput.blur()
       return focusAfterBlock(editor, ctrl.pos + ctrl.node.nodeSize)
     }
-    if (
-      ctrl.target.closest(
-        'button[aria-label="Replace image"], button[aria-label="Remove image"]',
-      ) &&
-      captionInput
-    ) {
+    if (captionInput) {
       captionInput.focus()
       return true
     }
-    return false
+    return focusAfterBlock(editor, ctrl.pos + ctrl.node.nodeSize)
   }
   if (!isAtLastVisualLine(view, state)) return false
   const nextPos = findNextBlockPos(state)
@@ -374,14 +340,18 @@ function handleArrowDown(
 function handleArrowUp({ editor, state, view }: HtmdCommandContext, event: KeyboardEvent): boolean {
   const ctrl = findNodeViewControl(state, event, 'imageNode')
   if (ctrl) {
-    if (
-      ctrl.target.matches('input[aria-label="Image caption"]') ||
-      ctrl.target.closest('button[aria-label="Replace image"], button[aria-label="Remove image"]')
-    ) {
-      ctrl.target.blur()
-      return focusBeforeBlock(editor, ctrl.pos)
+    const captionInput = ctrl.wrapper.querySelector<HTMLInputElement>(
+      'input[aria-label="Image caption"]',
+    )
+    const replaceBtn = ctrl.wrapper.querySelector<HTMLButtonElement>(
+      'button[aria-label="Replace image"]',
+    )
+    if (ctrl.target === captionInput && replaceBtn) {
+      replaceBtn.focus()
+      return true
     }
-    return false
+    ctrl.target.blur()
+    return focusBeforeBlock(editor, ctrl.pos)
   }
   if (!isAtFirstVisualLine(view, state)) return false
   const prevPos = findPrevBlockPos(state)

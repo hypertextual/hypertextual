@@ -137,6 +137,7 @@ export type NodeViewRenderer<TEditor = unknown> = HtmdNodeViewFactory<TEditor>
 
 export interface HtmdNodeViews<TEditor = unknown> {
   image?: HtmdNodeViewFactory<TEditor>
+  drawio?: HtmdNodeViewFactory<TEditor>
   urlMention?: HtmdNodeViewFactory<TEditor>
   linkPreview?: HtmdNodeViewFactory<TEditor>
   codeBlock?: HtmdNodeViewFactory<TEditor>

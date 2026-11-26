@@ -14,7 +14,7 @@ export interface ArticleMetadata {
   name: string
   revision: string
 }
-export interface ImageAsset {
+export interface FileAsset {
   source: string
   url: string
 }
@@ -25,8 +25,8 @@ export interface WorkspaceClient {
     revision: string,
     title: string,
   ): Promise<ArticleMetadata>
-  importImage(path: string, bytes: number[]): Promise<ImageAsset>
-  readImage(path: string, source: string): Promise<ImageAsset>
+  importFileAsset(path: string, bytes: number[], filename?: string): Promise<FileAsset>
+  readFileAsset(path: string, source: string): Promise<FileAsset>
   open(): Promise<{ root: string; entries: WorkspaceNode[] }>
   list(path: string): Promise<WorkspaceNode[]>
   create(): Promise<WorkspaceNode>
@@ -41,8 +41,10 @@ export interface WorkspaceClient {
 export const workspaceClient: WorkspaceClient = {
   saveArticle: (relativePath, content, expectedRevision, title) =>
     invoke('workspace_save_article', { relativePath, content, expectedRevision, title }),
-  importImage: (articlePath, bytes) => invoke('workspace_import_image', { articlePath, bytes }),
-  readImage: (articlePath, source) => invoke('workspace_read_image', { articlePath, source }),
+  importFileAsset: (articlePath, bytes, filename) =>
+    invoke('workspace_import_file_asset', { articlePath, bytes, filename }),
+  readFileAsset: (articlePath, source) =>
+    invoke('workspace_read_file_asset', { articlePath, source }),
   open: () => {
     if (!isTauri())
       return Promise.reject(

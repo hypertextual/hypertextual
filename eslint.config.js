@@ -15,6 +15,7 @@ export default tseslint.config(
       '**/test-results/**',
       '**/playwright-report/**',
       '**/routeTree.gen.ts',
+      '**/public/vendor/**',
     ],
   },
   eslint.configs.recommended,

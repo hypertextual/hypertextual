@@ -1469,4 +1469,36 @@ describe('When handling url-mention', () => {
       })
     }
   })
+
+  describe('When handling Draw.io diagram blocks', () => {
+    for (const [source, attrs] of [
+      [
+        '![Architecture](.media/arch.drawio.svg)',
+        { src: '.media/arch.drawio.svg', alt: 'Architecture', caption: '' },
+      ],
+      [
+        '![System](.media/system.drawio.png "System overview")',
+        { src: '.media/system.drawio.png', alt: 'System', caption: 'System overview' },
+      ],
+      [
+        '![Flow](diagrams/flow.drawio "Request flow")',
+        { src: 'diagrams/flow.drawio', alt: 'Flow', caption: 'Request flow' },
+      ],
+    ] as const) {
+      it(`round-trips drawio block ${source}`, () => {
+        // Given
+        const expected = {
+          type: 'doc',
+          content: [{ type: 'drawio', attrs }],
+        }
+        // When
+        const result = parse(source)
+        const serialized = serialize(result.content)
+        // Then
+        expect(result).toEqual({ content: expected, issues: [] })
+        expect(serialized).toBe(`${source}\n`)
+        expect(parse(serialized)).toEqual({ content: expected, issues: [] })
+      })
+    }
+  })
 })

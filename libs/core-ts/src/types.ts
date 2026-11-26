@@ -138,6 +138,7 @@ export interface EditorHostServices {
   notifications?: EditorNotificationService
   media?: EditorMediaService
   embedRegistry?: EmbeddedEditorRegistry
+  openExternal?: (source: string) => Promise<void>
 }
 
 export interface Editor<

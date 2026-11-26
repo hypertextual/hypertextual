@@ -126,7 +126,7 @@ test.describe(
       await page.locator('[role="treeitem"][data-value$="titled-link.md"]').click()
       await expect(page.locator('.ProseMirror a')).toHaveAttribute('title', 'Preserve this title')
       await page.locator('[role="treeitem"][data-value$="image.png"]').click()
-      await expect(page.locator('.image-preview img')).toBeVisible()
+      await expect(page.locator('[data-file-viewer-image]')).toBeVisible()
       await page.locator('[role="treeitem"][data-value$="manual.pdf"]').click()
       await expect(page.getByRole('heading', { name: 'Unsupported file type' })).toBeVisible()
       await page.getByRole('button', { name: 'Open In Default App' }).click()
@@ -328,9 +328,9 @@ test.describe(
       await expect(page.locator('.ProseMirror img')).toBeVisible()
       await expect
         .poll(() => readFile(join(workspace.root, 'Drafts/one.md'), 'utf8'))
-        .toContain('.images/')
+        .toContain('.media/')
       expect(await readFile(join(workspace.root, 'Drafts/one.md'), 'utf8')).not.toContain('data:')
-      expect(await readdir(join(workspace.root, 'Drafts/.images'))).toHaveLength(1)
+      expect(await readdir(join(workspace.root, 'Drafts/.media'))).toHaveLength(1)
       await expect(page.getByRole('alertdialog')).toHaveCount(0)
       await page.reload()
       await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
@@ -341,7 +341,7 @@ test.describe(
           page.locator('.ProseMirror img').evaluate((el) => (el as HTMLImageElement).naturalWidth),
         )
         .toBeGreaterThan(0)
-      await expect(page.getByRole('treeitem', { name: '.images', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
     })
 
     test('User can recover a failed formatted save through the alert dialog', async ({
@@ -1439,7 +1439,7 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
         const path = `${title} mapped.md`
         await expect(page.locator('.ProseMirror img')).toBeVisible()
         await expect(dialog).toHaveCount(0)
-        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.images/')
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.media/')
         const source = await readFile(join(workspace.root, path), 'utf8')
         expect(source).toContain('Anchor marker')
         const imageOffset = source.search(/!\[/)
@@ -1870,9 +1870,9 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
 
         // Assert
         await expect(page.locator('.ProseMirror img')).toBeVisible()
-        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.images/')
+        await expect.poll(() => readFile(join(workspace.root, path), 'utf8')).toContain('.media/')
         await expect(dialog).toHaveCount(0)
-        expect(await readdir(join(workspace.root, '.images'))).toHaveLength(1)
+        expect(await readdir(join(workspace.root, '.media'))).toHaveLength(1)
       })
     })
 
@@ -2012,8 +2012,8 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
       await page.getByRole('button', { name: 'Upload', exact: true }).last().click()
       // Assert
       await expect(page.locator('.ProseMirror img')).toBeVisible()
-      await expect.poll(() => readFile(saved, 'utf8')).toContain('.images/')
-      expect(await readdir(join(workspace.root, '.images'))).toHaveLength(1)
+      await expect.poll(() => readFile(saved, 'utf8')).toContain('.media/')
+      expect(await readdir(join(workspace.root, '.media'))).toHaveLength(1)
       // Act
       const caption = page.locator('.ProseMirror .caption-input')
       await caption.fill('An edited caption')
@@ -2038,9 +2038,8 @@ for (const initialWorkspace of ['empty', 'existing'] as const) {
             .evaluate((image) => (image as HTMLImageElement).naturalWidth),
         )
         .toBeGreaterThan(0)
-      await expect(page.getByRole('treeitem', { name: '.images', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
       // Act
-      await page.locator('.ProseMirror img').hover()
       await page.getByRole('button', { name: 'Remove image', exact: true }).click()
       // Assert
       await expect(page.locator('.ProseMirror img')).toHaveCount(0)
@@ -2127,3 +2126,103 @@ async function removeBlock(page: Page, block: Locator) {
     await page.keyboard.press('Backspace')
   }
 }
+
+test.describe(
+  'Given an article editor uploading files into .media/',
+  { tag: ['@desktop', '@editor', '@drawio'] },
+  () => {
+    const plainSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="40"><rect width="60" height="40" fill="#94a3b8"/></svg>'
+    const drawioSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" content="&lt;mxfile&gt;&lt;diagram id=&quot;1&quot;&gt;&lt;mxGraphModel/&gt;&lt;/diagram&gt;&lt;/mxfile&gt;"><rect width="120" height="60" fill="#e2e8f0"/></svg>'
+    const drawioPng = Buffer.concat([png, Buffer.from('tEXtmxfile\0<mxfile/>')])
+    const drawioXml =
+      '<mxfile host="Electron"><diagram id="d1" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="Client" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="20" y="20" width="120" height="50" as="geometry"/></mxCell></root></mxGraphModel></diagram></mxfile>'
+
+    for (const spec of [
+      {
+        label: '.png image via /image',
+        slash: 'Image',
+        dialogName: 'Insert image',
+        file: { name: 'photo.png', mimeType: 'image/png', buffer: png },
+        expectedExt: '.png',
+        expectedSelector: '.ProseMirror img',
+      },
+      {
+        label: '.svg image via /image',
+        slash: 'Image',
+        dialogName: 'Insert image',
+        file: { name: 'icon.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(plainSvg) },
+        expectedExt: '.svg',
+        expectedSelector: '.ProseMirror img',
+      },
+      {
+        label: '.drawio.svg via /drawio',
+        slash: 'Draw.io Diagram',
+        dialogName: 'Insert Draw.io diagram',
+        file: {
+          name: 'arch.drawio.svg',
+          mimeType: 'image/svg+xml',
+          buffer: Buffer.from(drawioSvg),
+        },
+        expectedExt: '.drawio.svg',
+        expectedSelector: '.ProseMirror [data-drawio-node] [data-file-viewer-image]',
+      },
+      {
+        label: '.drawio.png via /drawio',
+        slash: 'Draw.io Diagram',
+        dialogName: 'Insert Draw.io diagram',
+        file: { name: 'system.drawio.png', mimeType: 'image/png', buffer: drawioPng },
+        expectedExt: '.drawio.png',
+        expectedSelector: '.ProseMirror [data-drawio-node] [data-file-viewer-image]',
+      },
+      {
+        label: 'plain .drawio XML via /drawio',
+        slash: 'Draw.io Diagram',
+        dialogName: 'Insert Draw.io diagram',
+        file: {
+          name: 'flow.drawio',
+          mimeType: 'application/xml',
+          buffer: Buffer.from(drawioXml),
+        },
+        expectedExt: '.drawio',
+        expectedSelector: '.ProseMirror [data-drawio-node] [data-drawio-xml-viewport]',
+      },
+    ]) {
+      test(`saves ${spec.label} into .media/ and renders the embedded preview`, async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
+        await page.locator('[role="treeitem"][data-value="Drafts/one.md"]').click()
+        await edit(page, '\n')
+
+        // Act
+        await insertBlock(page, spec.slash)
+        const dialog = page.getByRole('dialog', { name: spec.dialogName })
+        await expect(dialog).toBeVisible()
+        await dialog.locator('input[type="file"]').setInputFiles(spec.file)
+        await dialog.getByRole('button', { name: 'Upload', exact: true }).last().click()
+
+        // Assert
+        await expect(page.locator(spec.expectedSelector)).toBeVisible()
+        if (spec.expectedExt === '.drawio') {
+          await expect
+            .poll(async () => {
+              const box = await page
+                .locator('.ProseMirror [data-drawio-node] [data-drawio-xml-host] svg')
+                .first()
+                .boundingBox()
+              return box ? box.width > 20 && box.height > 20 : false
+            })
+            .toBe(true)
+        }
+        await expect
+          .poll(() => readFile(join(workspace.root, 'Drafts/one.md'), 'utf8'))
+          .toContain(`.media/${spec.file.name}`)
+        expect(await readdir(join(workspace.root, 'Drafts/.media'))).toEqual([spec.file.name])
+      })
+    }
+  },
+)

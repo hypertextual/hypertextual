@@ -47,6 +47,10 @@ function portableNode(node: JSONContent): JSONContent {
     attrs.alt ??= ''
     attrs.caption ??= ''
   }
+  if (node.type === 'drawio' && attrs) {
+    attrs.alt ??= ''
+    attrs.caption ??= ''
+  }
   if (node.type === 'orderedList' && attrs) attrs.type = null
   return {
     ...node,

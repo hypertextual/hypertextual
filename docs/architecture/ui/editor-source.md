@@ -141,6 +141,7 @@ binding.destroy()
 | `@tiptap/*`, `@tiptap/pm`, `lowlight`, `marked`, `@xmldom/xmldom` | `libs/htmd-ts` | `3.31.4` / `3.3.0` / `17.0.6` / `0.9.12` |
 | `@cloudvoyant/helical-ui` | `libs/htmd-ts`, `libs/ui`, `apps/hypertextual-svelte` | `0.21.1-rc.202611031218.5085f0d` |
 | `@cloudvoyant/helical-svelte`, `@ark-ui/svelte`, `lucide-svelte` | `libs/ui`, `apps/hypertextual-svelte` | `0.21.1-rc.202611031218.5085f0d` / `5.24.3` / `0.577.0` |
+| `jgraph/drawio` `viewer-static.min.js` (Apache 2.0, SHA-256 `c294fab9bc4bccb1790709ffa00f2d237863877f4c14d90147ef08da6d3ddd3a`) | `apps/hypertextual-svelte/public/vendor/drawio/` | `dev` snapshot (2026-11-21) |
 
 `libs/ui` and `apps/hypertextual-svelte` do not depend on `@tiptap/*`, `lowlight`, or `svelte-tiptap`.
 

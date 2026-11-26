@@ -622,6 +622,10 @@ describe('Given an HtmdEditor in normal mode', () => {
 
       expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
+      expect(editor.getSubtextCursor()).toBeNull()
+      expect(editor.getSelectionState().isNodeSelection).toBe(true)
+
+      expect(target.move('down', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(editor.getSubtextCursor()?.kind).toBe('imageCaption')
       expect(editor.getSelectionState().isNodeSelection).toBe(true)
 
@@ -630,6 +634,9 @@ describe('Given an HtmdEditor in normal mode', () => {
 
       expect(target.move('up', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(editor.getSubtextCursor()?.kind).toBe('imageCaption')
+      expect(target.move('up', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
+      expect(editor.getSubtextCursor()).toBeNull()
+      expect(editor.getSelectionState().isNodeSelection).toBe(true)
       expect(target.move('docEnd', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       expect(target.move('docStart', { preset: 'helix', mode: 'normal', count: 1 })).toBe(true)
       editor.destroy()
@@ -912,6 +919,25 @@ describe('Given an extension defined with defineHtmdExtension', () => {
       expect(Object.keys(keymap)).toContain('Tab')
       expect(Object.keys(keymap)).toContain('Mod-Shift-n')
       expect(Object.keys(keymap)).toContain('Mod-Alt-n')
+    })
+
+    it('resolves drawio asset sources in HtmdDocument and exposes drawio viewport shortcuts', () => {
+      // Arrange
+      const source = '# Title\n\n![Arch](.media/arch.drawio.svg "System overview")'
+      const doc = HtmdEditor.deserialize(source)
+
+      // Act
+      expect(doc.imageSources).toEqual(['.media/arch.drawio.svg'])
+      doc.displayImages((path) => `blob:test-${path}`)
+      const displayed = doc.content!.content!.find((n) => n.type === 'drawio')
+      const portable = doc.transformImages(doc.content!, (url) => url.replace(/^blob:test-/, ''))
+
+      // Assert
+      expect(displayed?.attrs?.src).toBe('blob:test-.media/arch.drawio.svg')
+      expect(displayed?.attrs?.caption).toBe('System overview')
+      expect(portable.content!.find((n) => n.type === 'drawio')?.attrs?.src).toBe(
+        '.media/arch.drawio.svg',
+      )
     })
   })
 })

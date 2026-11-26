@@ -7,6 +7,7 @@ export default mergeConfig(
   appConfig,
   defineConfig({
     root: fileURLToPath(new URL('../..', import.meta.url)),
+    publicDir: 'apps/hypertextual-svelte/public',
     build: {
       outDir: 'e2e/hypertextual-desktop/dist-e2e',
       rolldownOptions: { input: 'e2e/hypertextual-desktop/fixture.html' },

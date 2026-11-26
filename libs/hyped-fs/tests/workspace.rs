@@ -56,19 +56,21 @@ mod tests {
             }
 
             #[test]
-            fn it_hides_image_directories_and_atomic_save_files() {
+            fn it_excludes_atomic_save_files_while_returning_dotfiles_for_ui_filtering() {
                 // Given
                 let fixture = WorkspaceFixture::new();
+                fixture.write_file(".media/diagram.drawio.svg", "<svg/>");
                 fixture.write_file(".images/photo.png", "image");
                 fixture.write_file(".hypertextual-save-pending", "draft");
+                fixture.write_file(".hyped-fs-save-pending", "draft");
                 fixture.write_file("visible.md", "# Visible");
 
                 // When
                 let entries = fixture.workspace.list("").unwrap();
+                let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
 
                 // Then
-                assert_eq!(entries.len(), 1);
-                assert_eq!(entries[0].path, "visible.md");
+                assert_eq!(paths, vec![".images", ".media", "visible.md"]);
             }
         }
     }
@@ -343,6 +345,31 @@ mod tests {
 
             // Then
             assert_eq!(result.unwrap_err().code, "unsupported");
+        }
+
+        #[test]
+        fn it_resolves_drawio_compound_extensions_before_os_default() {
+            // Given / When / Then
+            for path in [
+                "diagrams/arch.drawio.svg",
+                "diagrams/arch.drawio.png",
+                "diagrams/arch.DRAWIO.SVG",
+                "flow.drawio",
+                ".media/abc123.drawio.svg",
+            ] {
+                assert_eq!(
+                    hyped_fs::WorkspaceService::preferred_app_for_path(path),
+                    Some("draw.io"),
+                    "{path}"
+                );
+            }
+            for path in ["photo.png", "icon.svg", "report.pdf", "notes.md", ".drawio"] {
+                assert_eq!(
+                    hyped_fs::WorkspaceService::preferred_app_for_path(path),
+                    None,
+                    "{path}"
+                );
+            }
         }
     }
 

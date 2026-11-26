@@ -1,6 +1,6 @@
 <script lang="ts">
   import { useOptionalPaneRegistration } from '@cloudvoyant/helical-svelte'
-  import { HtmdEditor } from '@hypertextual/ui'
+  import { FileViewer, HtmdEditor } from '@hypertextual/ui'
   import type { WorkspaceService } from '../services/workspaceService.svelte'
   import ContentFallback from './ContentFallback.svelte'
 
@@ -24,6 +24,14 @@
 
   // Derived -------------------------------------------------------------------
   const editor = $derived(workspace.editor)
+
+  // Lifecycle -----------------------------------------------------------------
+  $effect(() => {
+    if (typeof window === 'undefined') return
+    const onFocus = () => editor.handleWindowFocus()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  })
 </script>
 
 <main
@@ -33,7 +41,18 @@
   class="document-pane"
   aria-label="Article"
 >
-  {#if !editor.loading && !editor.openingError && !editor.unsupported && !editor.image && editor.document?.content && editor.selected}
+  {#if !editor.loading && !editor.openingError && !editor.unsupported && editor.filePreview && editor.selected}
+    {#key editor.filePreview.path}
+      <FileViewer
+        standalone
+        kind={editor.filePreview.kind}
+        title={editor.filePreview.title}
+        src={editor.filePreview.src}
+        xml={editor.filePreview.xml}
+        onopenexternal={() => void editor.openInDefaultApp()}
+      />
+    {/key}
+  {:else if !editor.loading && !editor.openingError && !editor.unsupported && editor.document?.content && editor.selected}
     {#key editor.version}
       <HtmdEditor
         document={editor.document.content}

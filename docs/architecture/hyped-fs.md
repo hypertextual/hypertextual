@@ -79,13 +79,13 @@ The existing article service performs this sequence inside `hyped-fs`. The deskt
 | `ArticleService`   | `new`, `create`, `create_file`, `read`, `write`, and `save`             |
 | `MediaService`     | `new`, `import`, and `read`                                             |
 
-`Workspace`, `WorkspaceListing`, `WorkspaceNode`, `ArticleContent`, `ArticleMetadata`, and `ImageAsset` live in the crate. `WorkspaceError` and `Result` preserve the existing transport payloads without depending on Tauri. Model methods remain limited to factories, validation, mapping, and derived values. Services perform filesystem access.
+`Workspace`, `WorkspaceListing`, `WorkspaceNode`, `ArticleContent`, `ArticleMetadata`, and `FileAsset` live in the crate. `WorkspaceError` and `Result` preserve the existing transport payloads without depending on Tauri. Model methods remain limited to factories, validation, mapping, and derived values. Services perform filesystem access.
 
 Article reads return `ArticleContent { content, revision }`. The revision is a SHA-256 hash of the file bytes. Writes require the expected revision. Saves also receive an app-derived title and return `ArticleMetadata { path, name, revision }` after filename selection.
 
-Image operations return `ImageAsset { source, url }`. The source is a portable relative reference. The URL is a data URL for display. The app media service can replace it with a Blob URL, an object URL for image bytes held in memory. Remote HTTP image loading belongs to that app service.
+Media operations return `FileAsset { source, url }`. The source is a portable relative reference. The URL is a data URL for display. The app media service can replace it with a Blob URL, an object URL for asset bytes held in memory. Remote HTTP image loading belongs to that app service.
 
-Articles use `.md` or `.htmd`, contain UTF-8 text, and exclude null bytes. Articles and images each have a 16 MiB limit. Images use PNG, JPEG, GIF, or WebP headers. Imported files use content hashes under the article's adjacent `.images` directory. `WorkspaceError { code, message }` describes containment, validation, revision, permission, and I/O failures.
+Articles use `.md` or `.htmd`, contain UTF-8 text, and exclude null bytes. Articles and file assets each have a 16 MiB limit. Supported file assets include PNG, JPEG, GIF, WebP, SVG (including `.drawio.svg`), `.drawio.png`, and Draw.io XML (`.drawio`). Imported files use content hashes under the article's adjacent `.media` directory (legacy `.images` paths remain readable). `WorkspaceError { code, message }` describes containment, validation, revision, permission, and I/O failures.
 
 ## Implementation
 

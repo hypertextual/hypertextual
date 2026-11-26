@@ -43,11 +43,13 @@ export class WorkspaceService {
     this.editor = new EditorService(client, {
       titleChanged: (path, title) => this.updateTitle(path, title),
       saved: (path, saved, title) => this.saved(path, saved, title),
+      mediaImported: (articlePath) => this.handleMediaImported(articlePath),
     })
     this.hotkeys = new HotkeyService(this)
     this.editorServices = {
       media: this.editor.mediaService,
       embedRegistry: new DefaultEmbeddedEditorRegistry(),
+      openExternal: (source) => this.openExternalAsset(source),
     }
   }
 
@@ -73,17 +75,56 @@ export class WorkspaceService {
     ]
   }
   get nodes() {
+    const visible = this.settings.showHiddenFiles
+      ? this.entries
+      : this.entries.filter((entry) => !entry.name.startsWith('.'))
     return [
       ...(this.pendingEntry && !this.pendingParent
         ? [new WorkspaceNodeViewModel(this.pendingEntry).toTreeNode()]
         : []),
-      ...this.entries.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode()),
+      ...visible.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode()),
     ]
   }
   get pendingNode() {
     return this.pendingEntry
       ? new WorkspaceNodeViewModel(this.pendingEntry).toTreeNode()
       : undefined
+  }
+
+  toggleShowHiddenFiles(): boolean {
+    const next = this.settings.toggleShowHiddenFiles()
+    this.treeVersion++
+    void this.refreshRoot()
+    return next
+  }
+
+  private async refreshRoot() {
+    try {
+      const items = await this.client.list('')
+      if (!this.active) return
+      this.entries = items
+      this.treeVersion++
+    } catch {
+      // Keep current sidebar entries if background refresh fails.
+    }
+  }
+
+  private handleMediaImported(articlePath: string) {
+    const parent = articlePath.includes('/')
+      ? articlePath.slice(0, articlePath.lastIndexOf('/'))
+      : ''
+    if (!parent) void this.refreshRoot()
+    else this.refresh(parent)
+  }
+
+  async openExternalAsset(source: string) {
+    if (!source || /^https?:|^data:|^blob:/i.test(source)) return
+    const articlePath = this.editor.selected?.path ?? ''
+    const parent = articlePath.includes('/')
+      ? articlePath.slice(0, articlePath.lastIndexOf('/'))
+      : ''
+    const relative = parent ? `${parent}/${source}` : source
+    await this.client.openDefaultApp(relative)
   }
 
   async open() {
@@ -107,8 +148,11 @@ export class WorkspaceService {
     const items = await this.client.list(node.value)
     if (!this.active) return []
     for (const entry of items) this.listed[entry.path] = entry
-    await this.loadTitles(items)
-    return items.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode())
+    const visible = this.settings.showHiddenFiles
+      ? items
+      : items.filter((entry) => !entry.name.startsWith('.'))
+    await this.loadTitles(visible)
+    return visible.map((entry) => new WorkspaceNodeViewModel(entry).toTreeNode())
   }
 
   async select(path: string) {

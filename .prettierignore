@@ -27,3 +27,6 @@ RELEASE_NOTES.md
 
 # Exact Markdown parser vectors contain format-significant directive boundaries.
 libs/htmd-ts/fixtures/*.md
+
+# Vendored third-party static scripts (minified upstream assets).
+**/public/vendor/

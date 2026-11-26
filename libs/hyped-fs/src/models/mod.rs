@@ -1,7 +1,7 @@
 mod article;
-mod image_asset;
+mod file_asset;
 mod workspace;
 
 pub use article::{ArticleContent, ArticleMetadata};
-pub use image_asset::ImageAsset;
+pub use file_asset::FileAsset;
 pub use workspace::{Workspace, WorkspaceListing, WorkspaceNode};

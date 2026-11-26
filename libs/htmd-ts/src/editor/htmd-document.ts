@@ -75,7 +75,7 @@ export class HtmdDocument implements EditorDocument<JSONContent> {
     })
     const cloned = walk(document)
     const visit = (node: JSONContent) => {
-      if (node.type === 'imageNode' && node.attrs?.src) {
+      if ((node.type === 'imageNode' || node.type === 'drawio') && node.attrs?.src) {
         node.attrs.src = transform(String(node.attrs.src))
       }
       node.content?.forEach(visit)

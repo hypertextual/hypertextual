@@ -30,8 +30,6 @@
       >Open In Default App</Button
     >
   </div>
-{:else if editor.image && editor.selected}
-  <div class="image-preview"><img src={editor.image} alt={editor.selected.name} /></div>
 {:else if editor.document && editor.selected}
   <Scroll class="min-h-0 flex-1" contentClass="source-preview p-6">
     <p class="readonly-notice mb-5 text-xs text-muted-foreground">{editor.document.reason}</p>
