@@ -25,6 +25,11 @@
   function handleModeChange(mode: ThemeMode): void {
     themeService.setThemeMode(mode)
   }
+
+  function handleWorkspaceChange(details: { value: string[] }): void {
+    const next = details.value[0]
+    if (next) void workspace.switchWorkspace(next)
+  }
 </script>
 
 <header class="titlebar" data-tauri-drag-region>
@@ -32,7 +37,12 @@
     ><PanelLeft size={14} strokeWidth={1.5} /></SidebarTrigger
   >
   <div class="workspace-chooser">
-    <Select items={workspace.items} value={[workspace.root]} size="sm">
+    <Select
+      items={workspace.items}
+      value={[workspace.activeWorkspaceName]}
+      onValueChange={handleWorkspaceChange}
+      size="sm"
+    >
       <SelectTrigger aria-label="Workspace selector" title={workspace.root} size="sm"
         ><SelectValue /><SelectIndicator
           ><ChevronDown size={12} strokeWidth={1.5} /></SelectIndicator

@@ -73,13 +73,14 @@ The existing article service performs this sequence inside `hyped-fs`. The deskt
 
 `WorkspaceService::from_home(home)` selects the default Hypertextual workspace. Operation paths remain relative to that workspace, and serialized entry paths use forward slashes. The desktop supplies the operating-system home directory through Tauri.
 
-| Public service     | Responsibilities                                                        |
-| ------------------ | ----------------------------------------------------------------------- |
-| `WorkspaceService` | `from_home`, `open`, `list`, `create_folder_in`, `rename`, and `delete` |
-| `ArticleService`   | `new`, `create`, `create_file`, `read`, `write`, and `save`             |
-| `MediaService`     | `new`, `import`, and `read`                                             |
+| Public service      | Responsibilities                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkspaceRegistry` | `from_home`, `list`, `active`, `open_folder`, `create_folder_workspace`, `switch`, `rename`, `relocate`, `remove`, `read_ui_state`, `patch_ui_state` |
+| `WorkspaceService`  | `from_home`, `from_root`, `open`, `list`, `create_folder_in`, `rename`, and `delete`                                            |
+| `ArticleService`    | `new`, `create`, `create_file`, `read`, `write`, and `save`                                                                     |
+| `MediaService`      | `new`, `import`, and `read`                                                                                                     |
 
-`Workspace`, `WorkspaceListing`, `WorkspaceNode`, `ArticleContent`, `ArticleMetadata`, and `FileAsset` live in the crate. `WorkspaceError` and `Result` preserve the existing transport payloads without depending on Tauri. Model methods remain limited to factories, validation, mapping, and derived values. Services perform filesystem access.
+`Workspace`, `WorkspaceBacking` (`Local`, `Synced`, `Remote`), `WorkspaceSyncState`, `WorkspaceRecord`, `WorkspaceRegistrySnapshot`, `WorkspaceUiState`, `WorkspaceStatePatch`, `WorkspaceListing`, `WorkspaceNode`, `ArticleContent`, `ArticleMetadata`, and `FileAsset` live in the crate. `WorkspaceRegistry` stores tracked workspaces in `~/.hypertextual/workspaces.json` (keyed by unique human-readable `name`) and per-workspace UI state in `~/.hypertextual/workspaces/<name>/state.json` without writing marker files into workspace folders. `WorkspaceService::list` excludes `.git`, `.DS_Store`, and atomic-save temporary files. `WorkspaceError` and `Result` preserve the existing transport payloads without depending on Tauri. Model methods remain limited to factories, validation, mapping, and derived values. Services perform filesystem access.
 
 Article reads return `ArticleContent { content, revision }`. The revision is a SHA-256 hash of the file bytes. Writes require the expected revision. Saves also receive an app-derived title and return `ArticleMetadata { path, name, revision }` after filename selection.
 

@@ -29,6 +29,7 @@
   import ContentPane from './ContentPane.svelte'
   import StatusBar from './StatusBar.svelte'
   import DraftRecoveryDialog from './DraftRecoveryDialog.svelte'
+  import AddWorkspaceDialog from './AddWorkspaceDialog.svelte'
   import type { WorkspaceClient } from '../clients/workspaceClient'
 
   // Props ---------------------------------------------------------------------
@@ -104,7 +105,7 @@
   }
 
   function handleSidebarOpenChange(next: boolean): void {
-    workspace.sidebarOpen = next
+    workspace.setSidebarOpen(next)
   }
 
   function handleCommandStyleChange(next: CommandStyle): void {
@@ -219,3 +220,5 @@
   ondiscard={() => void editor.reload()}
   onretry={editor.codecError ? undefined : () => void editor.retry()}
 />
+
+<AddWorkspaceDialog {workspace} />

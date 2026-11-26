@@ -13,6 +13,8 @@ use crate::{
 pub struct WorkspaceService {
     /// The workspace location shared by file operations.
     workspace: Workspace,
+    /// Whether `root()` may automatically create a missing directory (true only for default bootstrap).
+    auto_create: bool,
 }
 
 impl WorkspaceService {
@@ -20,11 +22,27 @@ impl WorkspaceService {
     pub fn from_home(home: PathBuf) -> Self {
         Self {
             workspace: Workspace::from_home(home),
+            auto_create: true,
+        }
+    }
+
+    /// Selects an existing workspace rooted at an arbitrary directory without auto-creating it.
+    pub fn from_root(root: PathBuf) -> Self {
+        Self {
+            workspace: Workspace::from_root(root),
+            auto_create: false,
         }
     }
 
     pub(super) fn root(&self) -> Result<PathBuf> {
-        fs::create_dir_all(&self.workspace.root)?;
+        if self.auto_create {
+            fs::create_dir_all(&self.workspace.root)?;
+        } else if !self.workspace.root.is_dir() {
+            return Err(error(
+                "missingWorkspace",
+                "Workspace folder could not be found on disk.",
+            ));
+        }
         Ok(self.workspace.root.canonicalize()?)
     }
 
@@ -64,13 +82,19 @@ impl WorkspaceService {
         let root = self.root()?;
         let mut entries = Vec::new();
         for entry in fs::read_dir(directory)? {
-            let entry = entry?;
+            let Ok(entry) = entry else {
+                continue;
+            };
             let name = entry
                 .file_name()
                 .into_string()
                 .map_err(|_| error("invalidName", "A workspace filename is not valid Unicode."))?;
-            // Atomic-save temporary files are never workspace entries.
-            if name.starts_with(".hypertextual-save-") || name.starts_with(".hyped-fs-save-") {
+            // Atomic-save temporary files and VCS/OS metadata are never workspace entries.
+            if name.starts_with(".hypertextual-save-")
+                || name.starts_with(".hyped-fs-save-")
+                || name == ".git"
+                || name == ".DS_Store"
+            {
                 continue;
             }
             let path = if relative.is_empty() {
@@ -78,10 +102,16 @@ impl WorkspaceService {
             } else {
                 format!("{relative}/{name}")
             };
-            let canonical = entry.path().canonicalize();
-            let kind = match canonical {
-                Ok(p) if p.starts_with(&root) && p.is_dir() => "directory",
-                Ok(p) if p.starts_with(&root) && p.is_file() => "file",
+            // Avoid unnecessary canonicalize() calls on non-symlinks (prevents FileProvider
+            // hydration/deadlocks on macOS cloud-synced directories).
+            let kind = match entry.file_type() {
+                Ok(ft) if ft.is_symlink() => match entry.path().canonicalize() {
+                    Ok(p) if p.starts_with(&root) && p.is_dir() => "directory",
+                    Ok(p) if p.starts_with(&root) && p.is_file() => "file",
+                    _ => "unavailable",
+                },
+                Ok(ft) if ft.is_dir() => "directory",
+                Ok(ft) if ft.is_file() => "file",
                 _ => "unavailable",
             };
             entries.push(WorkspaceNode { path, name, kind });

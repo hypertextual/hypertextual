@@ -15,12 +15,16 @@
     if (value === workspace.renamingPath) workspace.renamingPath = null
   }
 
-  function handleSelect(path: string): void {
-    if (workspace.editor.selected?.path === path) {
+  function handleSelect(path: string, options?: { newTab?: boolean }): void {
+    if (!options?.newTab && workspace.editor.selected?.path === path) {
       workspace.hotkeys.focusArticlePane()
       return
     }
-    void workspace.select(path)
+    void workspace.select(path, options)
+  }
+
+  function handleExpandedChange(values: string[]): void {
+    workspace.setExpandedFolders(values)
   }
 </script>
 
@@ -38,6 +42,8 @@
   getLabel={(node) => workspace.titles[node.value] ?? node.label}
   selected={workspace.editor.selected?.path ?? null}
   onselect={handleSelect}
+  expandedValues={workspace.expandedFolders}
+  onExpandedChange={handleExpandedChange}
   loadChildren={(node) => workspace.loadChildren(node)}
 >
   {#snippet icon(node, expanded)}

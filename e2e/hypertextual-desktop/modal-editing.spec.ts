@@ -17,7 +17,11 @@ async function openMermaidArticle(
 ) {
   await writeFile(join(workspace.root, mermaidPath), mermaidSource)
   await page.reload()
-  await page.getByRole('treeitem', { name: 'Drafts', exact: true }).click()
+  const drafts = page.getByRole('treeitem', { name: 'Drafts', exact: true })
+  await expect(drafts).toBeVisible()
+  if ((await drafts.getAttribute('aria-expanded')) !== 'true') {
+    await drafts.click()
+  }
   await page.locator(`[role="treeitem"][data-value="${mermaidPath}"]`).click()
   await expect(page.locator('.ProseMirror')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
@@ -873,6 +877,7 @@ test.describe(
           await expect(html).toHaveClass(/\btheme-catppuccin\b/)
           await expect(html).toHaveClass(/\bdark\b/)
           await expect(shell).toHaveAttribute('data-pane-outline', 'false')
+          await expect(page.locator('.ProseMirror')).toBeVisible()
           await page.keyboard.press(':')
           await expect(menu).toBeVisible()
           await expect(palette).toHaveCount(0)

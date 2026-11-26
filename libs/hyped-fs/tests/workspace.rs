@@ -4,6 +4,8 @@ mod common;
 mod article;
 #[path = "behaviors/media.rs"]
 mod media;
+#[path = "behaviors/registry.rs"]
+mod registry;
 
 mod tests {
 
