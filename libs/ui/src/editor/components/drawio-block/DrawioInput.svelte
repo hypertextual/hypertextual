@@ -3,8 +3,8 @@
   import { useKeymap } from '@cloudvoyant/helical-svelte'
   import type { ImageUploadResult } from 'htmd-ts'
   import { X } from 'lucide-svelte'
-  import ImageFileUpload from './ImageFileUpload.svelte'
-  import type { ImageInputProps } from './types'
+  import ImageFileUpload from '../ImageFileUpload.svelte'
+  import type { ImageInputProps } from '../types'
 
   // Props ---------------------------------------------------------------------
   let { editor, position, data, onClose, onUpload }: ImageInputProps = $props()
