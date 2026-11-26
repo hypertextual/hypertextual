@@ -13,6 +13,7 @@ export const fileViewerStyles = {
     },
   }),
   canvas: 'relative w-full flex-1 bg-transparent p-0',
+  drawioCanvas: 'relative aspect-[4/3] w-full flex-1 bg-transparent p-0',
   fullscreenCanvas: 'relative h-full min-h-0 w-full flex-1 bg-background p-0',
   image: 'block m-0 w-full h-auto !rounded-none select-none',
   fullscreenImage: 'm-0 h-full w-full !rounded-none select-none object-contain',

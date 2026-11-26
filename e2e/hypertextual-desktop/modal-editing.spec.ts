@@ -1342,95 +1342,196 @@ test.describe(
       await expect(page.getByRole('region', { name: 'Article content' })).toBeFocused()
     })
 
-    test('supports normal-mode pan/zoom, fullscreen, insert-mode centered CTA, caption editing, Replace, and Remove', async ({
-      page,
-      workspace,
-    }) => {
-      const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
-      const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
-
-      // Navigate onto the drawio preview in normal mode (j from title -> intro -> drawio preview)
-      await page.keyboard.press('j')
-      await page.keyboard.press('j')
-      await expect(drawioNode.locator('[data-drawio-caption-text]')).toHaveText('System overview')
-      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
-      await captureScreenshot(page, test.info(), 'drawio-block-normal')
-
-      // Second j moves modal cursor onto the caption; k returns to the preview
-      await page.keyboard.press('j')
-      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(1)
-      await page.keyboard.press('k')
-      await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
-
-      // Pan/zoom and fullscreen in normal mode
-      await page.keyboard.press('+')
-      await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1.25')
-      await page.keyboard.press('0')
-      await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1')
-      await page.keyboard.press('f')
-      await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'true')
-      await page.keyboard.press('Escape')
-      await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'false')
-
-      // Enter insert mode -> centered uniform Replace / Open / Remove controls + caption
-      await page.keyboard.press('i')
-      await expect(badge).toHaveText('helix · insert')
-      const replaceBtn = drawioNode.getByRole('button', { name: 'Replace diagram', exact: true })
-      const openBtn = drawioNode.locator('[data-drawio-cta]')
-      await expect(replaceBtn).toBeFocused()
-      await expect(openBtn).toBeVisible()
-      await expect(drawioNode.locator('[data-file-viewer-fullscreen]')).toBeVisible()
-      await captureScreenshot(page, test.info(), 'drawio-block-insert-cta')
-
-      // Tab cycles Replace -> Open -> Remove -> caption input
-      await page.keyboard.press('Tab')
-      await expect(openBtn).toBeFocused()
-
-      // Pressing Enter on focused Open button invokes openExternal
-      await page.keyboard.press('Enter')
-      expect(workspace.openedExternal).toContain('Drafts/.media/arch.drawio.svg')
-
-      await page.keyboard.press('Tab')
-      await expect(
-        drawioNode.getByRole('button', { name: 'Remove diagram', exact: true }),
-      ).toBeFocused()
-      await page.keyboard.press('Tab')
-      const captionInput = drawioNode.getByRole('textbox', {
-        name: 'Diagram caption',
-        exact: true,
+    test.describe('When in normal mode', () => {
+      test.beforeEach(async ({ page }) => {
+        // Navigate from title -> intro -> drawio preview
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
       })
-      await expect(captionInput).toBeFocused()
-      await captionInput.fill('Updated architecture')
-      await expect
-        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
-        .toContain('"Updated architecture"')
 
-      // Replace re-uploads a new .drawio.svg asset in place
-      await drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }).click()
-      const replaceDialog = page.getByRole('dialog', { name: 'Replace Draw.io diagram' })
-      await expect(replaceDialog).toBeVisible()
-      await replaceDialog.locator('input[type="file"]').setInputFiles({
-        name: 'replaced.drawio.svg',
-        mimeType: 'image/svg+xml',
-        buffer: Buffer.from(drawioSvgUpdated),
+      test('it focuses the preview first and moves to the caption on a second j', async ({
+        page,
+      }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Assert preview focused without caption cursor
+        await expect(drawioNode.locator('[data-drawio-caption-text]')).toHaveText('System overview')
+        await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
+        await captureScreenshot(page, test.info(), 'drawio-block-normal')
+
+        // Act: second j moves cursor onto caption; k returns to preview
+        await page.keyboard.press('j')
+        await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(1)
+        await page.keyboard.press('k')
+        await expect(drawioNode.locator('[data-pm-modal-cursor]')).toHaveCount(0)
       })
-      await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click()
-      await expect(replaceDialog).toHaveCount(0)
-      await expect
-        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
-        .not.toContain('.media/arch.drawio.svg')
 
-      // Escape exits to normal mode and hides centered CTA
-      await page.keyboard.press('Escape')
-      await expect(badge).toHaveText('helix · normal')
-      await expect(drawioNode.locator('[data-drawio-cta]')).toHaveCount(0)
+      test('it pans, zooms, and resets the viewport', async ({ page }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
 
-      // Deleting the selected block in normal mode with d persists across reload
-      await page.keyboard.press('d')
-      await expect(page.locator('.ProseMirror [data-drawio-node]')).toHaveCount(0)
-      await expect
-        .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
-        .not.toContain('![Arch]')
+        // Act
+        await page.keyboard.press('+')
+        await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1.25')
+        await page.keyboard.press('0')
+
+        // Assert
+        await expect(drawioNode).toHaveAttribute('data-drawio-scale', '1')
+      })
+
+      test('it toggles fullscreen with f and exits with Escape', async ({ page }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Act & Assert
+        await page.keyboard.press('f')
+        await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'true')
+        await page.keyboard.press('Escape')
+        await expect(drawioNode).toHaveAttribute('data-drawio-fullscreen', 'false')
+      })
+
+      test('it deletes the selected block with d and persists on disk', async ({
+        page,
+        workspace,
+      }) => {
+        // Act
+        await page.keyboard.press('d')
+
+        // Assert
+        await expect(page.locator('.ProseMirror [data-drawio-node]')).toHaveCount(0)
+        await expect
+          .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+          .not.toContain('![Arch]')
+      })
+    })
+
+    test.describe('When in select mode', () => {
+      test('it extends selection across the drawio block without trapping focus', async ({
+        page,
+      }) => {
+        // Arrange
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+        await page.keyboard.press('j')
+
+        // Act: enter select mode on intro and extend across drawio block to outro
+        await page.keyboard.press('v')
+        await expect(badge).toHaveText('helix · select')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await page.keyboard.press('Escape')
+
+        // Assert
+        await expect(badge).toHaveText('helix · normal')
+      })
+    })
+
+    test.describe('When in insert mode', () => {
+      test.beforeEach(async ({ page }) => {
+        await page.keyboard.press('j')
+        await page.keyboard.press('j')
+        await page.keyboard.press('i')
+        await expect(
+          page.locator('.document-status').getByTestId('which-key-mode-badge'),
+        ).toHaveText('helix · insert')
+      })
+
+      test('it focuses Replace and renders uniform Replace, Open, Remove, and fullscreen controls', async ({
+        page,
+      }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Assert
+        await expect(
+          drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }),
+        ).toBeFocused()
+        await expect(drawioNode.locator('[data-drawio-cta]')).toBeVisible()
+        await expect(
+          drawioNode.getByRole('button', { name: 'Remove diagram', exact: true }),
+        ).toBeVisible()
+        await expect(drawioNode.locator('[data-file-viewer-fullscreen]')).toBeVisible()
+        await captureScreenshot(page, test.info(), 'drawio-block-insert-cta')
+      })
+
+      test('it opens the diagram externally via Tab and Enter on Open', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Act
+        await page.keyboard.press('Tab')
+        await expect(drawioNode.locator('[data-drawio-cta]')).toBeFocused()
+        await page.keyboard.press('Enter')
+
+        // Assert
+        expect(workspace.openedExternal).toContain('Drafts/.media/arch.drawio.svg')
+      })
+
+      test('it cycles to the caption input and persists caption edits', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Act: Replace -> Open -> Remove -> Caption
+        await page.keyboard.press('Tab')
+        await page.keyboard.press('Tab')
+        await expect(
+          drawioNode.getByRole('button', { name: 'Remove diagram', exact: true }),
+        ).toBeFocused()
+        await page.keyboard.press('Tab')
+        const captionInput = drawioNode.getByRole('textbox', {
+          name: 'Diagram caption',
+          exact: true,
+        })
+        await expect(captionInput).toBeFocused()
+        await captionInput.fill('Updated architecture')
+
+        // Assert
+        await expect
+          .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+          .toContain('"Updated architecture"')
+      })
+
+      test('it replaces the diagram asset in place', async ({ page, workspace }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+
+        // Act
+        await drawioNode.getByRole('button', { name: 'Replace diagram', exact: true }).click()
+        const replaceDialog = page.getByRole('dialog', { name: 'Replace Draw.io diagram' })
+        await expect(replaceDialog).toBeVisible()
+        await replaceDialog.locator('input[type="file"]').setInputFiles({
+          name: 'replaced.drawio.svg',
+          mimeType: 'image/svg+xml',
+          buffer: Buffer.from(drawioSvgUpdated),
+        })
+        await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click()
+
+        // Assert
+        await expect(replaceDialog).toHaveCount(0)
+        await expect
+          .poll(() => readFile(join(workspace.root, drawioArticlePath), 'utf8'))
+          .not.toContain('.media/arch.drawio.svg')
+      })
+
+      test('it returns to normal mode on Escape and hides insert controls', async ({ page }) => {
+        // Arrange
+        const drawioNode = page.locator('.ProseMirror [data-drawio-node]')
+        const badge = page.locator('.document-status').getByTestId('which-key-mode-badge')
+
+        // Act
+        await page.keyboard.press('Escape')
+
+        // Assert
+        await expect(badge).toHaveText('helix · normal')
+        await expect(drawioNode.locator('[data-drawio-cta]')).toHaveCount(0)
+      })
     })
   },
 )

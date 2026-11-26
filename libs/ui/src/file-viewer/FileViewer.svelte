@@ -162,7 +162,9 @@
         {onviewportchange}
         {onfocus}
         onkeydown={handleStandaloneKeyDown}
-        class={fullscreen || standalone ? fileViewerStyles.fullscreenCanvas : fileViewerStyles.canvas}
+        class={fullscreen || standalone
+          ? fileViewerStyles.fullscreenCanvas
+          : fileViewerStyles.drawioCanvas}
       />
     {:else}
       <ImageRenderer
@@ -180,7 +182,11 @@
         {onviewportchange}
         {onfocus}
         onkeydown={handleStandaloneKeyDown}
-        class={fullscreen || standalone ? fileViewerStyles.fullscreenCanvas : fileViewerStyles.canvas}
+        class={fullscreen || standalone
+          ? fileViewerStyles.fullscreenCanvas
+          : isDrawio
+            ? fileViewerStyles.drawioCanvas
+            : fileViewerStyles.canvas}
       />
     {/if}
 

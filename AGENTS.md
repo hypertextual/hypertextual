@@ -102,6 +102,7 @@ let { ... }: ComponentProps = $props()
 - Cover all modal editing modes in BDD suites for all editor blocks.
 - Structure BDD `Given` / `When` / `it` clauses as a logical hierarchy that reflects the component or application behavior tree, narrowing down paths so branch coverage is clear.
 - [Proposed] Keep each BDD leaf test focused on a single behavior or transition and hoist shared setup into the enclosing `Given` scope (`beforeEach` / `beforeAll`).
+- [Proposed] Split modal-editing BDD suites into separate mode-scoped `describe` blocks (`normal`, `select`, `insert`) rather than combining modes into one large test.
 - Colocate TypeScript unit and integration tests beside their source as `*.test.ts`.
 - Prefer Playwright E2E tests with real DOM, persistence checks, and env-gated screenshot outputs (`E2E_SCREENSHOTS=1` into gitignored `test-results/`) over hand-rolled `window`/`document`/`localStorage` mocks in service tests; never check E2E screenshots into git.
 - Do not duplicate upstream `@cloudvoyant/helical-ui` component behavior tests in Hypertextual E2E suites; focus on testing custom additions and fragile integrations (such as custom editor behaviors, persistence, and side effects).

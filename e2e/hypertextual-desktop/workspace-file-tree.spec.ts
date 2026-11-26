@@ -588,62 +588,90 @@ test.describe(
       await expect(page.getByRole('treeitem', { name: '.media', exact: true })).toHaveCount(0)
     })
 
-    test('renders full-pane FileViewer for .drawio.svg, .drawio.png, .drawio, and standalone .png with external open and refresh', async ({
-      page,
-      workspace,
-    }) => {
-      // Arrange: expand diagrams/
-      await page.getByRole('treeitem', { name: 'diagrams', exact: true }).click()
+    test.describe('When opening standalone files from diagrams/', () => {
+      test.beforeEach(async ({ page }) => {
+        await page.getByRole('treeitem', { name: 'diagrams', exact: true }).click()
+      })
 
-      // Act & Assert: .drawio.svg (pure full-pane canvas with no top bar)
-      await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
-      const viewer = page.locator('[data-file-viewer]')
-      await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
-      await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
-      await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
-      await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
-      await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-svg')
+      test('it renders .drawio.svg full-pane without a top bar', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
 
-      // Act: open externally via WhichKey Space f o
-      await page.keyboard.press('Space')
-      await page.keyboard.press('f')
-      await page.keyboard.press('o')
-      await expect.poll(() => workspace.openedExternal).toContain('diagrams/arch.drawio.svg')
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
+        await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
+        await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-svg')
+      })
 
-      // Act: modify file on disk and refocus window -> auto-refreshes preview
-      const prevSrc = await viewer.locator('[data-file-viewer-image]').getAttribute('src')
-      await writeFile(
-        join(workspace.root, 'diagrams/arch.drawio.svg'),
-        drawioSvg.replace('Architecture', 'Updated Architecture'),
-      )
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-      await expect
-        .poll(() => viewer.locator('[data-file-viewer-image]').getAttribute('src'))
-        .not.toBe(prevSrc)
+      test('it opens externally via Space f o and auto-refreshes on window focus', async ({
+        page,
+        workspace,
+      }) => {
+        // Arrange
+        await page.locator('[role="treeitem"][data-value="diagrams/arch.drawio.svg"]').click()
+        const viewer = page.locator('[data-file-viewer]')
+        const prevSrc = await viewer.locator('[data-file-viewer-image]').getAttribute('src')
 
-      // Act & Assert: .drawio.png
-      await page.locator('[role="treeitem"][data-value="diagrams/system.drawio.png"]').click()
-      await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
-      await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
+        // Act: open externally via WhichKey Space f o
+        await page.keyboard.press('Space')
+        await page.keyboard.press('f')
+        await page.keyboard.press('o')
+        await expect.poll(() => workspace.openedExternal).toContain('diagrams/arch.drawio.svg')
 
-      // Act & Assert: plain .drawio XML actually renders non-zero SVG via viewer-static.min.js
-      await page.locator('[role="treeitem"][data-value="diagrams/flow.drawio"]').click()
-      await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-xml')
-      await expect(viewer.locator('[data-drawio-xml-viewport]')).toBeVisible()
-      await expect
-        .poll(async () => {
-          const box = await viewer.locator('[data-drawio-xml-host] svg').first().boundingBox()
-          return box ? box.width > 20 && box.height > 20 : false
-        })
-        .toBe(true)
-      await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-xml')
+        // Act: modify file on disk and refocus window
+        await writeFile(
+          join(workspace.root, 'diagrams/arch.drawio.svg'),
+          drawioSvg.replace('Architecture', 'Updated Architecture'),
+        )
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')))
 
-      // Act & Assert: standalone .png image (pure full-pane canvas with no top bar)
-      await page.locator('[role="treeitem"][data-value="diagrams/photo.png"]').click()
-      await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'image')
-      await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
-      await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
-      await captureScreenshot(page, test.info(), 'file-viewer-standalone-image')
+        // Assert
+        await expect
+          .poll(() => viewer.locator('[data-file-viewer-image]').getAttribute('src'))
+          .not.toBe(prevSrc)
+      })
+
+      test('it renders .drawio.png full-pane', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/system.drawio.png"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-image')
+        await expect(viewer.locator('[data-file-viewer-image]')).toBeVisible()
+      })
+
+      test('it renders plain .drawio XML offline as a non-zero SVG', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/flow.drawio"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'drawio-xml')
+        await expect(viewer.locator('[data-drawio-xml-viewport]')).toBeVisible()
+        await expect
+          .poll(async () => {
+            const box = await viewer.locator('[data-drawio-xml-host] svg').first().boundingBox()
+            return box ? box.width > 20 && box.height > 20 : false
+          })
+          .toBe(true)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-drawio-xml')
+      })
+
+      test('it renders standalone .png images full-pane without a top bar', async ({ page }) => {
+        // Act
+        await page.locator('[role="treeitem"][data-value="diagrams/photo.png"]').click()
+
+        // Assert
+        const viewer = page.locator('[data-file-viewer]')
+        await expect(viewer).toHaveAttribute('data-file-viewer-kind', 'image')
+        await expect(viewer.locator('[data-window-inplace-header]')).toHaveCount(0)
+        await expect(viewer.locator('[data-file-viewer-fullscreen]')).toHaveCount(0)
+        await captureScreenshot(page, test.info(), 'file-viewer-standalone-image')
+      })
     })
   },
 )
