@@ -34,7 +34,8 @@ test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-t
     await page.locator('[role="treeitem"][data-value$="same.htmd"]').click()
     await expect(page.locator('.ProseMirror h1')).toHaveText('HTMD')
     expect(await draftsControl.evaluate((el) => el.getBoundingClientRect().height)).toBe(24)
-    await expect(page.getByRole('tab')).toHaveCount(0)
+    await expect(page.getByRole('tab')).toHaveCount(1)
+    await expect(page.getByRole('tab', { name: 'HTMD' })).toBeVisible()
     await expect(page.getByRole('button', { name: /^save$/i })).toHaveCount(0)
     expect(workspace.writes).toEqual([])
   })
@@ -290,9 +291,7 @@ test.describe('When opening an existing workspace', { tag: ['@desktop', '@file-t
     ).toBeVisible()
     await expect(page.locator('[data-slot="sidebar-footer"]')).toHaveCount(0)
     await page.getByRole('combobox', { name: 'Workspace selector', exact: true }).click()
-    await expect(
-      page.getByRole('option', { name: 'Add workspace… (coming soon)', exact: true }),
-    ).toHaveAttribute('data-disabled', '')
+    await expect(page.getByRole('option', { name: 'Open workspace…', exact: true })).toBeVisible()
   })
 })
 
